@@ -9,6 +9,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { useColorScheme } from '@/components/useColorScheme';
 
+import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
+import '@/global.css';
+
 const queryClient = new QueryClient();
 
 export {
@@ -52,7 +55,9 @@ function RootLayoutNav() {
   const colorScheme = useColorScheme();
 
   return (
-    <QueryClientProvider client={queryClient}>
+    
+    <GluestackUIProvider mode="dark">
+      <QueryClientProvider client={queryClient}>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -60,5 +65,7 @@ function RootLayoutNav() {
         </Stack>
       </ThemeProvider>
     </QueryClientProvider>
+    </GluestackUIProvider>
+  
   );
 }
