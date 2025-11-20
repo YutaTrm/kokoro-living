@@ -6,8 +6,6 @@ import { Text, View } from './Themed';
 import { Box } from '@/components/ui/box';
 import { VStack } from '@/components/ui/vstack';
 
-import Colors from '@/constants/Colors';
-
 export default function EditScreenInfo({ path }: { path: string }) {
   return (
     <Box>
@@ -38,7 +36,7 @@ export default function EditScreenInfo({ path }: { path: string }) {
         <ExternalLink
           className="py-4"
           href="https://docs.expo.io/get-started/create-a-new-app/#opening-the-app-on-your-phonetablet">
-          <Text className="text-center" lightColor={Colors.light.tint}>
+          <Text className="text-center text-primary-500">
             Tap here if your app doesn't automatically update after making changes
           </Text>
         </ExternalLink>

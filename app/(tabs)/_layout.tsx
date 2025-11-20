@@ -1,24 +1,33 @@
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Link, Tabs } from 'expo-router';
-import React, { useState, useEffect } from 'react';
-import { Pressable } from 'react-native';
+import { Tabs } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { useColorScheme } from 'react-native';
 
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
-import { useColorScheme } from '@/components/useColorScheme';
-import Colors from '@/constants/Colors';
 import { supabase } from '@/src/lib/supabase';
 
-// You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
-function TabBarIcon(props: {
-  name: React.ComponentProps<typeof FontAwesome>['name'];
-  color: string;
-}) {
-  return <FontAwesome size={28} style={{ marginBottom: -3 }} {...props} />;
-}
+import {
+  House,
+  Search,
+  Bell,
+  User,
+} from 'lucide-react-native';
+
+// テーマカラー定義
+const colors = {
+  light: {
+    primary: '#45a393',
+    error: '#f08080',
+  },
+  dark: {
+    primary: '#5ec4b0',
+    error: '#ff9999',
+  },
+};
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const colorScheme = useColorScheme();
+  const themeColors = colors[colorScheme === 'dark' ? 'dark' : 'light'];
 
   useEffect(() => {
     // ログイン状態を確認
@@ -37,7 +46,7 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: themeColors.primary,
         tabBarShowLabel: false,
         tabBarStyle: isLoggedIn ? undefined : { display: 'none' },
         // Disable the static render of the header on web
@@ -48,7 +57,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'ホーム',
-          tabBarIcon: ({ color }) => <TabBarIcon name="home" color={color} />,
+          tabBarIcon: ({ color }) => <House color={color} size={24} />,
           headerShown: false,
         }}
       />
@@ -56,7 +65,7 @@ export default function TabLayout() {
         name="search"
         options={{
           title: '検索',
-          tabBarIcon: ({ color }) => <TabBarIcon name="search" color={color} />,
+          tabBarIcon: ({ color }) => <Search color={color} size={24} />,
           headerShown: false,
         }}
       />
@@ -64,7 +73,7 @@ export default function TabLayout() {
         name="notifications"
         options={{
           title: '通知',
-          tabBarIcon: ({ color }) => <TabBarIcon name="bell" color={color} />,
+          tabBarIcon: ({ color }) => <Bell color={color} size={24} />,
           headerShown: false,
         }}
       />
@@ -72,7 +81,7 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: 'マイページ',
-          tabBarIcon: ({ color }) => <TabBarIcon name="user" color={color} />,
+          tabBarIcon: ({ color }) => <User color={color} size={24} />,
           headerShown: false,
         }}
       />

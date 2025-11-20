@@ -1,9 +1,22 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, useColorScheme } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 
-import { Text, View } from '@/components/Themed';
+// テーマカラー定義
+const themeColors = {
+  light: {
+    primary: '#45a393',
+    error: '#f08080',
+  },
+  dark: {
+    primary: '#5ec4b0',
+    error: '#ff9999',
+  },
+};
+
+import { Text } from '@/components/Themed';
 import {
   Avatar,
   AvatarFallbackText,
@@ -14,13 +27,13 @@ import { Button, ButtonText } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
 import { Modal, ModalBackdrop, ModalBody, ModalCloseButton, ModalContent, ModalFooter, ModalHeader } from '@/components/ui/modal';
-import { Select, SelectBackdrop, SelectContent, SelectDragIndicator, SelectDragIndicatorWrapper, SelectIcon, SelectInput, SelectItem, SelectPortal, SelectScrollView, SelectTrigger } from '@/components/ui/select';
 import { VStack } from '@/components/ui/vstack';
 import { supabase } from '@/src/lib/supabase';
 
 interface UserProfile {
   avatarUrl: string | null;
   userName: string | null;
+  accountName: string | null;
   createdAt: string | null;
 }
 
@@ -57,6 +70,8 @@ interface MasterData {
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const colorScheme = useColorScheme();
+  const colors = themeColors[colorScheme === 'dark' ? 'dark' : 'light'];
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
@@ -254,7 +269,8 @@ export default function ProfileScreen() {
 
       const userProfile: UserProfile = {
         avatarUrl: user.user_metadata?.avatar_url || null,
-        userName: userData?.display_name || user.user_metadata?.user_name || user.user_metadata?.full_name || null,
+        userName: user.user_metadata?.name || userData?.display_name || null,
+        accountName: user.user_metadata?.user_name || null,
         createdAt: userData?.created_at || user.created_at || null,
       };
 
@@ -304,7 +320,7 @@ export default function ProfileScreen() {
       <HStack className="justify-between items-center mb-3">
         <Heading size="lg">{title}</Heading>
         <Button onPress={onAdd} size="sm" variant="link" className="p-1">
-          <FontAwesome name="plus" size={20} color="#45a393" />
+          <FontAwesome name="plus" size={20} color={colors.primary} />
         </Button>
       </HStack>
       {records.map((record) => (
@@ -317,7 +333,7 @@ export default function ProfileScreen() {
               </Text>
             </VStack>
             <Button onPress={() => onDelete(record.id)} size="sm" variant="link" className="p-2">
-              <FontAwesome name="trash-o" size={18} color="#f08080" />
+              <FontAwesome name="trash-o" size={18} color={colors.error} />
             </Button>
           </HStack>
         </Box>
@@ -345,33 +361,38 @@ export default function ProfileScreen() {
   }
 
   return (
-    <ScrollView className="flex-1">
-      <VStack className="items-center py-6 px-5">
+    <ScrollView className="flex-1 mt-12">
+      <HStack className="py-6 px-5" space="md">
         {profile.avatarUrl && (
-          <Avatar size="xl" className="mb-4">
+          <Avatar size="xl">
             <AvatarFallbackText>{profile.userName || 'User'}</AvatarFallbackText>
             <AvatarImage source={{ uri: profile.avatarUrl }} />
           </Avatar>
         )}
-        {profile.userName && (
-          <Heading size="2xl" className="mb-2">{profile.userName}</Heading>
-        )}
-        {profile.createdAt && (
-          <Text className="text-sm opacity-70">
-            登録日時: {new Date(profile.createdAt).toLocaleDateString('ja-JP')}
-          </Text>
-        )}
-      </VStack>
+        <VStack className="flex-1 justify-center" space="xs">
+          {profile.userName && (
+            <Heading size="xl">{profile.userName}</Heading>
+          )}
+          {profile.accountName && (
+            <Text className="text-sm opacity-60">@{profile.accountName}</Text>
+          )}
+          {profile.createdAt && (
+            <Text className="text-xs opacity-50">
+              登録日時: {new Date(profile.createdAt).toLocaleDateString('ja-JP')}
+            </Text>
+          )}
+        </VStack>
+      </HStack>
 
-      {renderMedicalSection('診断名', diagnoses, () => setShowDiagnosisModal(true), deleteDiagnosis)}
-      {renderMedicalSection('服薬', medications, () => setShowMedicationModal(true), () => {})}
-      {renderMedicalSection('治療', treatments, () => setShowTreatmentModal(true), () => {})}
-
-      <Box className="px-5 mt-4 mb-8">
+      <Box className="px-5 mb-8">
         <Button onPress={handleLogout} action="negative" className="w-full">
           <ButtonText>ログアウト</ButtonText>
         </Button>
       </Box>
+
+      {renderMedicalSection('診断名', diagnoses, () => setShowDiagnosisModal(true), deleteDiagnosis)}
+      {renderMedicalSection('服薬', medications, () => setShowMedicationModal(true), () => {})}
+      {renderMedicalSection('治療', treatments, () => setShowTreatmentModal(true), () => {})}
 
       {/* 診断名追加モーダル */}
       <Modal isOpen={showDiagnosisModal} onClose={() => setShowDiagnosisModal(false)}>
@@ -417,54 +438,30 @@ export default function ProfileScreen() {
             </ModalCloseButton>
           </ModalHeader>
           <ModalBody>
-            <VStack space="md">
+            <VStack space="lg" className="py-4">
               {/* 開始日 */}
               <Box>
                 <Text className="text-base font-semibold mb-2 text-primary-600">開始年月</Text>
                 <HStack space="sm">
-                  <Box className="flex-1">
-                    <Select selectedValue={startYear} onValueChange={setStartYear}>
-                      <SelectTrigger>
-                        <SelectInput placeholder="年" />
-                        <SelectIcon>
-                          <FontAwesome name="chevron-down" size={16} />
-                        </SelectIcon>
-                      </SelectTrigger>
-                      <SelectPortal>
-                        <SelectBackdrop />
-                        <SelectContent className="max-h-[30%]">
-                          <SelectDragIndicatorWrapper>
-                            <SelectDragIndicator />
-                          </SelectDragIndicatorWrapper>
-                          <SelectScrollView>
-                            {years.map((year) => (
-                              <SelectItem key={year} label={`${year}年`} value={year} />
-                            ))}
-                          </SelectScrollView>
-                        </SelectContent>
-                      </SelectPortal>
-                    </Select>
+                  <Box className="flex-1 border border-outline-200 rounded-lg overflow-hidden">
+                    <Picker
+                      selectedValue={startYear}
+                      onValueChange={(value) => setStartYear(value)}
+                    >
+                      {years.map((year) => (
+                        <Picker.Item key={year} label={`${year}年`} value={year} />
+                      ))}
+                    </Picker>
                   </Box>
-                  <Box className="flex-1">
-                    <Select selectedValue={startMonth} onValueChange={setStartMonth}>
-                      <SelectTrigger>
-                        <SelectInput placeholder="月" />
-                        <SelectIcon>
-                          <FontAwesome name="chevron-down" size={16} />
-                        </SelectIcon>
-                      </SelectTrigger>
-                      <SelectPortal>
-                        <SelectBackdrop />
-                        <SelectContent className="max-h-[30%]">
-                          <SelectDragIndicatorWrapper>
-                            <SelectDragIndicator />
-                          </SelectDragIndicatorWrapper>
-                          {months.map((month) => (
-                            <SelectItem key={month} label={`${month}月`} value={month} />
-                          ))}
-                        </SelectContent>
-                      </SelectPortal>
-                    </Select>
+                  <Box className="flex-1 border border-outline-200 rounded-lg overflow-hidden">
+                    <Picker
+                      selectedValue={startMonth}
+                      onValueChange={(value) => setStartMonth(value)}
+                    >
+                      {months.map((month) => (
+                        <Picker.Item key={month} label={`${month}月`} value={month} />
+                      ))}
+                    </Picker>
                   </Box>
                 </HStack>
               </Box>
@@ -487,51 +484,27 @@ export default function ProfileScreen() {
                   )}
                 </HStack>
                 <HStack space="sm">
-                  <Box className="flex-1">
-                    <Select selectedValue={endYear} onValueChange={setEndYear}>
-                      <SelectTrigger>
-                        <SelectInput placeholder="年" />
-                        <SelectIcon>
-                          <FontAwesome name="chevron-down" size={16} />
-                        </SelectIcon>
-                      </SelectTrigger>
-                      <SelectPortal>
-                        <SelectBackdrop />
-                        <SelectContent className="max-h-[30%]">
-                          <SelectDragIndicatorWrapper>
-                            <SelectDragIndicator />
-                          </SelectDragIndicatorWrapper>
-                          <SelectScrollView>
-                            <SelectItem label="未設定" value="" />
-                            {years.map((year) => (
-                              <SelectItem key={year} label={`${year}年`} value={year} />
-                            ))}
-                          </SelectScrollView>
-                        </SelectContent>
-                      </SelectPortal>
-                    </Select>
+                  <Box className="flex-1 border border-outline-200 rounded-lg overflow-hidden">
+                    <Picker
+                      selectedValue={endYear}
+                      onValueChange={(value) => setEndYear(value)}
+                    >
+                      <Picker.Item label="未設定" value="" />
+                      {years.map((year) => (
+                        <Picker.Item key={year} label={`${year}年`} value={year} />
+                      ))}
+                    </Picker>
                   </Box>
-                  <Box className="flex-1">
-                    <Select selectedValue={endMonth} onValueChange={setEndMonth}>
-                      <SelectTrigger>
-                        <SelectInput placeholder="月" />
-                        <SelectIcon>
-                          <FontAwesome name="chevron-down" size={16} />
-                        </SelectIcon>
-                      </SelectTrigger>
-                      <SelectPortal>
-                        <SelectBackdrop />
-                        <SelectContent className="max-h-[30%]">
-                          <SelectDragIndicatorWrapper>
-                            <SelectDragIndicator />
-                          </SelectDragIndicatorWrapper>
-                          <SelectItem label="未設定" value="" />
-                          {months.map((month) => (
-                            <SelectItem key={month} label={`${month}月`} value={month} />
-                          ))}
-                        </SelectContent>
-                      </SelectPortal>
-                    </Select>
+                  <Box className="flex-1 border border-outline-200 rounded-lg overflow-hidden">
+                    <Picker
+                      selectedValue={endMonth}
+                      onValueChange={(value) => setEndMonth(value)}
+                    >
+                      <Picker.Item label="未設定" value="" />
+                      {months.map((month) => (
+                        <Picker.Item key={month} label={`${month}月`} value={month} />
+                      ))}
+                    </Picker>
                   </Box>
                 </HStack>
               </Box>

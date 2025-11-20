@@ -115,11 +115,11 @@ export default function TabOneScreen() {
       <Box className="flex-1 items-center justify-center">
         <Button
           onPress={handleXLogin}
-          className="bg-black rounded-full px-6 py-3"
+          className="bg-typography-black rounded-full px-6 py-3"
         >
           <HStack space="sm" className="items-center">
-            <XLogo width={20} height={20} color="#FFFFFF" />
-            <ButtonText className="text-white text-base font-semibold">Xアカウントで登録</ButtonText>
+            <XLogo width={20} height={20} />
+            <ButtonText className="text-typography-white text-base font-semibold">Xアカウントで登録</ButtonText>
           </HStack>
         </Button>
       </Box>
@@ -139,16 +139,16 @@ export default function TabOneScreen() {
         }
       />
       <TouchableOpacity
-        className="absolute right-5 bottom-5 w-14 h-14 rounded-full bg-primary-500 items-center justify-center shadow-lg"
+        className="absolute right-5 bottom-5 w-14 h-14 rounded-full bg-primary-500 items-center justify-center"
         style={{
-          shadowColor: '#000',
+          shadowColor: 'rgba(0,0,0,0.3)',
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.25,
           shadowRadius: 3.84,
           elevation: 5,
         }}
       >
-        <FontAwesome name="plus" size={24} color="#FFFFFF" />
+        <FontAwesome name="plus" size={24} color="white" />
       </TouchableOpacity>
     </Box>
   );
