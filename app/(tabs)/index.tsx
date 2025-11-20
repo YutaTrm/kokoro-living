@@ -1,9 +1,12 @@
-import { StyleSheet, TouchableOpacity, Alert, FlatList, ActivityIndicator } from 'react-native';
+import { Alert, FlatList, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useState, useEffect } from 'react';
 import * as WebBrowser from 'expo-web-browser';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 
 import { Text, View } from '@/components/Themed';
+import { Box } from '@/components/ui/box';
+import { Button, ButtonText } from '@/components/ui/button';
+import { HStack } from '@/components/ui/hstack';
 import XLogo from '@/components/icons/XLogo';
 import { supabase } from '@/src/lib/supabase';
 
@@ -101,93 +104,52 @@ export default function TabOneScreen() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <Box className="flex-1 items-center justify-center">
         <ActivityIndicator size="large" />
-      </View>
+      </Box>
     );
   }
 
   if (!isLoggedIn) {
     return (
-      <View style={styles.container}>
-        <TouchableOpacity style={styles.xButton} onPress={handleXLogin}>
-          <XLogo width={20} height={20} color="#FFFFFF" />
-          <Text style={styles.xButtonText}>Xアカウントで登録</Text>
-        </TouchableOpacity>
-      </View>
+      <Box className="flex-1 items-center justify-center">
+        <Button
+          onPress={handleXLogin}
+          className="bg-black rounded-full px-6 py-3"
+        >
+          <HStack space="sm" className="items-center">
+            <XLogo width={20} height={20} color="#FFFFFF" />
+            <ButtonText className="text-white text-base font-semibold">Xアカウントで登録</ButtonText>
+          </HStack>
+        </Button>
+      </Box>
     );
   }
 
   // ログイン済み: タイムライン表示
   return (
-    <View style={styles.timelineContainer}>
+    <Box className="flex-1">
       <FlatList
         data={[]}
         renderItem={() => null}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>まだ投稿がありません</Text>
-          </View>
+          <Box className="flex-1 items-center justify-center pt-24">
+            <Text className="text-base opacity-50">まだ投稿がありません</Text>
+          </Box>
         }
       />
-      <TouchableOpacity style={styles.fabButton}>
+      <TouchableOpacity
+        className="absolute right-5 bottom-5 w-14 h-14 rounded-full bg-primary-500 items-center justify-center shadow-lg"
+        style={{
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.25,
+          shadowRadius: 3.84,
+          elevation: 5,
+        }}
+      >
         <FontAwesome name="plus" size={24} color="#FFFFFF" />
       </TouchableOpacity>
-    </View>
+    </Box>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  timelineContainer: {
-    flex: 1,
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 100,
-  },
-  emptyText: {
-    fontSize: 16,
-    opacity: 0.5,
-  },
-  xButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#000000',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 24,
-    gap: 8,
-  },
-  xButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  fabButton: {
-    position: 'absolute',
-    right: 20,
-    bottom: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#45a393',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-});

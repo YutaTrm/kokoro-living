@@ -1,10 +1,21 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Image, Modal, Platform, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView } from 'react-native';
 
 import { Text, View } from '@/components/Themed';
+import {
+  Avatar,
+  AvatarFallbackText,
+  AvatarImage,
+} from '@/components/ui/avatar';
+import { Box } from '@/components/ui/box';
+import { Button, ButtonText } from '@/components/ui/button';
+import { Heading } from '@/components/ui/heading';
+import { HStack } from '@/components/ui/hstack';
+import { Modal, ModalBackdrop, ModalBody, ModalCloseButton, ModalContent, ModalFooter, ModalHeader } from '@/components/ui/modal';
+import { Select, SelectBackdrop, SelectContent, SelectDragIndicator, SelectDragIndicatorWrapper, SelectIcon, SelectInput, SelectItem, SelectPortal, SelectScrollView, SelectTrigger } from '@/components/ui/select';
+import { VStack } from '@/components/ui/vstack';
 import { supabase } from '@/src/lib/supabase';
 
 interface UserProfile {
@@ -61,13 +72,18 @@ export default function ProfileScreen() {
   const [medicationMasters, setMedicationMasters] = useState<MasterData[]>([]);
   const [treatmentMasters, setTreatmentMasters] = useState<MasterData[]>([]);
 
-  // 日付選択用のstate
+  // 日付選択用のstate（年月選択）
   const [selectedDiagnosisId, setSelectedDiagnosisId] = useState<string | null>(null);
   const [showDateModal, setShowDateModal] = useState(false);
-  const [startDate, setStartDate] = useState(new Date());
-  const [endDate, setEndDate] = useState<Date | null>(null);
-  const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
+  const [startYear, setStartYear] = useState<string>(new Date().getFullYear().toString());
+  const [startMonth, setStartMonth] = useState<string>((new Date().getMonth() + 1).toString());
+  const [endYear, setEndYear] = useState<string>('');
+  const [endMonth, setEndMonth] = useState<string>('');
+
+  // 年と月の選択肢を生成（過去80年分）
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 80 }, (_, i) => (currentYear - i).toString());
+  const months = Array.from({ length: 12 }, (_, i) => (i + 1).toString());
 
   useEffect(() => {
     loadUserProfile();
@@ -98,8 +114,12 @@ export default function ProfileScreen() {
   const selectDiagnosisForDate = (diagnosisId: string) => {
     setSelectedDiagnosisId(diagnosisId);
     setShowDiagnosisModal(false);
-    setStartDate(new Date());
-    setEndDate(null);
+    // リセット
+    const now = new Date();
+    setStartYear(now.getFullYear().toString());
+    setStartMonth((now.getMonth() + 1).toString());
+    setEndYear('');
+    setEndMonth('');
     setShowDateModal(true);
   };
 
@@ -110,11 +130,21 @@ export default function ProfileScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // YYYY-MM-01形式で保存
+      const startDate = `${startYear}-${startMonth.padStart(2, '0')}-01`;
+      const endDate = endYear && endMonth ? `${endYear}-${endMonth.padStart(2, '0')}-01` : null;
+
+      // バリデーション: 終了日が開始日より前でないかチェック
+      if (endDate && endDate < startDate) {
+        Alert.alert('エラー', '終了日は開始日以降を選択してください');
+        return;
+      }
+
       const { error } = await supabase.from('user_diagnoses').insert({
         user_id: user.id,
         diagnosis_id: selectedDiagnosisId,
-        start_date: startDate.toISOString().split('T')[0],
-        end_date: endDate ? endDate.toISOString().split('T')[0] : null,
+        start_date: startDate,
+        end_date: endDate,
       });
 
       if (error) {
@@ -162,13 +192,13 @@ export default function ProfileScreen() {
       // 服薬を取得
       const { data: medicationsData } = await supabase
         .from('user_medications')
-        .select('ingredients(name), products(name), start_date, end_date')
+        .select('id, ingredients(name), products(name), start_date, end_date')
         .eq('user_id', user.id);
 
       // 治療を取得
       const { data: treatmentsData } = await supabase
         .from('user_treatments')
-        .select('treatments(name), start_date, end_date')
+        .select('id, treatments(name), start_date, end_date')
         .eq('user_id', user.id);
 
       if (diagnosesData) {
@@ -181,7 +211,8 @@ export default function ProfileScreen() {
       }
 
       if (medicationsData) {
-        setMedications(medicationsData.map((m: MedicationData) => ({
+        setMedications(medicationsData.map((m: MedicationData & { id: string }) => ({
+          id: m.id,
           name: m.products?.name || m.ingredients?.name || '',
           startDate: m.start_date,
           endDate: m.end_date,
@@ -189,7 +220,8 @@ export default function ProfileScreen() {
       }
 
       if (treatmentsData) {
-        setTreatments(treatmentsData.map((t: TreatmentData) => ({
+        setTreatments(treatmentsData.map((t: TreatmentData & { id: string }) => ({
+          id: t.id,
           name: t.treatments?.name || '',
           startDate: t.start_date,
           endDate: t.end_date,
@@ -249,14 +281,16 @@ export default function ProfileScreen() {
     }
   };
 
-  const formatDate = (date: Date): string => {
-    return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
+  const formatYearMonth = (dateStr: string | null): string => {
+    if (!dateStr) return '現在';
+    const [year, month] = dateStr.split('-');
+    return `${year}年${parseInt(month)}月`;
   };
 
   const formatDateRange = (startDate: string | null, endDate: string | null): string => {
     if (!startDate) return '期間未設定';
-    const start = startDate;
-    const end = endDate || '現在';
+    const start = formatYearMonth(startDate);
+    const end = formatYearMonth(endDate);
     return `${start} 〜 ${end}`;
   };
 
@@ -266,413 +300,262 @@ export default function ProfileScreen() {
     onAdd: () => void,
     onDelete: (id: string) => void
   ) => (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>{title}</Text>
-        <TouchableOpacity onPress={onAdd} style={styles.addButton}>
+    <Box className="px-5 py-4 border-t border-outline-200">
+      <HStack className="justify-between items-center mb-3">
+        <Heading size="lg">{title}</Heading>
+        <Button onPress={onAdd} size="sm" variant="link" className="p-1">
           <FontAwesome name="plus" size={20} color="#45a393" />
-        </TouchableOpacity>
-      </View>
+        </Button>
+      </HStack>
       {records.map((record) => (
-        <View key={record.id} style={styles.recordItem}>
-          <View style={styles.recordContent}>
-            <View>
-              <Text style={styles.recordName}>{record.name}</Text>
-              <Text style={styles.recordDate}>
+        <Box key={record.id} className="py-2 px-3 bg-background-50 rounded-lg mb-2">
+          <HStack className="justify-between items-center">
+            <VStack>
+              <Text className="text-base font-semibold">{record.name}</Text>
+              <Text className="text-sm opacity-60">
                 {formatDateRange(record.startDate, record.endDate)}
               </Text>
-            </View>
-            <TouchableOpacity onPress={() => onDelete(record.id)} style={styles.deleteButton}>
+            </VStack>
+            <Button onPress={() => onDelete(record.id)} size="sm" variant="link" className="p-2">
               <FontAwesome name="trash-o" size={18} color="#f08080" />
-            </TouchableOpacity>
-          </View>
-        </View>
+            </Button>
+          </HStack>
+        </Box>
       ))}
       {records.length === 0 && (
-        <Text style={styles.emptyText}>まだ登録がありません</Text>
+        <Text className="text-sm opacity-50 text-center py-2">まだ登録がありません</Text>
       )}
-    </View>
+    </Box>
   );
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <Box className="flex-1 items-center justify-center p-5">
         <ActivityIndicator size="large" />
-      </View>
+      </Box>
     );
   }
 
   if (!profile) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.message}>ログインしていません</Text>
-      </View>
+      <Box className="flex-1 items-center justify-center p-5">
+        <Text className="text-base opacity-70">ログインしていません</Text>
+      </Box>
     );
   }
 
   return (
-    <ScrollView style={styles.scrollView}>
-      <View style={styles.profileHeader}>
+    <ScrollView className="flex-1">
+      <VStack className="items-center py-6 px-5">
         {profile.avatarUrl && (
-          <Image
-            source={{ uri: profile.avatarUrl }}
-            style={styles.avatar}
-          />
+          <Avatar size="xl" className="mb-4">
+            <AvatarFallbackText>{profile.userName || 'User'}</AvatarFallbackText>
+            <AvatarImage source={{ uri: profile.avatarUrl }} />
+          </Avatar>
         )}
         {profile.userName && (
-          <Text style={styles.userName}>{profile.userName}</Text>
+          <Heading size="2xl" className="mb-2">{profile.userName}</Heading>
         )}
         {profile.createdAt && (
-          <Text style={styles.createdAt}>
+          <Text className="text-sm opacity-70">
             登録日時: {new Date(profile.createdAt).toLocaleDateString('ja-JP')}
           </Text>
         )}
-      </View>
+      </VStack>
 
       {renderMedicalSection('診断名', diagnoses, () => setShowDiagnosisModal(true), deleteDiagnosis)}
       {renderMedicalSection('服薬', medications, () => setShowMedicationModal(true), () => {})}
       {renderMedicalSection('治療', treatments, () => setShowTreatmentModal(true), () => {})}
 
+      <Box className="px-5 mt-4 mb-8">
+        <Button onPress={handleLogout} action="negative" className="w-full">
+          <ButtonText>ログアウト</ButtonText>
+        </Button>
+      </Box>
+
       {/* 診断名追加モーダル */}
-      <Modal visible={showDiagnosisModal} transparent animationType="slide">
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>診断名を選択</Text>
-            <FlatList
-              data={diagnosisMasters.filter(
+      <Modal isOpen={showDiagnosisModal} onClose={() => setShowDiagnosisModal(false)}>
+        <ModalBackdrop />
+        <ModalContent className="max-h-[80%]">
+          <ModalHeader>
+            <Heading size="lg">診断名を選択</Heading>
+            <ModalCloseButton>
+              <FontAwesome name="close" size={20} />
+            </ModalCloseButton>
+          </ModalHeader>
+          <ModalBody>
+            <VStack space="sm">
+              {diagnosisMasters
+                .filter((master) => !diagnoses.some((d) => d.name === master.name))
+                .map((item) => (
+                  <Button
+                    key={item.id}
+                    onPress={() => selectDiagnosisForDate(item.id)}
+                    variant="outline"
+                  >
+                    <ButtonText>{item.name}</ButtonText>
+                  </Button>
+                ))}
+              {diagnosisMasters.filter(
                 (master) => !diagnoses.some((d) => d.name === master.name)
+              ).length === 0 && (
+                <Text className="text-sm opacity-50 text-center py-2">追加可能な診断名がありません</Text>
               )}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.modalItem}
-                  onPress={() => selectDiagnosisForDate(item.id)}
-                >
-                  <Text style={styles.modalItemText}>{item.name}</Text>
-                </TouchableOpacity>
-              )}
-              ListEmptyComponent={
-                <Text style={styles.emptyText}>追加可能な診断名がありません</Text>
-              }
-            />
-            <TouchableOpacity
-              style={styles.modalCloseButton}
-              onPress={() => setShowDiagnosisModal(false)}
-            >
-              <Text style={styles.modalCloseText}>キャンセル</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+            </VStack>
+          </ModalBody>
+        </ModalContent>
       </Modal>
 
-      {/* 日付選択モーダル */}
-      <Modal visible={showDateModal} transparent animationType="slide">
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>期間を選択</Text>
+      {/* 日付選択モーダル（年月選択） */}
+      <Modal isOpen={showDateModal} onClose={() => setShowDateModal(false)}>
+        <ModalBackdrop />
+        <ModalContent>
+          <ModalHeader>
+            <Heading size="lg">期間を選択</Heading>
+            <ModalCloseButton>
+              <FontAwesome name="close" size={20} />
+            </ModalCloseButton>
+          </ModalHeader>
+          <ModalBody>
+            <VStack space="md">
+              {/* 開始日 */}
+              <Box>
+                <Text className="text-base font-semibold mb-2 text-primary-600">開始年月</Text>
+                <HStack space="sm">
+                  <Box className="flex-1">
+                    <Select selectedValue={startYear} onValueChange={setStartYear}>
+                      <SelectTrigger>
+                        <SelectInput placeholder="年" />
+                        <SelectIcon>
+                          <FontAwesome name="chevron-down" size={16} />
+                        </SelectIcon>
+                      </SelectTrigger>
+                      <SelectPortal>
+                        <SelectBackdrop />
+                        <SelectContent className="max-h-[30%]">
+                          <SelectDragIndicatorWrapper>
+                            <SelectDragIndicator />
+                          </SelectDragIndicatorWrapper>
+                          <SelectScrollView>
+                            {years.map((year) => (
+                              <SelectItem key={year} label={`${year}年`} value={year} />
+                            ))}
+                          </SelectScrollView>
+                        </SelectContent>
+                      </SelectPortal>
+                    </Select>
+                  </Box>
+                  <Box className="flex-1">
+                    <Select selectedValue={startMonth} onValueChange={setStartMonth}>
+                      <SelectTrigger>
+                        <SelectInput placeholder="月" />
+                        <SelectIcon>
+                          <FontAwesome name="chevron-down" size={16} />
+                        </SelectIcon>
+                      </SelectTrigger>
+                      <SelectPortal>
+                        <SelectBackdrop />
+                        <SelectContent className="max-h-[30%]">
+                          <SelectDragIndicatorWrapper>
+                            <SelectDragIndicator />
+                          </SelectDragIndicatorWrapper>
+                          {months.map((month) => (
+                            <SelectItem key={month} label={`${month}月`} value={month} />
+                          ))}
+                        </SelectContent>
+                      </SelectPortal>
+                    </Select>
+                  </Box>
+                </HStack>
+              </Box>
 
-            <View style={styles.dateInputSection}>
-              <Text style={styles.dateLabel}>開始日</Text>
-              <TouchableOpacity
-                style={styles.dateButton}
+              {/* 終了日 */}
+              <Box>
+                <HStack className="justify-between items-center mb-2">
+                  <Text className="text-base font-semibold text-primary-600">終了年月（任意）</Text>
+                  {endYear && endMonth && (
+                    <Button
+                      size="xs"
+                      variant="link"
+                      onPress={() => {
+                        setEndYear('');
+                        setEndMonth('');
+                      }}
+                    >
+                      <ButtonText className="text-error-500">クリア</ButtonText>
+                    </Button>
+                  )}
+                </HStack>
+                <HStack space="sm">
+                  <Box className="flex-1">
+                    <Select selectedValue={endYear} onValueChange={setEndYear}>
+                      <SelectTrigger>
+                        <SelectInput placeholder="年" />
+                        <SelectIcon>
+                          <FontAwesome name="chevron-down" size={16} />
+                        </SelectIcon>
+                      </SelectTrigger>
+                      <SelectPortal>
+                        <SelectBackdrop />
+                        <SelectContent className="max-h-[30%]">
+                          <SelectDragIndicatorWrapper>
+                            <SelectDragIndicator />
+                          </SelectDragIndicatorWrapper>
+                          <SelectScrollView>
+                            <SelectItem label="未設定" value="" />
+                            {years.map((year) => (
+                              <SelectItem key={year} label={`${year}年`} value={year} />
+                            ))}
+                          </SelectScrollView>
+                        </SelectContent>
+                      </SelectPortal>
+                    </Select>
+                  </Box>
+                  <Box className="flex-1">
+                    <Select selectedValue={endMonth} onValueChange={setEndMonth}>
+                      <SelectTrigger>
+                        <SelectInput placeholder="月" />
+                        <SelectIcon>
+                          <FontAwesome name="chevron-down" size={16} />
+                        </SelectIcon>
+                      </SelectTrigger>
+                      <SelectPortal>
+                        <SelectBackdrop />
+                        <SelectContent className="max-h-[30%]">
+                          <SelectDragIndicatorWrapper>
+                            <SelectDragIndicator />
+                          </SelectDragIndicatorWrapper>
+                          <SelectItem label="未設定" value="" />
+                          {months.map((month) => (
+                            <SelectItem key={month} label={`${month}月`} value={month} />
+                          ))}
+                        </SelectContent>
+                      </SelectPortal>
+                    </Select>
+                  </Box>
+                </HStack>
+              </Box>
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <VStack space="sm" className="w-full">
+              <Button onPress={saveDiagnosisWithDate} className="w-full">
+                <ButtonText>保存</ButtonText>
+              </Button>
+              <Button
+                variant="outline"
                 onPress={() => {
-                  setShowStartPicker(true);
-                  setShowEndPicker(false);
+                  setShowDateModal(false);
+                  setSelectedDiagnosisId(null);
                 }}
+                className="w-full"
               >
-                <Text style={styles.dateButtonText}>
-                  {formatDate(startDate)}
-                </Text>
-                <FontAwesome name="calendar" size={20} color="#45a393" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.dateInputSection}>
-              <Text style={styles.dateLabel}>終了日（任意）</Text>
-              <TouchableOpacity
-                style={styles.dateButton}
-                onPress={() => {
-                  setShowEndPicker(true);
-                  setShowStartPicker(false);
-                }}
-              >
-                <Text style={styles.dateButtonText}>
-                  {endDate ? formatDate(endDate) : '未設定'}
-                </Text>
-                <FontAwesome name="calendar" size={20} color="#45a393" />
-              </TouchableOpacity>
-              {endDate && (
-                <TouchableOpacity
-                  style={styles.clearButton}
-                  onPress={() => setEndDate(null)}
-                >
-                  <Text style={styles.clearButtonText}>クリア</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {showStartPicker && (
-              <DateTimePicker
-                value={startDate}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={(event, date) => {
-                  if (Platform.OS === 'android') {
-                    setShowStartPicker(false);
-                  }
-                  if (date) setStartDate(date);
-                }}
-              />
-            )}
-
-            {showEndPicker && (
-              <DateTimePicker
-                value={endDate || new Date()}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                minimumDate={startDate}
-                onChange={(event, date) => {
-                  if (Platform.OS === 'android') {
-                    setShowEndPicker(false);
-                  }
-                  if (date) setEndDate(date);
-                }}
-              />
-            )}
-
-            {Platform.OS === 'ios' && (showStartPicker || showEndPicker) && (
-              <TouchableOpacity
-                style={styles.datePickerDoneButton}
-                onPress={() => {
-                  setShowStartPicker(false);
-                  setShowEndPicker(false);
-                }}
-              >
-                <Text style={styles.datePickerDoneText}>完了</Text>
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity
-              style={styles.saveButton}
-              onPress={saveDiagnosisWithDate}
-            >
-              <Text style={styles.saveButtonText}>保存</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.modalCloseButton}
-              onPress={() => {
-                setShowDateModal(false);
-                setSelectedDiagnosisId(null);
-              }}
-            >
-              <Text style={styles.modalCloseText}>キャンセル</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+                <ButtonText>キャンセル</ButtonText>
+              </Button>
+            </VStack>
+          </ModalFooter>
+        </ModalContent>
       </Modal>
-
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.logoutButtonText}>ログアウト</Text>
-      </TouchableOpacity>
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  profileHeader: {
-    alignItems: 'center',
-    paddingVertical: 24,
-    paddingHorizontal: 20,
-  },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    marginBottom: 16,
-  },
-  userName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  createdAt: {
-    fontSize: 14,
-    opacity: 0.7,
-  },
-  message: {
-    fontSize: 16,
-    opacity: 0.7,
-  },
-  section: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#d0e8e3',
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  addButton: {
-    padding: 4,
-  },
-  emptyText: {
-    fontSize: 14,
-    opacity: 0.5,
-    textAlign: 'center',
-    paddingVertical: 8,
-  },
-  recordItem: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#e8f5f2',
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  recordContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  recordName: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  recordDate: {
-    fontSize: 14,
-    opacity: 0.6,
-  },
-  deleteButton: {
-    padding: 8,
-  },
-  logoutButton: {
-    backgroundColor: '#f08080',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    marginTop: 16,
-    marginHorizontal: 20,
-    marginBottom: 32,
-  },
-  logoutButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 20,
-    maxHeight: '80%',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    paddingHorizontal: 20,
-    marginBottom: 16,
-  },
-  modalItem: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#d0e8e3',
-  },
-  modalItemText: {
-    fontSize: 16,
-  },
-  modalCloseButton: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#d0e8e3',
-    backgroundColor: '#e8f5f2',
-  },
-  modalCloseText: {
-    fontSize: 16,
-    textAlign: 'center',
-    color: '#f08080',
-    fontWeight: '600',
-  },
-  dateInputSection: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  dateLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-    color: '#2d6b5f',
-  },
-  dateButton: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#e8f5f2',
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#d0e8e3',
-  },
-  dateButtonText: {
-    fontSize: 16,
-    color: '#2d6b5f',
-  },
-  clearButton: {
-    marginTop: 8,
-    alignSelf: 'flex-end',
-  },
-  clearButtonText: {
-    fontSize: 14,
-    color: '#f08080',
-  },
-  saveButton: {
-    backgroundColor: '#45a393',
-    paddingVertical: 16,
-    marginHorizontal: 20,
-    marginTop: 16,
-    borderRadius: 8,
-  },
-  saveButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  datePickerDoneButton: {
-    backgroundColor: '#45a393',
-    paddingVertical: 12,
-    marginHorizontal: 20,
-    marginTop: 8,
-    borderRadius: 8,
-  },
-  datePickerDoneText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-});

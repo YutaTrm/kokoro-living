@@ -1,23 +1,11 @@
-import { StyleSheet } from 'react-native';
-
 import { Text, View } from '@/components/Themed';
+import { Box } from '@/components/ui/box';
+import { Heading } from '@/components/ui/heading';
 
 export default function SearchScreen() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>検索</Text>
-    </View>
+    <Box className="flex-1 items-center justify-center">
+      <Heading size="xl">検索</Heading>
+    </Box>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-});
