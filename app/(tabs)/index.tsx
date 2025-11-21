@@ -49,33 +49,50 @@ export default function TabOneScreen() {
     setIsLoggedIn(loggedIn);
     setLoading(false);
 
-    if (loggedIn) {
-      loadPosts();
-    }
+    // ログイン状態に関わらず投稿を読み込む
+    loadPosts();
   };
 
   const loadPosts = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
 
-      // 自分がフォローしている人のIDを取得
-      const { data: followingData } = await supabase
-        .from('follows')
-        .select('following_id')
-        .eq('follower_id', user.id);
+      let postsData;
+      let postsError;
 
-      const followingIds = followingData?.map(f => f.following_id) || [];
-      const userIds = [user.id, ...followingIds]; // 自分のIDも追加
+      if (user) {
+        // ログイン済み: 自分がフォローしている人のIDを取得
+        const { data: followingData } = await supabase
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', user.id);
 
-      // 自分とフォローしている人の投稿を取得
-      const { data: postsData, error: postsError } = await supabase
-        .from('posts')
-        .select('id, content, created_at, user_id')
-        .in('user_id', userIds)
-        .is('parent_post_id', null)
-        .order('created_at', { ascending: false })
-        .limit(50);
+        const followingIds = followingData?.map(f => f.following_id) || [];
+        const userIds = [user.id, ...followingIds]; // 自分のIDも追加
+
+        // 自分とフォローしている人の投稿を取得
+        const result = await supabase
+          .from('posts')
+          .select('id, content, created_at, user_id')
+          .in('user_id', userIds)
+          .is('parent_post_id', null)
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        postsData = result.data;
+        postsError = result.error;
+      } else {
+        // 未ログイン: すべての投稿を取得
+        const result = await supabase
+          .from('posts')
+          .select('id, content, created_at, user_id')
+          .is('parent_post_id', null)
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        postsData = result.data;
+        postsError = result.error;
+      }
 
       if (postsError) throw postsError;
 
@@ -199,23 +216,7 @@ export default function TabOneScreen() {
     );
   }
 
-  if (!isLoggedIn) {
-    return (
-      <Box className="flex-1 items-center justify-center">
-        <Button
-          onPress={handleXLogin}
-          className="bg-typography-black rounded-full px-6 py-3"
-        >
-          <HStack space="sm" className="items-center">
-            <XLogo width={20} height={20} />
-            <ButtonText className="text-typography-white text-base font-semibold">Xアカウントで登録</ButtonText>
-          </HStack>
-        </Button>
-      </Box>
-    );
-  }
-
-  // ログイン済み: タイムライン表示
+  // タイムライン表示（ログイン状態に関わらず）
   return (
     <Box className="flex-1">
       <FlatList
@@ -232,15 +233,18 @@ export default function TabOneScreen() {
           </Box>
         }
       />
-      <Button
-        className="absolute right-5 bottom-5 rounded-full h-16 w-16"
-        variant="solid"
-        size="md"
-        action="primary"
-        onPress={() => router.push('/create-post')}
-      >
-        <ButtonIcon as={AddIcon} size="lg" />
-      </Button>
+      {/* 投稿ボタンはログイン時のみ表示 */}
+      {isLoggedIn && (
+        <Button
+          className="absolute right-5 bottom-5 rounded-full h-16 w-16"
+          variant="solid"
+          size="md"
+          action="primary"
+          onPress={() => router.push('/create-post')}
+        >
+          <ButtonIcon as={AddIcon} size="lg" />
+        </Button>
+      )}
     </Box>
   );
 }

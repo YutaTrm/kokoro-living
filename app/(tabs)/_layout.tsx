@@ -33,7 +33,6 @@ export default function TabLayout() {
       screenOptions={{
         tabBarActiveTintColor: '#333',
         tabBarShowLabel: false,
-        tabBarStyle: isLoggedIn ? undefined : { display: 'none' },
         // Disable the static render of the header on web
         // to prevent a hydration error in React Navigation v6.
         headerShown: useClientOnlyValue(false, true),

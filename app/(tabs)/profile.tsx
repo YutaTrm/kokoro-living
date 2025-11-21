@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, FlatList, ScrollView } from 'react-native';
 
+import LoginPrompt from '@/components/LoginPrompt';
 import DatePickerModal from '@/components/profile/DatePickerModal';
 import DiagnosisModal from '@/components/profile/DiagnosisModal';
 import MedicalSection from '@/components/profile/MedicalSection';
@@ -435,25 +436,15 @@ export default function ProfileScreen() {
   };
 
 
-  if (loading) {
-    return (
-      <Box className="flex-1 items-center justify-center p-5">
-        <Spinner size="large" />
-      </Box>
-    );
-  }
-
-  if (!profile) {
-    return (
-      <Box className="flex-1 items-center justify-center p-5">
-        <Text className="text-base opacity-70">ログインしていません</Text>
-      </Box>
-    );
-  }
-
   return (
-    <ScrollView className="flex-1 mt-12">
-      <ProfileHeader profile={profile} onLogout={handleLogout} />
+    <LoginPrompt>
+      {loading ? (
+        <Box className="flex-1 items-center justify-center p-5">
+          <Spinner size="large" />
+        </Box>
+      ) : profile ? (
+        <ScrollView className="flex-1 mt-12">
+          <ProfileHeader profile={profile} onLogout={handleLogout} />
 
       {/* タブバー */}
       <HStack className="border-b border-outline-200 mb-4">
@@ -586,6 +577,8 @@ export default function ProfileScreen() {
         initialEndYear={endYear}
         initialEndMonth={endMonth}
       />
-    </ScrollView>
+        </ScrollView>
+      ) : null}
+    </LoginPrompt>
   );
 }
