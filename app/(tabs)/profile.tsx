@@ -5,12 +5,9 @@ import { Alert, FlatList } from 'react-native';
 import LoginPrompt from '@/components/LoginPrompt';
 import PostItem from '@/components/PostItem';
 import DatePickerModal from '@/components/profile/DatePickerModal';
-import DiagnosisModal from '@/components/profile/DiagnosisModal';
 import MedicalSection from '@/components/profile/MedicalSection';
-import MedicationModal from '@/components/profile/MedicationModal';
 import ProfileHeader from '@/components/profile/ProfileHeader';
-import StatusModal from '@/components/profile/StatusModal';
-import TreatmentModal from '@/components/profile/TreatmentModal';
+import SelectModal from '@/components/profile/SelectModal';
 import { Text } from '@/components/Themed';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonText } from '@/components/ui/button';
@@ -98,10 +95,8 @@ export default function ProfileScreen() {
   const [likedPosts, setLikedPosts] = useState<Post[]>([]);
   const [bookmarkedPosts, setBookmarkedPosts] = useState<Post[]>([]);
 
-  const [showDiagnosisModal, setShowDiagnosisModal] = useState(false);
-  const [showMedicationModal, setShowMedicationModal] = useState(false);
-  const [showTreatmentModal, setShowTreatmentModal] = useState(false);
-  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [showSelectModal, setShowSelectModal] = useState(false);
+  const [selectModalType, setSelectModalType] = useState<'diagnosis' | 'medication' | 'treatment' | 'status'>('diagnosis');
 
   const [diagnosisMasters, setDiagnosisMasters] = useState<MasterData[]>([]);
   const [medicationMasters, setMedicationMasters] = useState<MasterData[]>([]);
@@ -173,10 +168,37 @@ export default function ProfileScreen() {
     }
   };
 
-  const selectDiagnosisForDate = (diagnosisId: string) => {
-    setSelectedDiagnosisId(diagnosisId);
-    setShowDiagnosisModal(false);
-    // リセット
+  const openSelectModal = (type: 'diagnosis' | 'medication' | 'treatment' | 'status') => {
+    setSelectModalType(type);
+    setShowSelectModal(true);
+  };
+
+  const handleSelectItem = (itemId: string, type: 'diagnosis' | 'medication' | 'treatment' | 'status') => {
+    // 選択したIDを保存
+    switch (type) {
+      case 'diagnosis':
+        setSelectedDiagnosisId(itemId);
+        break;
+      case 'medication':
+        setSelectedMedicationId(itemId);
+        break;
+      case 'treatment':
+        setSelectedTreatmentId(itemId);
+        break;
+      case 'status':
+        setSelectedStatusId(itemId);
+        break;
+    }
+
+    // 他の選択をクリア
+    if (type !== 'diagnosis') setSelectedDiagnosisId(null);
+    if (type !== 'medication') setSelectedMedicationId(null);
+    if (type !== 'treatment') setSelectedTreatmentId(null);
+    if (type !== 'status') setSelectedStatusId(null);
+
+    setShowSelectModal(false);
+
+    // 日付選択モーダルを表示
     const now = new Date();
     setStartYear(now.getFullYear().toString());
     setStartMonth((now.getMonth() + 1).toString());
@@ -230,18 +252,6 @@ export default function ProfileScreen() {
     }
   };
 
-  const selectStatusForDate = (statusId: string) => {
-    setSelectedStatusId(statusId);
-    setSelectedDiagnosisId(null); // 診断名をクリア
-    setShowStatusModal(false);
-    // リセット
-    const now = new Date();
-    setStartYear(now.getFullYear().toString());
-    setStartMonth((now.getMonth() + 1).toString());
-    setEndYear('');
-    setEndMonth('');
-    setShowDateModal(true);
-  };
 
   const saveStatusWithDate = async (startDate: string, endDate: string | null) => {
     try {
@@ -288,19 +298,6 @@ export default function ProfileScreen() {
     }
   };
 
-  const selectTreatmentForDate = (treatmentId: string) => {
-    setSelectedTreatmentId(treatmentId);
-    setSelectedDiagnosisId(null);
-    setSelectedStatusId(null);
-    setSelectedMedicationId(null);
-    setShowTreatmentModal(false);
-    const now = new Date();
-    setStartYear(now.getFullYear().toString());
-    setStartMonth((now.getMonth() + 1).toString());
-    setEndYear('');
-    setEndMonth('');
-    setShowDateModal(true);
-  };
 
   const saveTreatmentWithDate = async (startDate: string, endDate: string | null) => {
     try {
@@ -347,19 +344,6 @@ export default function ProfileScreen() {
     }
   };
 
-  const selectMedicationForDate = (medicationId: string) => {
-    setSelectedMedicationId(medicationId);
-    setSelectedDiagnosisId(null);
-    setSelectedStatusId(null);
-    setSelectedTreatmentId(null);
-    setShowMedicationModal(false);
-    const now = new Date();
-    setStartYear(now.getFullYear().toString());
-    setStartMonth((now.getMonth() + 1).toString());
-    setEndYear('');
-    setEndMonth('');
-    setShowDateModal(true);
-  };
 
   const saveMedicationWithDate = async (startDate: string, endDate: string | null) => {
     try {
@@ -817,25 +801,25 @@ export default function ProfileScreen() {
           <MedicalSection
             title="診断名"
             records={diagnoses}
-            onAdd={() => setShowDiagnosisModal(true)}
+            onAdd={() => openSelectModal('diagnosis')}
             onDelete={deleteDiagnosis}
           />
           <MedicalSection
             title="服薬"
             records={medications}
-            onAdd={() => setShowMedicationModal(true)}
+            onAdd={() => openSelectModal('medication')}
             onDelete={deleteMedication}
           />
           <MedicalSection
             title="治療"
             records={treatments}
-            onAdd={() => setShowTreatmentModal(true)}
+            onAdd={() => openSelectModal('treatment')}
             onDelete={deleteTreatment}
           />
           <MedicalSection
             title="ステータス"
             records={statuses}
-            onAdd={() => setShowStatusModal(true)}
+            onAdd={() => openSelectModal('status')}
             onDelete={deleteStatus}
           />
 
@@ -926,40 +910,35 @@ export default function ProfileScreen() {
         </Box>
       ) : null}
 
-      {/* 診断名追加モーダル */}
-      <DiagnosisModal
-        isOpen={showDiagnosisModal}
-        onClose={() => setShowDiagnosisModal(false)}
-        diagnosisMasters={diagnosisMasters}
-        existingDiagnoses={diagnoses}
-        onSelect={selectDiagnosisForDate}
-      />
-
-      {/* ステータス追加モーダル */}
-      <StatusModal
-        isOpen={showStatusModal}
-        onClose={() => setShowStatusModal(false)}
-        statusMasters={statusMasters}
-        existingStatuses={statuses}
-        onSelect={selectStatusForDate}
-      />
-
-      {/* 治療追加モーダル */}
-      <TreatmentModal
-        isOpen={showTreatmentModal}
-        onClose={() => setShowTreatmentModal(false)}
-        treatmentMasters={treatmentMasters}
-        existingTreatments={treatments}
-        onSelect={selectTreatmentForDate}
-      />
-
-      {/* 服薬追加モーダル */}
-      <MedicationModal
-        isOpen={showMedicationModal}
-        onClose={() => setShowMedicationModal(false)}
-        medicationMasters={medicationMasters}
-        existingMedications={medications}
-        onSelect={selectMedicationForDate}
+      {/* 選択モーダル */}
+      <SelectModal
+        isOpen={showSelectModal}
+        onClose={() => setShowSelectModal(false)}
+        title={
+          selectModalType === 'diagnosis' ? '診断名を選択' :
+          selectModalType === 'medication' ? '服薬を選択' :
+          selectModalType === 'treatment' ? '治療を選択' :
+          'ステータスを選択'
+        }
+        masters={
+          selectModalType === 'diagnosis' ? diagnosisMasters :
+          selectModalType === 'medication' ? medicationMasters :
+          selectModalType === 'treatment' ? treatmentMasters :
+          statusMasters
+        }
+        existingItems={
+          selectModalType === 'diagnosis' ? diagnoses :
+          selectModalType === 'medication' ? medications :
+          selectModalType === 'treatment' ? treatments :
+          statuses
+        }
+        onSelect={(id) => handleSelectItem(id, selectModalType)}
+        emptyMessage={
+          selectModalType === 'diagnosis' ? '追加可能な診断名がありません' :
+          selectModalType === 'medication' ? '追加可能な服薬がありません' :
+          selectModalType === 'treatment' ? '追加可能な治療がありません' :
+          '追加可能なステータスがありません'
+        }
       />
 
       {/* 日付選択モーダル（年月選択） */}
