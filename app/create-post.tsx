@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, TextInput } from 'react-native';
 
@@ -21,19 +21,25 @@ interface MedicalTag {
 
 export default function CreatePostScreen() {
   const router = useRouter();
+  const { postId } = useLocalSearchParams<{ postId?: string }>();
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingTags, setLoadingTags] = useState(true);
+  const [loadingPost, setLoadingPost] = useState(!!postId);
 
   const [availableTags, setAvailableTags] = useState<MedicalTag[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   const maxLength = 140;
   const remainingChars = maxLength - content.length;
+  const isEditMode = !!postId;
 
   useEffect(() => {
     loadUserMedicalData();
-  }, []);
+    if (postId) {
+      loadExistingPost();
+    }
+  }, [postId]);
 
   const loadUserMedicalData = async () => {
     try {
@@ -105,6 +111,64 @@ export default function CreatePostScreen() {
     }
   };
 
+  const loadExistingPost = async () => {
+    try {
+      if (!postId) return;
+
+      // 投稿内容を取得
+      const { data: post, error: postError } = await supabase
+        .from('posts')
+        .select('content')
+        .eq('id', postId)
+        .single();
+
+      if (postError || !post) {
+        Alert.alert('エラー', '投稿の取得に失敗しました');
+        router.back();
+        return;
+      }
+
+      setContent(post.content);
+
+      // 既存のタグを取得
+      const tagIds: string[] = [];
+
+      // 診断名タグ
+      const { data: diagnosesData } = await supabase
+        .from('post_diagnoses')
+        .select('user_diagnosis_id')
+        .eq('post_id', postId);
+      if (diagnosesData) {
+        tagIds.push(...diagnosesData.map(d => d.user_diagnosis_id));
+      }
+
+      // 治療法タグ
+      const { data: treatmentsData } = await supabase
+        .from('post_treatments')
+        .select('user_treatment_id')
+        .eq('post_id', postId);
+      if (treatmentsData) {
+        tagIds.push(...treatmentsData.map(t => t.user_treatment_id));
+      }
+
+      // 服薬タグ
+      const { data: medicationsData } = await supabase
+        .from('post_medications')
+        .select('user_medication_id')
+        .eq('post_id', postId);
+      if (medicationsData) {
+        tagIds.push(...medicationsData.map(m => m.user_medication_id));
+      }
+
+      setSelectedTags(tagIds);
+    } catch (error) {
+      console.error('投稿読み込みエラー:', error);
+      Alert.alert('エラー', '投稿の読み込みに失敗しました');
+    } finally {
+      setLoadingPost(false);
+    }
+  };
+
   const toggleTag = (tagId: string) => {
     setSelectedTags((prev) =>
       prev.includes(tagId)
@@ -132,18 +196,43 @@ export default function CreatePostScreen() {
         return;
       }
 
-      // 投稿を作成
-      const { data: post, error: postError } = await supabase
-        .from('posts')
-        .insert({
-          user_id: user.id,
-          content: content.trim(),
-        })
-        .select()
-        .single();
+      let finalPostId: string;
 
-      if (postError || !post) {
-        throw postError;
+      if (isEditMode && postId) {
+        // 編集モード：投稿を更新
+        const { error: updateError } = await supabase
+          .from('posts')
+          .update({ content: content.trim() })
+          .eq('id', postId);
+
+        if (updateError) {
+          throw updateError;
+        }
+
+        // 既存のタグをすべて削除
+        await Promise.all([
+          supabase.from('post_diagnoses').delete().eq('post_id', postId),
+          supabase.from('post_treatments').delete().eq('post_id', postId),
+          supabase.from('post_medications').delete().eq('post_id', postId),
+        ]);
+
+        finalPostId = postId;
+      } else {
+        // 新規作成モード：投稿を作成
+        const { data: post, error: postError } = await supabase
+          .from('posts')
+          .insert({
+            user_id: user.id,
+            content: content.trim(),
+          })
+          .select()
+          .single();
+
+        if (postError || !post) {
+          throw postError;
+        }
+
+        finalPostId = post.id;
       }
 
       // タグを関連付け
@@ -166,7 +255,7 @@ export default function CreatePostScreen() {
             : 'user_medication_id';
 
         return supabase.from(tableName).insert({
-          post_id: post.id,
+          post_id: finalPostId,
           [columnName]: tagId,
         });
       });
@@ -177,11 +266,19 @@ export default function CreatePostScreen() {
       router.replace('/(tabs)');
     } catch (error) {
       console.error('投稿エラー:', error);
-      Alert.alert('エラー', '投稿に失敗しました');
+      Alert.alert('エラー', isEditMode ? '更新に失敗しました' : '投稿に失敗しました');
     } finally {
       setLoading(false);
     }
   };
+
+  if (loadingPost) {
+    return (
+      <Box className="flex-1 items-center justify-center">
+        <Spinner size="large" />
+      </Box>
+    );
+  }
 
   return (
     <Box className="flex-1 bg-background-0">
@@ -195,7 +292,7 @@ export default function CreatePostScreen() {
           disabled={loading || !content.trim()}
           size="sm"
         >
-          <ButtonText>{loading ? '投稿中...' : '投稿'}</ButtonText>
+          <ButtonText>{loading ? (isEditMode ? '更新中...' : '投稿中...') : (isEditMode ? '更新' : '投稿')}</ButtonText>
         </Button>
       </HStack>
 
@@ -244,7 +341,7 @@ export default function CreatePostScreen() {
                               value={tag.id}
                               isChecked={selectedTags.includes(tag.id)}
                               onChange={() => toggleTag(tag.id)}
-                              size="sm"
+                              size="md"
                             >
                               <CheckboxIndicator>
                                 <CheckboxIcon as={CheckIcon} />
@@ -270,7 +367,7 @@ export default function CreatePostScreen() {
                               value={tag.id}
                               isChecked={selectedTags.includes(tag.id)}
                               onChange={() => toggleTag(tag.id)}
-                              size="sm"
+                              size="md"
                             >
                               <CheckboxIndicator>
                                 <CheckboxIcon as={CheckIcon} />
@@ -296,7 +393,7 @@ export default function CreatePostScreen() {
                               value={tag.id}
                               isChecked={selectedTags.includes(tag.id)}
                               onChange={() => toggleTag(tag.id)}
-                              size="sm"
+                              size="md"
                             >
                               <CheckboxIndicator>
                                 <CheckboxIcon as={CheckIcon} />
@@ -311,7 +408,7 @@ export default function CreatePostScreen() {
               </VStack>
             ) : (
               <Text className="text-sm text-typography-500">
-                タグを追加するには、プロフィールで医療情報を登録してください
+                タグを追加するには、プロフィールで情報を登録してください
               </Text>
             )}
           </Box>

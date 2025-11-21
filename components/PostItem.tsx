@@ -1,8 +1,8 @@
 import { useRouter } from 'expo-router';
-import { Pressable } from 'react-native';
+import { Pressable, ScrollView } from 'react-native';
 
 import { Text } from '@/components/Themed';
-import { Avatar, AvatarFallbackText } from '@/components/ui/avatar';
+import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
 import { HStack } from '@/components/ui/hstack';
 import { VStack } from '@/components/ui/vstack';
@@ -15,8 +15,11 @@ interface PostItemProps {
     user: {
       display_name: string;
       user_id: string;
+      avatar_url?: string | null;
     };
-    tags: string[];
+    diagnoses: string[];
+    treatments: string[];
+    medications: string[];
   };
 }
 
@@ -48,16 +51,47 @@ export default function PostItem({ post }: PostItemProps) {
         <HStack space="sm" className="items-start">
           {/* アバター */}
           <Avatar size="md">
-            <AvatarFallbackText>{post.user.display_name || 'User'}</AvatarFallbackText>
+            {post.user.avatar_url ? (
+              <AvatarImage source={{ uri: post.user.avatar_url }} />
+            ) : (
+              <AvatarFallbackText>{post.user.display_name || 'User'}</AvatarFallbackText>
+            )}
           </Avatar>
 
           {/* 投稿内容 */}
           <VStack className="flex-1" space="xs">
-            {/* ユーザー名と時間 */}
-            <HStack space="xs" className="items-center">
+            {/* ユーザー名、時間、タグ */}
+            <HStack space="xs" className="items-center flex-1">
               <Text className="font-semibold text-base">{post.user.display_name}</Text>
               <Text className="text-sm text-typography-500">·</Text>
               <Text className="text-sm text-typography-500">{formatDate(post.created_at)}</Text>
+
+              {/* タグ（横スクロール） */}
+              {(post.diagnoses.length > 0 || post.treatments.length > 0 || post.medications.length > 0) && (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  className="flex-1"
+                >
+                  <HStack space="xs" className="ml-1">
+                    {post.diagnoses.map((tag, index) => (
+                      <Box key={`d-${index}`} className="bg-blue-100 px-2 py-1 rounded">
+                        <Text className="text-xs text-blue-700">{tag}</Text>
+                      </Box>
+                    ))}
+                    {post.treatments.map((tag, index) => (
+                      <Box key={`t-${index}`} className="bg-green-100 px-2 py-1 rounded">
+                        <Text className="text-xs text-green-700">{tag}</Text>
+                      </Box>
+                    ))}
+                    {post.medications.map((tag, index) => (
+                      <Box key={`m-${index}`} className="bg-purple-100 px-2 py-1 rounded">
+                        <Text className="text-xs text-purple-700">{tag}</Text>
+                      </Box>
+                    ))}
+                  </HStack>
+                </ScrollView>
+              )}
             </HStack>
 
             {/* 投稿テキスト */}

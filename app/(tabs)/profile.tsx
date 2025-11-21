@@ -72,8 +72,11 @@ interface Post {
   user: {
     display_name: string;
     user_id: string;
+    avatar_url?: string | null;
   };
-  tags: string[];
+  diagnoses: string[];
+  treatments: string[];
+  medications: string[];
 }
 
 type TabType = 'profile' | 'posts' | 'likes' | 'bookmarks';
@@ -497,20 +500,30 @@ export default function ProfileScreen() {
       // ユーザー情報を取得
       const { data: userData } = await supabase
         .from('users')
-        .select('user_id, display_name')
+        .select('user_id, display_name, avatar_url')
         .eq('user_id', user.id)
         .single();
 
-      const formattedPosts: Post[] = postsData.map((post: any) => ({
-        id: post.id,
-        content: post.content,
-        created_at: post.created_at,
-        user: {
-          display_name: userData?.display_name || 'Unknown',
-          user_id: post.user_id,
-        },
-        tags: [],
-      }));
+      // タグを一括取得
+      const postIds = postsData.map(p => p.id);
+      const tagsMap = await fetchTagsForPosts(postIds);
+
+      const formattedPosts: Post[] = postsData.map((post: any) => {
+        const tags = tagsMap.get(post.id) || { diagnoses: [], treatments: [], medications: [] };
+        return {
+          id: post.id,
+          content: post.content,
+          created_at: post.created_at,
+          user: {
+            display_name: userData?.display_name || 'Unknown',
+            user_id: post.user_id,
+            avatar_url: userData?.avatar_url || null,
+          },
+          diagnoses: tags.diagnoses,
+          treatments: tags.treatments,
+          medications: tags.medications,
+        };
+      });
 
       setUserPosts(formattedPosts);
     } catch (error) {
@@ -540,24 +553,34 @@ export default function ProfileScreen() {
       const postUserIds = [...new Set(likesData.map((like: any) => like.posts.user_id))];
       const { data: usersData } = await supabase
         .from('users')
-        .select('user_id, display_name')
+        .select('user_id, display_name, avatar_url')
         .in('user_id', postUserIds);
 
       // ユーザー情報をマップに変換
       const usersMap = new Map(
-        (usersData || []).map(u => [u.user_id, u.display_name])
+        (usersData || []).map(u => [u.user_id, { display_name: u.display_name, avatar_url: u.avatar_url }])
       );
 
-      const formattedPosts: Post[] = likesData.map((like: any) => ({
-        id: like.posts.id,
-        content: like.posts.content,
-        created_at: like.posts.created_at,
-        user: {
-          display_name: usersMap.get(like.posts.user_id) || 'Unknown',
-          user_id: like.posts.user_id,
-        },
-        tags: [],
-      }));
+      // タグを一括取得
+      const postIds = likesData.map((like: any) => like.posts.id);
+      const tagsMap = await fetchTagsForPosts(postIds);
+
+      const formattedPosts: Post[] = likesData.map((like: any) => {
+        const tags = tagsMap.get(like.posts.id) || { diagnoses: [], treatments: [], medications: [] };
+        return {
+          id: like.posts.id,
+          content: like.posts.content,
+          created_at: like.posts.created_at,
+          user: {
+            display_name: usersMap.get(like.posts.user_id)?.display_name || 'Unknown',
+            user_id: like.posts.user_id,
+            avatar_url: usersMap.get(like.posts.user_id)?.avatar_url || null,
+          },
+          diagnoses: tags.diagnoses,
+          treatments: tags.treatments,
+          medications: tags.medications,
+        };
+      });
 
       setLikedPosts(formattedPosts);
     } catch (error) {
@@ -587,24 +610,34 @@ export default function ProfileScreen() {
       const postUserIds = [...new Set(bookmarksData.map((bookmark: any) => bookmark.posts.user_id))];
       const { data: usersData } = await supabase
         .from('users')
-        .select('user_id, display_name')
+        .select('user_id, display_name, avatar_url')
         .in('user_id', postUserIds);
 
       // ユーザー情報をマップに変換
       const usersMap = new Map(
-        (usersData || []).map(u => [u.user_id, u.display_name])
+        (usersData || []).map(u => [u.user_id, { display_name: u.display_name, avatar_url: u.avatar_url }])
       );
 
-      const formattedPosts: Post[] = bookmarksData.map((bookmark: any) => ({
-        id: bookmark.posts.id,
-        content: bookmark.posts.content,
-        created_at: bookmark.posts.created_at,
-        user: {
-          display_name: usersMap.get(bookmark.posts.user_id) || 'Unknown',
-          user_id: bookmark.posts.user_id,
-        },
-        tags: [],
-      }));
+      // タグを一括取得
+      const postIds = bookmarksData.map((bookmark: any) => bookmark.posts.id);
+      const tagsMap = await fetchTagsForPosts(postIds);
+
+      const formattedPosts: Post[] = bookmarksData.map((bookmark: any) => {
+        const tags = tagsMap.get(bookmark.posts.id) || { diagnoses: [], treatments: [], medications: [] };
+        return {
+          id: bookmark.posts.id,
+          content: bookmark.posts.content,
+          created_at: bookmark.posts.created_at,
+          user: {
+            display_name: usersMap.get(bookmark.posts.user_id)?.display_name || 'Unknown',
+            user_id: bookmark.posts.user_id,
+            avatar_url: usersMap.get(bookmark.posts.user_id)?.avatar_url || null,
+          },
+          diagnoses: tags.diagnoses,
+          treatments: tags.treatments,
+          medications: tags.medications,
+        };
+      });
 
       setBookmarkedPosts(formattedPosts);
     } catch (error) {
@@ -662,6 +695,53 @@ export default function ProfileScreen() {
     } catch (error) {
       Alert.alert('エラー', '予期しないエラーが発生しました');
     }
+  };
+
+  const fetchTagsForPosts = async (postIds: string[]): Promise<Map<string, { diagnoses: string[]; treatments: string[]; medications: string[] }>> => {
+    const { data: diagnosesTagsData } = await supabase
+      .from('post_diagnoses')
+      .select('post_id, user_diagnoses(diagnoses(name))')
+      .in('post_id', postIds);
+
+    const { data: treatmentsTagsData } = await supabase
+      .from('post_treatments')
+      .select('post_id, user_treatments(treatments(name))')
+      .in('post_id', postIds);
+
+    const { data: medicationsTagsData } = await supabase
+      .from('post_medications')
+      .select('post_id, user_medications(ingredients(name), products(name))')
+      .in('post_id', postIds);
+
+    const tagsMap = new Map<string, { diagnoses: string[]; treatments: string[]; medications: string[] }>();
+    postIds.forEach(postId => {
+      const diagnoses: string[] = [];
+      const treatments: string[] = [];
+      const medications: string[] = [];
+
+      diagnosesTagsData?.forEach((d: any) => {
+        if (d.post_id === postId && d.user_diagnoses?.diagnoses?.name) {
+          diagnoses.push(d.user_diagnoses.diagnoses.name);
+        }
+      });
+
+      treatmentsTagsData?.forEach((t: any) => {
+        if (t.post_id === postId && t.user_treatments?.treatments?.name) {
+          treatments.push(t.user_treatments.treatments.name);
+        }
+      });
+
+      medicationsTagsData?.forEach((m: any) => {
+        if (m.post_id === postId) {
+          const name = m.user_medications?.products?.name || m.user_medications?.ingredients?.name;
+          if (name) medications.push(name);
+        }
+      });
+
+      tagsMap.set(postId, { diagnoses, treatments, medications });
+    });
+
+    return tagsMap;
   };
 
   const handleSaveBio = async () => {

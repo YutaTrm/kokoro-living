@@ -1,10 +1,10 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { Bookmark, Heart, MessageCircle } from 'lucide-react-native';
+import { Bookmark, Edit, Heart, MessageCircle } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView } from 'react-native';
+import { Alert, Pressable, ScrollView as RNScrollView } from 'react-native';
 
 import { Text } from '@/components/Themed';
-import { Avatar, AvatarFallbackText } from '@/components/ui/avatar';
+import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonText } from '@/components/ui/button';
 import { HStack } from '@/components/ui/hstack';
@@ -20,6 +20,7 @@ interface Post {
   user: {
     display_name: string;
     user_id: string;
+    avatar_url?: string | null;
   };
 }
 
@@ -30,6 +31,7 @@ interface Reply {
   user: {
     display_name: string;
     user_id: string;
+    avatar_url?: string | null;
   };
 }
 
@@ -44,6 +46,7 @@ export default function PostDetailScreen() {
   const [isLiked, setIsLiked] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [tags, setTags] = useState<{ diagnoses: string[]; treatments: string[]; medications: string[] }>({
     diagnoses: [],
     treatments: [],
@@ -63,6 +66,7 @@ export default function PostDetailScreen() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsLoggedIn(!!session);
+      setCurrentUserId(session?.user?.id || null);
     });
 
     return () => subscription.unsubscribe();
@@ -71,6 +75,7 @@ export default function PostDetailScreen() {
   const checkLoginStatus = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     setIsLoggedIn(!!session);
+    setCurrentUserId(session?.user?.id || null);
   };
 
   const loadPostDetail = async () => {
@@ -86,7 +91,7 @@ export default function PostDetailScreen() {
       // ユーザー情報を取得
       const { data: userData } = await supabase
         .from('users')
-        .select('user_id, display_name')
+        .select('user_id, display_name, avatar_url')
         .eq('user_id', postData.user_id)
         .single();
 
@@ -95,6 +100,7 @@ export default function PostDetailScreen() {
         user: {
           display_name: userData?.display_name || 'Unknown',
           user_id: postData.user_id,
+          avatar_url: userData?.avatar_url || null,
         },
       });
     } catch (error) {
@@ -125,11 +131,11 @@ export default function PostDetailScreen() {
       const userIds = [...new Set(repliesData.map(r => r.user_id))];
       const { data: usersData } = await supabase
         .from('users')
-        .select('user_id, display_name')
+        .select('user_id, display_name, avatar_url')
         .in('user_id', userIds);
 
       const usersMap = new Map(
-        (usersData || []).map(u => [u.user_id, u.display_name])
+        (usersData || []).map(u => [u.user_id, { display_name: u.display_name, avatar_url: u.avatar_url }])
       );
 
       const formattedReplies: Reply[] = repliesData.map((reply: any) => ({
@@ -137,8 +143,9 @@ export default function PostDetailScreen() {
         content: reply.content,
         created_at: reply.created_at,
         user: {
-          display_name: usersMap.get(reply.user_id) || 'Unknown',
+          display_name: usersMap.get(reply.user_id)?.display_name || 'Unknown',
           user_id: reply.user_id,
+          avatar_url: usersMap.get(reply.user_id)?.avatar_url || null,
         },
       }));
 
@@ -323,6 +330,12 @@ export default function PostDetailScreen() {
     router.push(`/reply/${id}`);
   };
 
+  const handleEdit = () => {
+    router.push(`/create-post?postId=${id}`);
+  };
+
+  const isOwnPost = currentUserId && post && currentUserId === post.user_id;
+
   if (loading) {
     return (
       <Box className="flex-1 items-center justify-center">
@@ -345,12 +358,16 @@ export default function PostDetailScreen() {
   return (
     <>
       <Stack.Screen options={{ title: 'ポスト' }} />
-      <ScrollView className="flex-1 bg-background-0">
+      <RNScrollView className="flex-1 bg-background-0">
         {/* 投稿詳細 */}
       <Box className="px-4 py-4 border-b border-outline-200">
         <HStack space="sm" className="items-start mb-3">
           <Avatar size="md">
-            <AvatarFallbackText>{post.user.display_name}</AvatarFallbackText>
+            {post.user.avatar_url ? (
+              <AvatarImage source={{ uri: post.user.avatar_url }} />
+            ) : (
+              <AvatarFallbackText>{post.user.display_name}</AvatarFallbackText>
+            )}
           </Avatar>
           <VStack>
             <Text className="font-semibold text-base">{post.user.display_name}</Text>
@@ -360,35 +377,44 @@ export default function PostDetailScreen() {
 
         <Text className="text-lg leading-6 mb-2">{post.content}</Text>
 
-        {/* タグ表示 */}
+        {/* タグ表示（改行） */}
         {(tags.diagnoses.length > 0 || tags.treatments.length > 0 || tags.medications.length > 0) && (
-          <HStack space="xs" className="flex-wrap mb-2">
+          <Box className="mb-2 flex-row flex-wrap gap-2">
             {tags.diagnoses.map((tag, index) => (
-              <Box key={`d-${index}`} className="bg-blue-100 px-3 py-1 rounded mb-2">
+              <Box key={`d-${index}`} className="bg-blue-100 px-3 py-1 rounded">
                 <Text className="text-xs text-blue-700">{tag}</Text>
               </Box>
             ))}
             {tags.treatments.map((tag, index) => (
-              <Box key={`t-${index}`} className="bg-green-100 px-3 py-1 rounded mb-2">
+              <Box key={`t-${index}`} className="bg-green-100 px-3 py-1 rounded">
                 <Text className="text-xs text-green-700">{tag}</Text>
               </Box>
             ))}
             {tags.medications.map((tag, index) => (
-              <Box key={`m-${index}`} className="bg-purple-100 px-3 py-1 rounded mb-2">
+              <Box key={`m-${index}`} className="bg-purple-100 px-3 py-1 rounded">
                 <Text className="text-xs text-purple-700">{tag}</Text>
               </Box>
             ))}
-          </HStack>
+          </Box>
         )}
 
         {/* 統計情報 */}
-        <HStack space="lg" className="mb-3">
-          <Text className="text-sm text-typography-500">
-            <Text className="font-semibold text-typography-900">{repliesCount}</Text> 件の返信
-          </Text>
-          <Text className="text-sm text-typography-500">
-            <Text className="font-semibold text-typography-900">{likesCount}</Text> いいね
-          </Text>
+        <HStack space="lg" className="mb-3 justify-between items-center">
+          <HStack space="lg">
+            <Text className="text-sm text-typography-500">
+              <Text className="font-semibold text-typography-900">{repliesCount}</Text> 件の返信
+            </Text>
+            <Text className="text-sm text-typography-500">
+              <Text className="font-semibold text-typography-900">{likesCount}</Text> いいね
+            </Text>
+          </HStack>
+
+          {/* 編集ボタン（自分の投稿のみ） */}
+          {isOwnPost && (
+            <Pressable onPress={handleEdit}>
+              <Edit size={20} color="#666" />
+            </Pressable>
+          )}
         </HStack>
 
         {/* アクションボタン */}
@@ -427,7 +453,11 @@ export default function PostDetailScreen() {
             <Box key={reply.id} className="px-4 py-3 border-b border-outline-200">
               <HStack space="sm" className="items-start">
                 <Avatar size="sm">
-                  <AvatarFallbackText>{reply.user.display_name}</AvatarFallbackText>
+                  {reply.user.avatar_url ? (
+                    <AvatarImage source={{ uri: reply.user.avatar_url }} />
+                  ) : (
+                    <AvatarFallbackText>{reply.user.display_name}</AvatarFallbackText>
+                  )}
                 </Avatar>
                 <VStack className="flex-1" space="xs">
                   <HStack space="xs" className="items-center">
@@ -442,7 +472,7 @@ export default function PostDetailScreen() {
           ))}
         </Box>
       )}
-      </ScrollView>
+      </RNScrollView>
     </>
   );
 }

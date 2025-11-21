@@ -17,8 +17,11 @@ interface Post {
   user: {
     display_name: string;
     user_id: string;
+    avatar_url?: string | null;
   };
-  tags: string[];
+  diagnoses: string[];
+  treatments: string[];
+  medications: string[];
 }
 
 export default function TabOneScreen() {
@@ -100,25 +103,83 @@ export default function TabOneScreen() {
       const postUserIds = [...new Set(postsData.map(p => p.user_id))];
       const { data: usersData, error: usersError } = await supabase
         .from('users')
-        .select('user_id, display_name')
+        .select('user_id, display_name, avatar_url')
         .in('user_id', postUserIds);
 
       if (usersError) throw usersError;
 
       // ユーザー情報をマップに変換
       const usersMap = new Map(
-        (usersData || []).map(u => [u.user_id, u.display_name])
+        (usersData || []).map(u => [u.user_id, { display_name: u.display_name, avatar_url: u.avatar_url }])
       );
+
+      // 投稿IDを取得
+      const postIds = postsData.map(p => p.id);
+
+      // 診断名を取得
+      const { data: diagnosesData } = await supabase
+        .from('post_diagnoses')
+        .select('post_id, user_diagnoses(diagnoses(name))')
+        .in('post_id', postIds);
+
+      // 治療法を取得
+      const { data: treatmentsData } = await supabase
+        .from('post_treatments')
+        .select('post_id, user_treatments(treatments(name))')
+        .in('post_id', postIds);
+
+      // 服薬を取得
+      const { data: medicationsData } = await supabase
+        .from('post_medications')
+        .select('post_id, user_medications(ingredients(name), products(name))')
+        .in('post_id', postIds);
+
+      // 投稿ごとのタグをマップに変換
+      const diagnosesMap = new Map<string, string[]>();
+      diagnosesData?.forEach((d: any) => {
+        const name = d.user_diagnoses?.diagnoses?.name;
+        if (name) {
+          if (!diagnosesMap.has(d.post_id)) {
+            diagnosesMap.set(d.post_id, []);
+          }
+          diagnosesMap.get(d.post_id)?.push(name);
+        }
+      });
+
+      const treatmentsMap = new Map<string, string[]>();
+      treatmentsData?.forEach((t: any) => {
+        const name = t.user_treatments?.treatments?.name;
+        if (name) {
+          if (!treatmentsMap.has(t.post_id)) {
+            treatmentsMap.set(t.post_id, []);
+          }
+          treatmentsMap.get(t.post_id)?.push(name);
+        }
+      });
+
+      const medicationsMap = new Map<string, string[]>();
+      medicationsData?.forEach((m: any) => {
+        const name = m.user_medications?.products?.name || m.user_medications?.ingredients?.name;
+        if (name) {
+          if (!medicationsMap.has(m.post_id)) {
+            medicationsMap.set(m.post_id, []);
+          }
+          medicationsMap.get(m.post_id)?.push(name);
+        }
+      });
 
       const formattedPosts: Post[] = postsData.map((post: any) => ({
         id: post.id,
         content: post.content,
         created_at: post.created_at,
         user: {
-          display_name: usersMap.get(post.user_id) || 'Unknown',
+          display_name: usersMap.get(post.user_id)?.display_name || 'Unknown',
           user_id: post.user_id,
+          avatar_url: usersMap.get(post.user_id)?.avatar_url || null,
         },
-        tags: [],
+        diagnoses: diagnosesMap.get(post.id) || [],
+        treatments: treatmentsMap.get(post.id) || [],
+        medications: medicationsMap.get(post.id) || [],
       }));
 
       setPosts(formattedPosts);
