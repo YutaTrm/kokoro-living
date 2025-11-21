@@ -862,6 +862,22 @@ export default function ProfileScreen() {
               </Button>
             </VStack>
           </Box>
+
+          {/* 自分のプロフィールを表示 */}
+          <Box className="px-5 py-4 border-t border-outline-200">
+            <Button
+              onPress={async () => {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                  router.push(`/user/${user.id}`);
+                }
+              }}
+              variant="outline"
+              className="w-full"
+            >
+              <ButtonText>自分のプロフィール</ButtonText>
+            </Button>
+          </Box>
         </>
       )}
 

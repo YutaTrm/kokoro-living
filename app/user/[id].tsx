@@ -302,11 +302,19 @@ export default function UserDetailScreen() {
               <Box>
                 <Text className="text-xs text-typography-500 mb-1">診断名</Text>
                 <Box className="flex-row flex-wrap gap-1">
-                  {diagnoses.map((d) => (
-                    <Box key={d.id} className="bg-blue-100 px-2 py-1 rounded">
-                      <Text className="text-xs text-blue-700">{d.name}</Text>
-                    </Box>
-                  ))}
+                  {diagnoses.map((d) => {
+                    const isEnded = d.endDate !== null;
+                    return (
+                      <Box
+                        key={d.id}
+                        className={`px-2 py-1 rounded ${isEnded ? 'bg-gray-100' : 'bg-blue-100'}`}
+                      >
+                        <Text className={`text-xs ${isEnded ? 'text-gray-500' : 'text-blue-700'}`}>
+                          {d.name}
+                        </Text>
+                      </Box>
+                    );
+                  })}
                 </Box>
               </Box>
             )}
@@ -316,11 +324,19 @@ export default function UserDetailScreen() {
               <Box>
                 <Text className="text-xs text-typography-500 mb-1">治療</Text>
                 <Box className="flex-row flex-wrap gap-1">
-                  {treatments.map((t) => (
-                    <Box key={t.id} className="bg-green-100 px-2 py-1 rounded">
-                      <Text className="text-xs text-green-700">{t.name}</Text>
-                    </Box>
-                  ))}
+                  {treatments.map((t) => {
+                    const isEnded = t.endDate !== null;
+                    return (
+                      <Box
+                        key={t.id}
+                        className={`px-2 py-1 rounded ${isEnded ? 'bg-gray-100' : 'bg-green-100'}`}
+                      >
+                        <Text className={`text-xs ${isEnded ? 'text-gray-500' : 'text-green-700'}`}>
+                          {t.name}
+                        </Text>
+                      </Box>
+                    );
+                  })}
                 </Box>
               </Box>
             )}
@@ -330,11 +346,19 @@ export default function UserDetailScreen() {
               <Box>
                 <Text className="text-xs text-typography-500 mb-1">服薬</Text>
                 <Box className="flex-row flex-wrap gap-1">
-                  {medications.map((m) => (
-                    <Box key={m.id} className="bg-purple-100 px-2 py-1 rounded">
-                      <Text className="text-xs text-purple-700">{m.name}</Text>
-                    </Box>
-                  ))}
+                  {medications.map((m) => {
+                    const isEnded = m.endDate !== null;
+                    return (
+                      <Box
+                        key={m.id}
+                        className={`px-2 py-1 rounded ${isEnded ? 'bg-gray-100' : 'bg-purple-100'}`}
+                      >
+                        <Text className={`text-xs ${isEnded ? 'text-gray-500' : 'text-purple-700'}`}>
+                          {m.name}
+                        </Text>
+                      </Box>
+                    );
+                  })}
                 </Box>
               </Box>
             )}
@@ -344,11 +368,19 @@ export default function UserDetailScreen() {
               <Box>
                 <Text className="text-xs text-typography-500 mb-1">ステータス</Text>
                 <Box className="flex-row flex-wrap gap-1">
-                  {statuses.map((s) => (
-                    <Box key={s.id} className="bg-orange-100 px-2 py-1 rounded">
-                      <Text className="text-xs text-orange-700">{s.name}</Text>
-                    </Box>
-                  ))}
+                  {statuses.map((s) => {
+                    const isEnded = s.endDate !== null;
+                    return (
+                      <Box
+                        key={s.id}
+                        className={`px-2 py-1 rounded ${isEnded ? 'bg-gray-100' : 'bg-orange-100'}`}
+                      >
+                        <Text className={`text-xs ${isEnded ? 'text-gray-500' : 'text-orange-700'}`}>
+                          {s.name}
+                        </Text>
+                      </Box>
+                    );
+                  })}
                 </Box>
               </Box>
             )}
@@ -366,7 +398,7 @@ export default function UserDetailScreen() {
             <FlatList
               data={posts}
               keyExtractor={(item) => item.id}
-              renderItem={({ item }) => <PostItem post={item} />}
+              renderItem={({ item }) => <PostItem post={item} disableAvatarTap={true} />}
               scrollEnabled={false}
             />
           )}

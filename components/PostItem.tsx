@@ -21,9 +21,10 @@ interface PostItemProps {
     treatments: string[];
     medications: string[];
   };
+  disableAvatarTap?: boolean;
 }
 
-export default function PostItem({ post }: PostItemProps) {
+export default function PostItem({ post, disableAvatarTap = false }: PostItemProps) {
   const router = useRouter();
 
   const formatDate = (dateString: string) => {
@@ -46,31 +47,43 @@ export default function PostItem({ post }: PostItemProps) {
   };
 
   const handleAvatarPress = (e: any) => {
+    if (disableAvatarTap) return;
     e.stopPropagation();
     router.push(`/user/${post.user.user_id}`);
   };
+
+  const AvatarComponent = disableAvatarTap ? (
+    <Avatar size="md">
+      {post.user.avatar_url ? (
+        <AvatarImage source={{ uri: post.user.avatar_url }} />
+      ) : (
+        <AvatarFallbackText>{post.user.display_name || 'User'}</AvatarFallbackText>
+      )}
+    </Avatar>
+  ) : (
+    <Pressable onPress={handleAvatarPress}>
+      <Avatar size="md">
+        {post.user.avatar_url ? (
+          <AvatarImage source={{ uri: post.user.avatar_url }} />
+        ) : (
+          <AvatarFallbackText>{post.user.display_name || 'User'}</AvatarFallbackText>
+        )}
+      </Avatar>
+    </Pressable>
+  );
 
   return (
     <Pressable onPress={handlePress}>
       <Box className="border-b border-outline-200 px-4 py-3">
         <HStack space="sm" className="items-start">
           {/* アバター */}
-          <Pressable onPress={handleAvatarPress}>
-            <Avatar size="md">
-              {post.user.avatar_url ? (
-                <AvatarImage source={{ uri: post.user.avatar_url }} />
-              ) : (
-                <AvatarFallbackText>{post.user.display_name || 'User'}</AvatarFallbackText>
-              )}
-            </Avatar>
-          </Pressable>
+          {AvatarComponent}
 
           {/* 投稿内容 */}
           <VStack className="flex-1" space="xs">
             {/* ユーザー名、時間、タグ */}
             <HStack space="xs" className="items-center flex-1">
               <Text className="font-semibold text-base">{post.user.display_name}</Text>
-              <Text className="text-sm text-typography-500">·</Text>
               <Text className="text-sm text-typography-500">{formatDate(post.created_at)}</Text>
 
               {/* タグ（横スクロール） */}
