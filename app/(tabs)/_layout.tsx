@@ -42,7 +42,6 @@ export default function TabLayout() {
         options={{
           title: 'ホーム',
           tabBarIcon: ({ color }) => <House color={color} size={24} />,
-          headerShown: false,
         }}
       />
       <Tabs.Screen
@@ -50,7 +49,6 @@ export default function TabLayout() {
         options={{
           title: '検索',
           tabBarIcon: ({ color }) => <Search color={color} size={24} />,
-          headerShown: false,
         }}
       />
       <Tabs.Screen
@@ -58,7 +56,6 @@ export default function TabLayout() {
         options={{
           title: '通知',
           tabBarIcon: ({ color }) => <Bell color={color} size={24} />,
-          headerShown: false,
         }}
       />
       <Tabs.Screen
@@ -66,7 +63,6 @@ export default function TabLayout() {
         options={{
           title: 'マイページ',
           tabBarIcon: ({ color }) => <User color={color} size={24} />,
-          headerShown: false,
         }}
       />
     </Tabs>
