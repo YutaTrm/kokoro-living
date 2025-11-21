@@ -115,7 +115,9 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
             </HStack>
 
             {/* 投稿テキスト */}
-            <Text className="text-base leading-5">{post.content}</Text>
+            <Text className="text-base leading-5" numberOfLines={3} ellipsizeMode="tail">
+              {post.content}
+            </Text>
           </VStack>
         </HStack>
       </Box>

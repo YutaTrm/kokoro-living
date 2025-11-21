@@ -30,6 +30,12 @@ export default function CreatePostScreen() {
   const [availableTags, setAvailableTags] = useState<MedicalTag[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
+  // experienced_at用の状態管理
+  const currentDate = new Date();
+  const [experiencedYear, setExperiencedYear] = useState(currentDate.getFullYear().toString());
+  const [experiencedMonth, setExperiencedMonth] = useState((currentDate.getMonth() + 1).toString());
+  const [isExperiencedAtUnset, setIsExperiencedAtUnset] = useState(false);
+
   const maxLength = 140;
   const remainingChars = maxLength - content.length;
   const isEditMode = !!postId;
@@ -118,7 +124,7 @@ export default function CreatePostScreen() {
       // 投稿内容を取得
       const { data: post, error: postError } = await supabase
         .from('posts')
-        .select('content')
+        .select('content, experienced_at')
         .eq('id', postId)
         .single();
 
@@ -129,6 +135,16 @@ export default function CreatePostScreen() {
       }
 
       setContent(post.content);
+
+      // experienced_atを設定
+      if (post.experienced_at) {
+        const date = new Date(post.experienced_at);
+        setExperiencedYear(date.getFullYear().toString());
+        setExperiencedMonth((date.getMonth() + 1).toString());
+        setIsExperiencedAtUnset(false);
+      } else {
+        setIsExperiencedAtUnset(true);
+      }
 
       // 既存のタグを取得
       const tagIds: string[] = [];
@@ -198,11 +214,19 @@ export default function CreatePostScreen() {
 
       let finalPostId: string;
 
+      // experienced_atを計算
+      const experiencedAt = isExperiencedAtUnset
+        ? null
+        : `${experiencedYear}-${experiencedMonth.padStart(2, '0')}-01`;
+
       if (isEditMode && postId) {
         // 編集モード：投稿を更新
         const { error: updateError } = await supabase
           .from('posts')
-          .update({ content: content.trim() })
+          .update({
+            content: content.trim(),
+            experienced_at: experiencedAt,
+          })
           .eq('id', postId);
 
         if (updateError) {
@@ -224,6 +248,7 @@ export default function CreatePostScreen() {
           .insert({
             user_id: user.id,
             content: content.trim(),
+            experienced_at: experiencedAt,
           })
           .select()
           .single();
@@ -317,6 +342,66 @@ export default function CreatePostScreen() {
             >
               {remainingChars}
             </Text>
+          </Box>
+
+          {/* 体験日時選択 */}
+          <Box>
+            <Heading size="sm" className="mb-3">
+              体験日時（任意）
+            </Heading>
+            <HStack space="sm">
+              <Box className="flex-1 border border-outline-200 rounded-lg">
+                <ScrollView className="max-h-40">
+                  <Pressable
+                    onPress={() => setIsExperiencedAtUnset(true)}
+                    className={`p-3 border-b border-outline-100 ${isExperiencedAtUnset ? 'bg-secondary-300' : ''}`}
+                  >
+                    <Text
+                      className={`text-center ${isExperiencedAtUnset ? 'font-semibold text-primary-600' : ''}`}
+                    >
+                      未設定
+                    </Text>
+                  </Pressable>
+                  {Array.from({ length: 50 }, (_, i) => (currentDate.getFullYear() - i).toString()).map((year) => (
+                    <Pressable
+                      key={year}
+                      onPress={() => {
+                        setExperiencedYear(year);
+                        setIsExperiencedAtUnset(false);
+                      }}
+                      className={`p-3 border-b border-outline-100 ${experiencedYear === year && !isExperiencedAtUnset ? 'bg-secondary-300' : ''}`}
+                    >
+                      <Text
+                        className={`text-center ${experiencedYear === year && !isExperiencedAtUnset ? 'font-semibold text-primary-600' : ''}`}
+                      >
+                        {year}年
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </Box>
+              <Box className="flex-1 border border-outline-200 rounded-lg">
+                <ScrollView className="max-h-40">
+                  {Array.from({ length: 12 }, (_, i) => (i + 1).toString()).map((month) => (
+                    <Pressable
+                      key={month}
+                      onPress={() => {
+                        setExperiencedMonth(month);
+                        setIsExperiencedAtUnset(false);
+                      }}
+                      className={`p-3 border-b border-outline-100 ${experiencedMonth === month && !isExperiencedAtUnset ? 'bg-secondary-300' : ''}`}
+                      disabled={isExperiencedAtUnset}
+                    >
+                      <Text
+                        className={`text-center ${experiencedMonth === month && !isExperiencedAtUnset ? 'font-semibold text-primary-600' : ''} ${isExperiencedAtUnset ? 'text-typography-400' : ''}`}
+                      >
+                        {month}月
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </Box>
+            </HStack>
           </Box>
 
           {/* タグ選択 */}

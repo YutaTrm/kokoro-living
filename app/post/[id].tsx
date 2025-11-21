@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { Bookmark, Edit, Heart, MessageCircle } from 'lucide-react-native';
+import { Bookmark, Clock, Edit, Heart, MessageCircle } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView as RNScrollView } from 'react-native';
 
@@ -17,6 +17,7 @@ interface Post {
   content: string;
   created_at: string;
   user_id: string;
+  experienced_at?: string | null;
   user: {
     display_name: string;
     user_id: string;
@@ -82,7 +83,7 @@ export default function PostDetailScreen() {
     try {
       const { data: postData, error: postError } = await supabase
         .from('posts')
-        .select('id, content, created_at, user_id')
+        .select('id, content, created_at, user_id, experienced_at')
         .eq('id', id)
         .single();
 
@@ -322,6 +323,13 @@ export default function PostDetailScreen() {
     });
   };
 
+  const formatExperiencedAt = (dateString: string) => {
+    const date = new Date(dateString);
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    return `${year}/${month}当時`;
+  };
+
   const handleReply = () => {
     if (!isLoggedIn) {
       Alert.alert('エラー', 'ログインしてください');
@@ -382,6 +390,14 @@ export default function PostDetailScreen() {
         </HStack>
 
         <Text className="text-lg leading-6 mb-2">{post.content}</Text>
+
+        {/* 体験日時表示 */}
+        {post.experienced_at && (
+          <HStack space="xs" className="items-center mb-2">
+            <Clock size={16} color="#666" />
+            <Text className="text-sm text-typography-500">{formatExperiencedAt(post.experienced_at)}</Text>
+          </HStack>
+        )}
 
         {/* タグ表示（改行） */}
         {(tags.diagnoses.length > 0 || tags.treatments.length > 0 || tags.medications.length > 0) && (
