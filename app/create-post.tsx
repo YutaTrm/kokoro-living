@@ -1,0 +1,322 @@
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Alert, Pressable, ScrollView, TextInput } from 'react-native';
+
+import { Text } from '@/components/Themed';
+import { Box } from '@/components/ui/box';
+import { Button, ButtonText } from '@/components/ui/button';
+import { Checkbox, CheckboxIcon, CheckboxIndicator, CheckboxLabel } from '@/components/ui/checkbox';
+import { Heading } from '@/components/ui/heading';
+import { HStack } from '@/components/ui/hstack';
+import { CheckIcon } from '@/components/ui/icon';
+import { Spinner } from '@/components/ui/spinner';
+import { VStack } from '@/components/ui/vstack';
+import { supabase } from '@/src/lib/supabase';
+
+interface MedicalTag {
+  id: string;
+  name: string;
+  type: 'diagnosis' | 'treatment' | 'medication';
+}
+
+export default function CreatePostScreen() {
+  const router = useRouter();
+  const [content, setContent] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [loadingTags, setLoadingTags] = useState(true);
+
+  const [availableTags, setAvailableTags] = useState<MedicalTag[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+
+  const maxLength = 140;
+  const remainingChars = maxLength - content.length;
+
+  useEffect(() => {
+    loadUserMedicalData();
+  }, []);
+
+  const loadUserMedicalData = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const tags: MedicalTag[] = [];
+
+      // 診断名を取得
+      const { data: diagnoses } = await supabase
+        .from('user_diagnoses')
+        .select('id, diagnoses(name)')
+        .eq('user_id', user.id);
+
+      if (diagnoses) {
+        diagnoses.forEach((d: any) => {
+          if (d.diagnoses?.name) {
+            tags.push({
+              id: d.id,
+              name: d.diagnoses.name,
+              type: 'diagnosis',
+            });
+          }
+        });
+      }
+
+      // 治療法を取得
+      const { data: treatments } = await supabase
+        .from('user_treatments')
+        .select('id, treatments(name)')
+        .eq('user_id', user.id);
+
+      if (treatments) {
+        treatments.forEach((t: any) => {
+          if (t.treatments?.name) {
+            tags.push({
+              id: t.id,
+              name: t.treatments.name,
+              type: 'treatment',
+            });
+          }
+        });
+      }
+
+      // 服薬を取得
+      const { data: medications } = await supabase
+        .from('user_medications')
+        .select('id, ingredients(name), products(name)')
+        .eq('user_id', user.id);
+
+      if (medications) {
+        medications.forEach((m: any) => {
+          const name = m.products?.name || m.ingredients?.name;
+          if (name) {
+            tags.push({
+              id: m.id,
+              name: name,
+              type: 'medication',
+            });
+          }
+        });
+      }
+
+      setAvailableTags(tags);
+    } catch (error) {
+      console.error('医療情報取得エラー:', error);
+    } finally {
+      setLoadingTags(false);
+    }
+  };
+
+  const toggleTag = (tagId: string) => {
+    setSelectedTags((prev) =>
+      prev.includes(tagId)
+        ? prev.filter((id) => id !== tagId)
+        : [...prev, tagId]
+    );
+  };
+
+  const handlePost = async () => {
+    if (!content.trim()) {
+      Alert.alert('エラー', '投稿内容を入力してください');
+      return;
+    }
+
+    if (content.length > maxLength) {
+      Alert.alert('エラー', `投稿は${maxLength}文字以内で入力してください`);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        Alert.alert('エラー', 'ログインしてください');
+        return;
+      }
+
+      // 投稿を作成
+      const { data: post, error: postError } = await supabase
+        .from('posts')
+        .insert({
+          user_id: user.id,
+          content: content.trim(),
+        })
+        .select()
+        .single();
+
+      if (postError || !post) {
+        throw postError;
+      }
+
+      // タグを関連付け
+      const tagPromises = selectedTags.map((tagId) => {
+        const tag = availableTags.find((t) => t.id === tagId);
+        if (!tag) return null;
+
+        const tableName =
+          tag.type === 'diagnosis'
+            ? 'post_diagnoses'
+            : tag.type === 'treatment'
+            ? 'post_treatments'
+            : 'post_medications';
+
+        const columnName =
+          tag.type === 'diagnosis'
+            ? 'user_diagnosis_id'
+            : tag.type === 'treatment'
+            ? 'user_treatment_id'
+            : 'user_medication_id';
+
+        return supabase.from(tableName).insert({
+          post_id: post.id,
+          [columnName]: tagId,
+        });
+      });
+
+      await Promise.all(tagPromises.filter((p) => p !== null));
+
+      // タイムラインにリダイレクト（リロードされる）
+      router.replace('/(tabs)');
+    } catch (error) {
+      console.error('投稿エラー:', error);
+      Alert.alert('エラー', '投稿に失敗しました');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Box className="flex-1 bg-background-0">
+      {/* ヘッダー */}
+      <HStack className="justify-between items-center px-4 py-3 border-b border-outline-200">
+        <Button variant="link" onPress={() => router.back()}>
+          <ButtonText>キャンセル</ButtonText>
+        </Button>
+        <Button
+          onPress={handlePost}
+          disabled={loading || !content.trim()}
+          size="sm"
+        >
+          <ButtonText>{loading ? '投稿中...' : '投稿'}</ButtonText>
+        </Button>
+      </HStack>
+
+      <ScrollView className="flex-1">
+        <VStack className="p-4" space="lg">
+          {/* テキスト入力 */}
+          <Box>
+            <TextInput
+              className="text-base min-h-[120px] text-typography-900"
+              placeholder="状態や感情を記述してください"
+              placeholderTextColor="#999"
+              multiline
+              value={content}
+              onChangeText={setContent}
+              maxLength={maxLength}
+              autoFocus
+            />
+            <Text
+              className={`text-sm text-right mt-2 ${
+                remainingChars < 0 ? 'text-error-500' : 'text-typography-500'
+              }`}
+            >
+              {remainingChars}
+            </Text>
+          </Box>
+
+          {/* タグ選択 */}
+          <Box>
+            <Heading size="sm" className="mb-3">
+              タグを選択（任意）
+            </Heading>
+            {loadingTags ? (
+              <Spinner size="large" />
+            ) : availableTags.length > 0 ? (
+              <VStack space="lg">
+                {/* 診断名グループ */}
+                {availableTags.filter(t => t.type === 'diagnosis').length > 0 && (
+                  <Box>
+                    <Text className="text-sm font-semibold mb-2 text-typography-700">診断名</Text>
+                    <VStack space="sm">
+                      {availableTags
+                        .filter(t => t.type === 'diagnosis')
+                        .map((tag) => (
+                          <Pressable key={tag.id} onPress={() => toggleTag(tag.id)}>
+                            <Checkbox
+                              value={tag.id}
+                              isChecked={selectedTags.includes(tag.id)}
+                              onChange={() => toggleTag(tag.id)}
+                              size="sm"
+                            >
+                              <CheckboxIndicator>
+                                <CheckboxIcon as={CheckIcon} />
+                              </CheckboxIndicator>
+                              <CheckboxLabel>{tag.name}</CheckboxLabel>
+                            </Checkbox>
+                          </Pressable>
+                        ))}
+                    </VStack>
+                  </Box>
+                )}
+
+                {/* 治療法グループ */}
+                {availableTags.filter(t => t.type === 'treatment').length > 0 && (
+                  <Box>
+                    <Text className="text-sm font-semibold mb-2 text-typography-700">治療法</Text>
+                    <VStack space="sm">
+                      {availableTags
+                        .filter(t => t.type === 'treatment')
+                        .map((tag) => (
+                          <Pressable key={tag.id} onPress={() => toggleTag(tag.id)}>
+                            <Checkbox
+                              value={tag.id}
+                              isChecked={selectedTags.includes(tag.id)}
+                              onChange={() => toggleTag(tag.id)}
+                              size="sm"
+                            >
+                              <CheckboxIndicator>
+                                <CheckboxIcon as={CheckIcon} />
+                              </CheckboxIndicator>
+                              <CheckboxLabel>{tag.name}</CheckboxLabel>
+                            </Checkbox>
+                          </Pressable>
+                        ))}
+                    </VStack>
+                  </Box>
+                )}
+
+                {/* 服薬グループ */}
+                {availableTags.filter(t => t.type === 'medication').length > 0 && (
+                  <Box>
+                    <Text className="text-sm font-semibold mb-2 text-typography-700">服薬</Text>
+                    <VStack space="sm">
+                      {availableTags
+                        .filter(t => t.type === 'medication')
+                        .map((tag) => (
+                          <Pressable key={tag.id} onPress={() => toggleTag(tag.id)}>
+                            <Checkbox
+                              value={tag.id}
+                              isChecked={selectedTags.includes(tag.id)}
+                              onChange={() => toggleTag(tag.id)}
+                              size="sm"
+                            >
+                              <CheckboxIndicator>
+                                <CheckboxIcon as={CheckIcon} />
+                              </CheckboxIndicator>
+                              <CheckboxLabel>{tag.name}</CheckboxLabel>
+                            </Checkbox>
+                          </Pressable>
+                        ))}
+                    </VStack>
+                  </Box>
+                )}
+              </VStack>
+            ) : (
+              <Text className="text-sm text-typography-500">
+                タグを追加するには、プロフィールで医療情報を登録してください
+              </Text>
+            )}
+          </Box>
+        </VStack>
+      </ScrollView>
+    </Box>
+  );
+}

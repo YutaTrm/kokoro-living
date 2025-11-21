@@ -1,33 +1,18 @@
 import { Tabs } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { useColorScheme } from 'react-native';
 
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
 import { supabase } from '@/src/lib/supabase';
 
 import {
+  Bell,
   House,
   Search,
-  Bell,
   User,
 } from 'lucide-react-native';
 
-// テーマカラー定義
-const colors = {
-  light: {
-    primary: '#45a393',
-    error: '#f08080',
-  },
-  dark: {
-    primary: '#5ec4b0',
-    error: '#ff9999',
-  },
-};
-
 export default function TabLayout() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const colorScheme = useColorScheme();
-  const themeColors = colors[colorScheme === 'dark' ? 'dark' : 'light'];
 
   useEffect(() => {
     // ログイン状態を確認
@@ -46,7 +31,7 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: themeColors.primary,
+        tabBarActiveTintColor: '#333',
         tabBarShowLabel: false,
         tabBarStyle: isLoggedIn ? undefined : { display: 'none' },
         // Disable the static render of the header on web

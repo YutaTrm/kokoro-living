@@ -1,20 +1,37 @@
-import { Alert, FlatList, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { useState, useEffect } from 'react';
+import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { useEffect, useState } from 'react';
+import { Alert, FlatList, RefreshControl } from 'react-native';
 
-import { Text, View } from '@/components/Themed';
-import { Box } from '@/components/ui/box';
-import { Button, ButtonText } from '@/components/ui/button';
-import { HStack } from '@/components/ui/hstack';
 import XLogo from '@/components/icons/XLogo';
+import PostItem from '@/components/PostItem';
+import { Text } from '@/components/Themed';
+import { Box } from '@/components/ui/box';
+import { Button, ButtonIcon, ButtonText } from '@/components/ui/button';
+import { HStack } from '@/components/ui/hstack';
+import { AddIcon } from '@/components/ui/icon';
+import { Spinner } from '@/components/ui/spinner';
 import { supabase } from '@/src/lib/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
 
+interface Post {
+  id: string;
+  content: string;
+  created_at: string;
+  user: {
+    display_name: string;
+    user_id: string;
+  };
+  tags: string[];
+}
+
 export default function TabOneScreen() {
+  const router = useRouter();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     checkLoginStatus();
@@ -28,8 +45,80 @@ export default function TabOneScreen() {
 
   const checkLoginStatus = async () => {
     const { data: { session } } = await supabase.auth.getSession();
-    setIsLoggedIn(!!session);
+    const loggedIn = !!session;
+    setIsLoggedIn(loggedIn);
     setLoading(false);
+
+    if (loggedIn) {
+      loadPosts();
+    }
+  };
+
+  const loadPosts = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // 自分がフォローしている人のIDを取得
+      const { data: followingData } = await supabase
+        .from('follows')
+        .select('following_id')
+        .eq('follower_id', user.id);
+
+      const followingIds = followingData?.map(f => f.following_id) || [];
+      const userIds = [user.id, ...followingIds]; // 自分のIDも追加
+
+      // 自分とフォローしている人の投稿を取得
+      const { data: postsData, error: postsError } = await supabase
+        .from('posts')
+        .select('id, content, created_at, user_id')
+        .in('user_id', userIds)
+        .is('parent_post_id', null)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (postsError) throw postsError;
+
+      if (!postsData || postsData.length === 0) {
+        setPosts([]);
+        return;
+      }
+
+      // 投稿者のユーザー情報を取得
+      const postUserIds = [...new Set(postsData.map(p => p.user_id))];
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('user_id, display_name')
+        .in('user_id', postUserIds);
+
+      if (usersError) throw usersError;
+
+      // ユーザー情報をマップに変換
+      const usersMap = new Map(
+        (usersData || []).map(u => [u.user_id, u.display_name])
+      );
+
+      const formattedPosts: Post[] = postsData.map((post: any) => ({
+        id: post.id,
+        content: post.content,
+        created_at: post.created_at,
+        user: {
+          display_name: usersMap.get(post.user_id) || 'Unknown',
+          user_id: post.user_id,
+        },
+        tags: [],
+      }));
+
+      setPosts(formattedPosts);
+    } catch (error) {
+      console.error('投稿取得エラー:', error);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadPosts();
+    setRefreshing(false);
   };
   const handleXLogin = async () => {
     try {
@@ -105,7 +194,7 @@ export default function TabOneScreen() {
   if (loading) {
     return (
       <Box className="flex-1 items-center justify-center">
-        <ActivityIndicator size="large" />
+        <Spinner size="large" />
       </Box>
     );
   }
@@ -130,26 +219,28 @@ export default function TabOneScreen() {
   return (
     <Box className="flex-1">
       <FlatList
-        data={[]}
-        renderItem={() => null}
+        className="mt-12"
+        data={posts}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => <PostItem post={item} />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
         ListEmptyComponent={
           <Box className="flex-1 items-center justify-center pt-24">
             <Text className="text-base opacity-50">まだ投稿がありません</Text>
           </Box>
         }
       />
-      <TouchableOpacity
-        className="absolute right-5 bottom-5 w-14 h-14 rounded-full bg-primary-500 items-center justify-center"
-        style={{
-          shadowColor: 'rgba(0,0,0,0.3)',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.25,
-          shadowRadius: 3.84,
-          elevation: 5,
-        }}
+      <Button
+        className="absolute right-5 bottom-5 rounded-full h-16 w-16"
+        variant="solid"
+        size="md"
+        action="primary"
+        onPress={() => router.push('/create-post')}
       >
-        <FontAwesome name="plus" size={24} color="white" />
-      </TouchableOpacity>
+        <ButtonIcon as={AddIcon} size="lg" />
+      </Button>
     </Box>
   );
 }

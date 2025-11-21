@@ -16,6 +16,7 @@ export const config = {
     '--color-primary-900': '10 10 10',
     '--color-primary-950': '8 8 8',
 
+
     /* Secondary  */
     '--color-secondary-0': '253 253 253',
     '--color-secondary-50': '251 251 251',

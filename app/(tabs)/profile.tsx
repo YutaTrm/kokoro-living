@@ -1,33 +1,17 @@
-import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, useColorScheme } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
+import { Alert, FlatList, ScrollView } from 'react-native';
 
-// テーマカラー定義
-const themeColors = {
-  light: {
-    primary: '#45a393',
-    error: '#f08080',
-  },
-  dark: {
-    primary: '#5ec4b0',
-    error: '#ff9999',
-  },
-};
-
+import DatePickerModal from '@/components/profile/DatePickerModal';
+import DiagnosisModal from '@/components/profile/DiagnosisModal';
+import MedicalSection from '@/components/profile/MedicalSection';
+import ProfileHeader from '@/components/profile/ProfileHeader';
+import PostItem from '@/components/PostItem';
 import { Text } from '@/components/Themed';
-import {
-  Avatar,
-  AvatarFallbackText,
-  AvatarImage,
-} from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonText } from '@/components/ui/button';
-import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
-import { Modal, ModalBackdrop, ModalBody, ModalCloseButton, ModalContent, ModalFooter, ModalHeader } from '@/components/ui/modal';
-import { VStack } from '@/components/ui/vstack';
+import { Spinner } from '@/components/ui/spinner';
 import { supabase } from '@/src/lib/supabase';
 
 interface UserProfile {
@@ -68,16 +52,32 @@ interface MasterData {
   name: string;
 }
 
+interface Post {
+  id: string;
+  content: string;
+  created_at: string;
+  user: {
+    display_name: string;
+    user_id: string;
+  };
+  tags: string[];
+}
+
+type TabType = 'profile' | 'posts' | 'likes' | 'bookmarks';
+
 export default function ProfileScreen() {
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const colors = themeColors[colorScheme === 'dark' ? 'dark' : 'light'];
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [activeTab, setActiveTab] = useState<TabType>('profile');
 
   const [diagnoses, setDiagnoses] = useState<MedicalRecord[]>([]);
   const [medications, setMedications] = useState<MedicalRecord[]>([]);
   const [treatments, setTreatments] = useState<MedicalRecord[]>([]);
+
+  const [userPosts, setUserPosts] = useState<Post[]>([]);
+  const [likedPosts, setLikedPosts] = useState<Post[]>([]);
+  const [bookmarkedPosts, setBookmarkedPosts] = useState<Post[]>([]);
 
   const [showDiagnosisModal, setShowDiagnosisModal] = useState(false);
   const [showMedicationModal, setShowMedicationModal] = useState(false);
@@ -105,6 +105,16 @@ export default function ProfileScreen() {
     loadMedicalRecords();
     loadMasterData();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'posts') {
+      loadUserPosts();
+    } else if (activeTab === 'likes') {
+      loadLikedPosts();
+    } else if (activeTab === 'bookmarks') {
+      loadBookmarkedPosts();
+    }
+  }, [activeTab]);
 
   const loadMasterData = async () => {
     try {
@@ -138,22 +148,12 @@ export default function ProfileScreen() {
     setShowDateModal(true);
   };
 
-  const saveDiagnosisWithDate = async () => {
+  const saveDiagnosisWithDate = async (startDate: string, endDate: string | null) => {
     try {
       if (!selectedDiagnosisId) return;
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-
-      // YYYY-MM-01形式で保存
-      const startDate = `${startYear}-${startMonth.padStart(2, '0')}-01`;
-      const endDate = endYear && endMonth ? `${endYear}-${endMonth.padStart(2, '0')}-01` : null;
-
-      // バリデーション: 終了日が開始日より前でないかチェック
-      if (endDate && endDate < startDate) {
-        Alert.alert('エラー', '終了日は開始日以降を選択してください');
-        return;
-      }
 
       const { error } = await supabase.from('user_diagnoses').insert({
         user_id: user.id,
@@ -247,6 +247,143 @@ export default function ProfileScreen() {
     }
   };
 
+  const loadUserPosts = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: postsData, error: postsError } = await supabase
+        .from('posts')
+        .select('id, content, created_at, user_id')
+        .eq('user_id', user.id)
+        .is('parent_post_id', null)
+        .order('created_at', { ascending: false });
+
+      if (postsError) throw postsError;
+
+      if (!postsData || postsData.length === 0) {
+        setUserPosts([]);
+        return;
+      }
+
+      // ユーザー情報を取得
+      const { data: userData } = await supabase
+        .from('users')
+        .select('user_id, display_name')
+        .eq('user_id', user.id)
+        .single();
+
+      const formattedPosts: Post[] = postsData.map((post: any) => ({
+        id: post.id,
+        content: post.content,
+        created_at: post.created_at,
+        user: {
+          display_name: userData?.display_name || 'Unknown',
+          user_id: post.user_id,
+        },
+        tags: [],
+      }));
+
+      setUserPosts(formattedPosts);
+    } catch (error) {
+      console.error('投稿取得エラー:', error);
+    }
+  };
+
+  const loadLikedPosts = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: likesData, error: likesError } = await supabase
+        .from('likes')
+        .select('post_id, posts!inner(id, content, created_at, user_id)')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (likesError) throw likesError;
+
+      if (!likesData || likesData.length === 0) {
+        setLikedPosts([]);
+        return;
+      }
+
+      // 投稿者のユーザー情報を取得
+      const postUserIds = [...new Set(likesData.map((like: any) => like.posts.user_id))];
+      const { data: usersData } = await supabase
+        .from('users')
+        .select('user_id, display_name')
+        .in('user_id', postUserIds);
+
+      // ユーザー情報をマップに変換
+      const usersMap = new Map(
+        (usersData || []).map(u => [u.user_id, u.display_name])
+      );
+
+      const formattedPosts: Post[] = likesData.map((like: any) => ({
+        id: like.posts.id,
+        content: like.posts.content,
+        created_at: like.posts.created_at,
+        user: {
+          display_name: usersMap.get(like.posts.user_id) || 'Unknown',
+          user_id: like.posts.user_id,
+        },
+        tags: [],
+      }));
+
+      setLikedPosts(formattedPosts);
+    } catch (error) {
+      console.error('いいね取得エラー:', error);
+    }
+  };
+
+  const loadBookmarkedPosts = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: bookmarksData, error: bookmarksError } = await supabase
+        .from('bookmarks')
+        .select('post_id, posts!inner(id, content, created_at, user_id)')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (bookmarksError) throw bookmarksError;
+
+      if (!bookmarksData || bookmarksData.length === 0) {
+        setBookmarkedPosts([]);
+        return;
+      }
+
+      // 投稿者のユーザー情報を取得
+      const postUserIds = [...new Set(bookmarksData.map((bookmark: any) => bookmark.posts.user_id))];
+      const { data: usersData } = await supabase
+        .from('users')
+        .select('user_id, display_name')
+        .in('user_id', postUserIds);
+
+      // ユーザー情報をマップに変換
+      const usersMap = new Map(
+        (usersData || []).map(u => [u.user_id, u.display_name])
+      );
+
+      const formattedPosts: Post[] = bookmarksData.map((bookmark: any) => ({
+        id: bookmark.posts.id,
+        content: bookmark.posts.content,
+        created_at: bookmark.posts.created_at,
+        user: {
+          display_name: usersMap.get(bookmark.posts.user_id) || 'Unknown',
+          user_id: bookmark.posts.user_id,
+        },
+        tags: [],
+      }));
+
+      setBookmarkedPosts(formattedPosts);
+    } catch (error) {
+      console.error('ブックマーク取得エラー:', error);
+    }
+  };
+
   const loadUserProfile = async () => {
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -297,57 +434,11 @@ export default function ProfileScreen() {
     }
   };
 
-  const formatYearMonth = (dateStr: string | null): string => {
-    if (!dateStr) return '現在';
-    const [year, month] = dateStr.split('-');
-    return `${year}年${parseInt(month)}月`;
-  };
-
-  const formatDateRange = (startDate: string | null, endDate: string | null): string => {
-    if (!startDate) return '期間未設定';
-    const start = formatYearMonth(startDate);
-    const end = formatYearMonth(endDate);
-    return `${start} 〜 ${end}`;
-  };
-
-  const renderMedicalSection = (
-    title: string,
-    records: MedicalRecord[],
-    onAdd: () => void,
-    onDelete: (id: string) => void
-  ) => (
-    <Box className="px-5 py-4 border-t border-outline-200">
-      <HStack className="justify-between items-center mb-3">
-        <Heading size="lg">{title}</Heading>
-        <Button onPress={onAdd} size="sm" variant="link" className="p-1">
-          <FontAwesome name="plus" size={20} color={colors.primary} />
-        </Button>
-      </HStack>
-      {records.map((record) => (
-        <Box key={record.id} className="py-2 px-3 bg-background-50 rounded-lg mb-2">
-          <HStack className="justify-between items-center">
-            <VStack>
-              <Text className="text-base font-semibold">{record.name}</Text>
-              <Text className="text-sm opacity-60">
-                {formatDateRange(record.startDate, record.endDate)}
-              </Text>
-            </VStack>
-            <Button onPress={() => onDelete(record.id)} size="sm" variant="link" className="p-2">
-              <FontAwesome name="trash-o" size={18} color={colors.error} />
-            </Button>
-          </HStack>
-        </Box>
-      ))}
-      {records.length === 0 && (
-        <Text className="text-sm opacity-50 text-center py-2">まだ登録がありません</Text>
-      )}
-    </Box>
-  );
 
   if (loading) {
     return (
       <Box className="flex-1 items-center justify-center p-5">
-        <ActivityIndicator size="large" />
+        <Spinner size="large" />
       </Box>
     );
   }
@@ -362,173 +453,139 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView className="flex-1 mt-12">
-      <HStack className="py-6 px-5" space="md">
-        {profile.avatarUrl && (
-          <Avatar size="xl">
-            <AvatarFallbackText>{profile.userName || 'User'}</AvatarFallbackText>
-            <AvatarImage source={{ uri: profile.avatarUrl }} />
-          </Avatar>
-        )}
-        <VStack className="flex-1 justify-center" space="xs">
-          {profile.userName && (
-            <Heading size="xl">{profile.userName}</Heading>
-          )}
-          {profile.accountName && (
-            <Text className="text-sm opacity-60">@{profile.accountName}</Text>
-          )}
-          {profile.createdAt && (
-            <Text className="text-xs opacity-50">
-              登録日時: {new Date(profile.createdAt).toLocaleDateString('ja-JP')}
-            </Text>
-          )}
-        </VStack>
+      <ProfileHeader profile={profile} onLogout={handleLogout} />
+
+      {/* タブバー */}
+      <HStack className="border-b border-outline-200 mb-4">
+        <Button
+          onPress={() => setActiveTab('profile')}
+          variant="link"
+          className={`flex-1 rounded-none ${activeTab === 'profile' ? 'border-b-2 border-primary-500' : ''}`}
+        >
+          <ButtonText className={activeTab === 'profile' ? 'text-primary-600 font-semibold' : 'text-typography-500'}>
+            プロフィール
+          </ButtonText>
+        </Button>
+        <Button
+          onPress={() => setActiveTab('posts')}
+          variant="link"
+          className={`flex-1 rounded-none ${activeTab === 'posts' ? 'border-b-2 border-primary-500' : ''}`}
+        >
+          <ButtonText className={activeTab === 'posts' ? 'text-primary-600 font-semibold' : 'text-typography-500'}>
+            投稿
+          </ButtonText>
+        </Button>
+        <Button
+          onPress={() => setActiveTab('likes')}
+          variant="link"
+          className={`flex-1 rounded-none ${activeTab === 'likes' ? 'border-b-2 border-primary-500' : ''}`}
+        >
+          <ButtonText className={activeTab === 'likes' ? 'text-primary-600 font-semibold' : 'text-typography-500'}>
+            いいね
+          </ButtonText>
+        </Button>
+        <Button
+          onPress={() => setActiveTab('bookmarks')}
+          variant="link"
+          className={`flex-1 rounded-none ${activeTab === 'bookmarks' ? 'border-b-2 border-primary-500' : ''}`}
+        >
+          <ButtonText className={activeTab === 'bookmarks' ? 'text-primary-600 font-semibold' : 'text-typography-500'}>
+            ブックマーク
+          </ButtonText>
+        </Button>
       </HStack>
 
-      <Box className="px-5 mb-8">
-        <Button onPress={handleLogout} action="negative" className="w-full">
-          <ButtonText>ログアウト</ButtonText>
-        </Button>
-      </Box>
+      {/* タブの内容 */}
+      {activeTab === 'profile' && (
+        <>
+          <MedicalSection
+            title="診断名"
+            records={diagnoses}
+            onAdd={() => setShowDiagnosisModal(true)}
+            onDelete={deleteDiagnosis}
+          />
+          <MedicalSection
+            title="服薬"
+            records={medications}
+            onAdd={() => setShowMedicationModal(true)}
+            onDelete={() => {}}
+          />
+          <MedicalSection
+            title="治療"
+            records={treatments}
+            onAdd={() => setShowTreatmentModal(true)}
+            onDelete={() => {}}
+          />
+        </>
+      )}
 
-      {renderMedicalSection('診断名', diagnoses, () => setShowDiagnosisModal(true), deleteDiagnosis)}
-      {renderMedicalSection('服薬', medications, () => setShowMedicationModal(true), () => {})}
-      {renderMedicalSection('治療', treatments, () => setShowTreatmentModal(true), () => {})}
+      {activeTab === 'posts' && (
+        <Box className="flex-1">
+          {userPosts.length === 0 ? (
+            <Box className="px-5">
+              <Text className="text-base opacity-50 text-center py-8">まだ投稿がありません</Text>
+            </Box>
+          ) : (
+            <FlatList
+              data={userPosts}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => <PostItem post={item} />}
+            />
+          )}
+        </Box>
+      )}
+
+      {activeTab === 'likes' && (
+        <Box className="flex-1">
+          {likedPosts.length === 0 ? (
+            <Box className="px-5">
+              <Text className="text-base opacity-50 text-center py-8">まだいいねがありません</Text>
+            </Box>
+          ) : (
+            <FlatList
+              data={likedPosts}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => <PostItem post={item} />}
+            />
+          )}
+        </Box>
+      )}
+
+      {activeTab === 'bookmarks' && (
+        <Box className="flex-1">
+          {bookmarkedPosts.length === 0 ? (
+            <Box className="px-5">
+              <Text className="text-base opacity-50 text-center py-8">まだブックマークがありません</Text>
+            </Box>
+          ) : (
+            <FlatList
+              data={bookmarkedPosts}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => <PostItem post={item} />}
+            />
+          )}
+        </Box>
+      )}
 
       {/* 診断名追加モーダル */}
-      <Modal isOpen={showDiagnosisModal} onClose={() => setShowDiagnosisModal(false)}>
-        <ModalBackdrop />
-        <ModalContent className="max-h-[80%]">
-          <ModalHeader>
-            <Heading size="lg">診断名を選択</Heading>
-            <ModalCloseButton>
-              <FontAwesome name="close" size={20} />
-            </ModalCloseButton>
-          </ModalHeader>
-          <ModalBody>
-            <VStack space="sm">
-              {diagnosisMasters
-                .filter((master) => !diagnoses.some((d) => d.name === master.name))
-                .map((item) => (
-                  <Button
-                    key={item.id}
-                    onPress={() => selectDiagnosisForDate(item.id)}
-                    variant="outline"
-                  >
-                    <ButtonText>{item.name}</ButtonText>
-                  </Button>
-                ))}
-              {diagnosisMasters.filter(
-                (master) => !diagnoses.some((d) => d.name === master.name)
-              ).length === 0 && (
-                <Text className="text-sm opacity-50 text-center py-2">追加可能な診断名がありません</Text>
-              )}
-            </VStack>
-          </ModalBody>
-        </ModalContent>
-      </Modal>
+      <DiagnosisModal
+        isOpen={showDiagnosisModal}
+        onClose={() => setShowDiagnosisModal(false)}
+        diagnosisMasters={diagnosisMasters}
+        existingDiagnoses={diagnoses}
+        onSelect={selectDiagnosisForDate}
+      />
 
       {/* 日付選択モーダル（年月選択） */}
-      <Modal isOpen={showDateModal} onClose={() => setShowDateModal(false)}>
-        <ModalBackdrop />
-        <ModalContent>
-          <ModalHeader>
-            <Heading size="lg">期間を選択</Heading>
-            <ModalCloseButton>
-              <FontAwesome name="close" size={20} />
-            </ModalCloseButton>
-          </ModalHeader>
-          <ModalBody>
-            <VStack space="lg" className="py-4">
-              {/* 開始日 */}
-              <Box>
-                <Text className="text-base font-semibold mb-2 text-primary-600">開始年月</Text>
-                <HStack space="sm">
-                  <Box className="flex-1 border border-outline-200 rounded-lg overflow-hidden">
-                    <Picker
-                      selectedValue={startYear}
-                      onValueChange={(value) => setStartYear(value)}
-                    >
-                      {years.map((year) => (
-                        <Picker.Item key={year} label={`${year}年`} value={year} />
-                      ))}
-                    </Picker>
-                  </Box>
-                  <Box className="flex-1 border border-outline-200 rounded-lg overflow-hidden">
-                    <Picker
-                      selectedValue={startMonth}
-                      onValueChange={(value) => setStartMonth(value)}
-                    >
-                      {months.map((month) => (
-                        <Picker.Item key={month} label={`${month}月`} value={month} />
-                      ))}
-                    </Picker>
-                  </Box>
-                </HStack>
-              </Box>
-
-              {/* 終了日 */}
-              <Box>
-                <HStack className="justify-between items-center mb-2">
-                  <Text className="text-base font-semibold text-primary-600">終了年月（任意）</Text>
-                  {endYear && endMonth && (
-                    <Button
-                      size="xs"
-                      variant="link"
-                      onPress={() => {
-                        setEndYear('');
-                        setEndMonth('');
-                      }}
-                    >
-                      <ButtonText className="text-error-500">クリア</ButtonText>
-                    </Button>
-                  )}
-                </HStack>
-                <HStack space="sm">
-                  <Box className="flex-1 border border-outline-200 rounded-lg overflow-hidden">
-                    <Picker
-                      selectedValue={endYear}
-                      onValueChange={(value) => setEndYear(value)}
-                    >
-                      <Picker.Item label="未設定" value="" />
-                      {years.map((year) => (
-                        <Picker.Item key={year} label={`${year}年`} value={year} />
-                      ))}
-                    </Picker>
-                  </Box>
-                  <Box className="flex-1 border border-outline-200 rounded-lg overflow-hidden">
-                    <Picker
-                      selectedValue={endMonth}
-                      onValueChange={(value) => setEndMonth(value)}
-                    >
-                      <Picker.Item label="未設定" value="" />
-                      {months.map((month) => (
-                        <Picker.Item key={month} label={`${month}月`} value={month} />
-                      ))}
-                    </Picker>
-                  </Box>
-                </HStack>
-              </Box>
-            </VStack>
-          </ModalBody>
-          <ModalFooter>
-            <VStack space="sm" className="w-full">
-              <Button onPress={saveDiagnosisWithDate} className="w-full">
-                <ButtonText>保存</ButtonText>
-              </Button>
-              <Button
-                variant="outline"
-                onPress={() => {
-                  setShowDateModal(false);
-                  setSelectedDiagnosisId(null);
-                }}
-                className="w-full"
-              >
-                <ButtonText>キャンセル</ButtonText>
-              </Button>
-            </VStack>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+      <DatePickerModal
+        isOpen={showDateModal}
+        onClose={() => setShowDateModal(false)}
+        onSave={saveDiagnosisWithDate}
+        initialStartYear={startYear}
+        initialStartMonth={startMonth}
+        initialEndYear={endYear}
+        initialEndMonth={endMonth}
+      />
     </ScrollView>
   );
 }

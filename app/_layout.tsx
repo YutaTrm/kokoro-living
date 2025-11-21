@@ -7,8 +7,8 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 
-import { useColorScheme } from '@/components/useColorScheme';
 import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
+import { useColorScheme } from '@/components/useColorScheme';
 import '@/global.css';
 
 const queryClient = new QueryClient();
@@ -60,6 +60,8 @@ function RootLayoutNav() {
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="create-post" options={{ presentation: 'modal', headerShown: false }} />
+          <Stack.Screen name="reply/[id]" options={{ presentation: 'modal', headerShown: false }} />
         </Stack>
       </ThemeProvider>
     </QueryClientProvider>
