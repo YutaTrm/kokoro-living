@@ -198,80 +198,79 @@ export default function TabOneScreen() {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'twitter',
         options: {
-          redirectTo: 'kokoroliving://',
+          redirectTo: 'kokoroliving://auth/callback',
+          skipBrowserRedirect: false,
         },
       });
 
       if (error) {
-        console.error('ログインエラー:', error);
+        console.error('[Login] Supabase Auth エラー:', error);
         Alert.alert('ログインエラー', error.message);
         return;
       }
 
       if (data?.url) {
-        console.log('認証URL:', data.url);
+        console.log('[Login] 認証URL取得:', data.url);
+
         const result = await WebBrowser.openAuthSessionAsync(
           data.url,
           'kokoroliving://'
         );
 
-        console.log('認証結果:', result);
+        console.log('[Login] WebBrowser結果:', JSON.stringify(result));
 
-        if (result.type === 'success') {
+        if (result.type === 'success' && result.url) {
           const url = result.url;
-          console.log('コールバックURL（完全）:', url);
+          console.log('[Login] コールバックURL:', url);
 
-          // URLからトークンを取得
-          let accessToken: string | null = null;
-          let refreshToken: string | null = null;
-
-          // ハッシュフラグメントとクエリパラメータの両方を試す
-          if (url.includes('#')) {
-            const hashPart = url.split('#')[1];
-            console.log('ハッシュ部分:', hashPart);
-            const params = new URLSearchParams(hashPart);
-            accessToken = params.get('access_token');
-            refreshToken = params.get('refresh_token');
+          // エラーチェック
+          if (url.includes('error=')) {
+            const errorMatch = url.match(/error=([^&]+)/);
+            const errorDescMatch = url.match(/error_description=([^&]+)/);
+            const errorDesc = errorDescMatch ? decodeURIComponent(errorDescMatch[1]) : 'Unknown error';
+            console.error('[Login] 認証エラー:', errorDesc);
+            Alert.alert('認証エラー', errorDesc);
+            return;
           }
 
-          if (!accessToken && url.includes('?')) {
-            const queryPart = url.split('?')[1]?.split('#')[0]; // #の前まで取得
-            console.log('クエリ部分:', queryPart);
-            const params = new URLSearchParams(queryPart);
-            accessToken = params.get('access_token');
-            refreshToken = params.get('refresh_token');
-          }
+          // トークン取得を試みる
+          const params = new URL(url).searchParams;
+          const hashParams = new URLSearchParams(url.split('#')[1] || '');
 
-          console.log('access_token:', accessToken ? '取得成功' : '取得失敗');
-          console.log('refresh_token:', refreshToken ? '取得成功' : '取得失敗');
+          const accessToken = params.get('access_token') || hashParams.get('access_token');
+          const refreshToken = params.get('refresh_token') || hashParams.get('refresh_token');
+
+          console.log('[Login] トークン取得:', {
+            accessToken: !!accessToken,
+            refreshToken: !!refreshToken,
+          });
 
           if (accessToken && refreshToken) {
-            console.log('セッション確立を試行中...');
             const { error: sessionError } = await supabase.auth.setSession({
               access_token: accessToken,
               refresh_token: refreshToken,
             });
 
             if (sessionError) {
-              console.error('セッションエラー:', sessionError);
+              console.error('[Login] セッション確立エラー:', sessionError);
               Alert.alert('エラー', 'ログインに失敗しました: ' + sessionError.message);
             } else {
-              console.log('セッション確立成功！');
+              console.log('[Login] ログイン成功！');
               Alert.alert('成功', 'ログインしました');
             }
           } else {
-            console.error('トークンが見つかりません');
-            console.error('URL全体:', url);
-            Alert.alert('エラー', 'トークンを取得できませんでした。コンソールを確認してください。');
+            console.error('[Login] トークンが見つかりません');
+            console.error('[Login] URL全体:', url);
+            Alert.alert('エラー', 'トークンを取得できませんでした');
           }
         } else if (result.type === 'cancel') {
-          console.log('ユーザーがキャンセルしました');
+          console.log('[Login] ユーザーがキャンセル');
         } else {
-          console.log('認証結果:', result.type);
+          console.log('[Login] 認証結果:', result.type);
         }
       }
     } catch (error) {
-      console.error('エラー:', error);
+      console.error('[Login] 予期しないエラー:', error);
       Alert.alert('エラー', '予期しないエラーが発生しました');
     }
   };

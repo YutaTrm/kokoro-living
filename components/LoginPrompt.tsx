@@ -40,6 +40,7 @@ export default function LoginPrompt({ children }: LoginPromptProps) {
         provider: 'twitter',
         options: {
           redirectTo: 'kokoroliving://auth/callback',
+          skipBrowserRedirect: false,
         },
       });
 
@@ -53,21 +54,30 @@ export default function LoginPrompt({ children }: LoginPromptProps) {
       if (data?.url) {
         const result = await WebBrowser.openAuthSessionAsync(
           data.url,
-          'kokoroliving://auth/callback'
+          'kokoroliving://'
         );
 
-        console.log('[LoginPrompt] WebBrowser結果:', result);
+        console.log('[LoginPrompt] WebBrowser結果:', JSON.stringify(result));
 
-        if (result.type === 'success') {
+        if (result.type === 'success' && result.url) {
           const url = result.url;
           console.log('[LoginPrompt] コールバックURL:', url);
-          const hashPart = url.split('#')[1];
-          const queryPart = url.split('?')[1];
-          console.log('[LoginPrompt] ハッシュ部分:', hashPart);
-          console.log('[LoginPrompt] クエリ部分:', queryPart);
-          const params = new URLSearchParams(hashPart || queryPart);
-          const accessToken = params.get('access_token');
-          const refreshToken = params.get('refresh_token');
+
+          // エラーチェック
+          if (url.includes('error=')) {
+            const errorMatch = url.match(/error_description=([^&]+)/);
+            const errorDesc = errorMatch ? decodeURIComponent(errorMatch[1]) : 'Unknown error';
+            console.error('[LoginPrompt] 認証エラー:', errorDesc);
+            Alert.alert('認証エラー', errorDesc);
+            return;
+          }
+
+          // トークン取得
+          const params = new URL(url).searchParams;
+          const hashParams = new URLSearchParams(url.split('#')[1] || '');
+
+          const accessToken = params.get('access_token') || hashParams.get('access_token');
+          const refreshToken = params.get('refresh_token') || hashParams.get('refresh_token');
 
           console.log('[LoginPrompt] トークン取得:', { accessToken: !!accessToken, refreshToken: !!refreshToken });
 
@@ -87,6 +97,7 @@ export default function LoginPrompt({ children }: LoginPromptProps) {
             }
           } else {
             console.error('[LoginPrompt] トークンが見つかりません');
+            console.error('[LoginPrompt] URL全体:', url);
             Alert.alert('エラー', 'トークンを取得できませんでした');
           }
         } else if (result.type === 'cancel') {
