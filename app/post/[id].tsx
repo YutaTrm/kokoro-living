@@ -334,6 +334,10 @@ export default function PostDetailScreen() {
     router.push(`/create-post?postId=${id}`);
   };
 
+  const handleUserPress = (userId: string) => {
+    router.push(`/user/${userId}`);
+  };
+
   const isOwnPost = currentUserId && post && currentUserId === post.user_id;
 
   if (loading) {
@@ -362,13 +366,15 @@ export default function PostDetailScreen() {
         {/* 投稿詳細 */}
       <Box className="px-4 py-4 border-b border-outline-200">
         <HStack space="sm" className="items-start mb-3">
-          <Avatar size="md">
-            {post.user.avatar_url ? (
-              <AvatarImage source={{ uri: post.user.avatar_url }} />
-            ) : (
-              <AvatarFallbackText>{post.user.display_name}</AvatarFallbackText>
-            )}
-          </Avatar>
+          <Pressable onPress={() => handleUserPress(post.user_id)}>
+            <Avatar size="md">
+              {post.user.avatar_url ? (
+                <AvatarImage source={{ uri: post.user.avatar_url }} />
+              ) : (
+                <AvatarFallbackText>{post.user.display_name}</AvatarFallbackText>
+              )}
+            </Avatar>
+          </Pressable>
           <VStack>
             <Text className="font-semibold text-base">{post.user.display_name}</Text>
             <Text className="text-sm text-typography-500">{formatDate(post.created_at)}</Text>
@@ -452,13 +458,15 @@ export default function PostDetailScreen() {
           {replies.map((reply) => (
             <Box key={reply.id} className="px-4 py-3 border-b border-outline-200">
               <HStack space="sm" className="items-start">
-                <Avatar size="sm">
-                  {reply.user.avatar_url ? (
-                    <AvatarImage source={{ uri: reply.user.avatar_url }} />
-                  ) : (
-                    <AvatarFallbackText>{reply.user.display_name}</AvatarFallbackText>
-                  )}
-                </Avatar>
+                <Pressable onPress={() => handleUserPress(reply.user.user_id)}>
+                  <Avatar size="sm">
+                    {reply.user.avatar_url ? (
+                      <AvatarImage source={{ uri: reply.user.avatar_url }} />
+                    ) : (
+                      <AvatarFallbackText>{reply.user.display_name}</AvatarFallbackText>
+                    )}
+                  </Avatar>
+                </Pressable>
                 <VStack className="flex-1" space="xs">
                   <HStack space="xs" className="items-center">
                     <Text className="font-semibold text-sm">{reply.user.display_name}</Text>
