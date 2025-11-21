@@ -1,10 +1,10 @@
 import { Text } from '@/components/Themed';
 import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
+import { Box } from '@/components/ui/box';
 import { Button, ButtonText } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
 import { VStack } from '@/components/ui/vstack';
-import { Box } from '@/components/ui/box';
 
 interface UserProfile {
   avatarUrl: string | null;
@@ -23,7 +23,7 @@ export default function ProfileHeader({ profile, onLogout }: ProfileHeaderProps)
     <>
       <HStack className="py-6 px-5" space="md">
         {profile.avatarUrl && (
-          <Avatar size="xl">
+          <Avatar size="lg">
             <AvatarFallbackText>{profile.userName || 'User'}</AvatarFallbackText>
             <AvatarImage source={{ uri: profile.avatarUrl }} />
           </Avatar>

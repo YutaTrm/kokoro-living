@@ -5,7 +5,6 @@ import PostItem from '@/components/PostItem';
 import { Text } from '@/components/Themed';
 import { Box } from '@/components/ui/box';
 import { Checkbox, CheckboxIcon, CheckboxIndicator, CheckboxLabel } from '@/components/ui/checkbox';
-import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
 import { CheckIcon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
@@ -431,7 +430,7 @@ export default function SearchScreen() {
                 onPress={() => setSortBy(option.value as SortOption)}
                 className={`flex-1 px-3 py-2 rounded-lg border ${
                   sortBy === option.value
-                    ? 'bg-primary-500 border-primary-500'
+                    ? 'bg-primary-50 border-primary-50'
                     : 'bg-background-0 border-outline-200'
                 }`}
               >

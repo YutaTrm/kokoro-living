@@ -287,7 +287,7 @@ export default function TabOneScreen() {
   return (
     <Box className="flex-1">
       <FlatList
-        className="mt-12"
+        className=""
         data={posts}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <PostItem post={item} />}

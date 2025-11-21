@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, FlatList, ScrollView } from 'react-native';
+import { Alert, FlatList } from 'react-native';
 
 import LoginPrompt from '@/components/LoginPrompt';
 import PostItem from '@/components/PostItem';
@@ -767,18 +767,12 @@ export default function ProfileScreen() {
   };
 
 
-  return (
-    <LoginPrompt>
-      {loading ? (
-        <Box className="flex-1 items-center justify-center p-5">
-          <Spinner size="large" />
-        </Box>
-      ) : profile ? (
-        <ScrollView className="flex-1 mt-12">
-          <ProfileHeader profile={profile} onLogout={handleLogout} />
+  const renderHeader = () => (
+    <>
+      <ProfileHeader profile={profile!} onLogout={handleLogout} />
 
       {/* タブバー */}
-      <HStack className="border-b border-outline-200 mb-4">
+      <HStack className="border-b border-outline-200">
         <Button
           onPress={() => setActiveTab('profile')}
           variant="link"
@@ -817,7 +811,7 @@ export default function ProfileScreen() {
         </Button>
       </HStack>
 
-      {/* タブの内容 */}
+      {/* プロフィールタブの内容 */}
       {activeTab === 'profile' && (
         <>
           <MedicalSection
@@ -880,54 +874,57 @@ export default function ProfileScreen() {
           </Box>
         </>
       )}
+    </>
+  );
 
-      {activeTab === 'posts' && (
-        <Box className="flex-1">
-          {userPosts.length === 0 ? (
-            <Box className="px-5">
-              <Text className="text-base opacity-50 text-center py-8">まだ投稿がありません</Text>
-            </Box>
-          ) : (
-            <FlatList
-              data={userPosts}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => <PostItem post={item} />}
-            />
-          )}
-        </Box>
-      )}
+  const getCurrentData = () => {
+    switch (activeTab) {
+      case 'posts':
+        return userPosts;
+      case 'likes':
+        return likedPosts;
+      case 'bookmarks':
+        return bookmarkedPosts;
+      default:
+        return [];
+    }
+  };
 
-      {activeTab === 'likes' && (
-        <Box className="flex-1">
-          {likedPosts.length === 0 ? (
-            <Box className="px-5">
-              <Text className="text-base opacity-50 text-center py-8">まだいいねがありません</Text>
-            </Box>
-          ) : (
-            <FlatList
-              data={likedPosts}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => <PostItem post={item} />}
-            />
-          )}
-        </Box>
-      )}
+  const renderEmptyComponent = () => {
+    if (activeTab === 'profile') return null;
 
-      {activeTab === 'bookmarks' && (
-        <Box className="flex-1">
-          {bookmarkedPosts.length === 0 ? (
-            <Box className="px-5">
-              <Text className="text-base opacity-50 text-center py-8">まだブックマークがありません</Text>
-            </Box>
-          ) : (
-            <FlatList
-              data={bookmarkedPosts}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => <PostItem post={item} />}
-            />
-          )}
+    const messages = {
+      posts: 'まだ投稿がありません',
+      likes: 'まだいいねがありません',
+      bookmarks: 'まだブックマークがありません',
+    };
+
+    return (
+      <Box className="px-5">
+        <Text className="text-base opacity-50 text-center py-8">
+          {messages[activeTab as keyof typeof messages]}
+        </Text>
+      </Box>
+    );
+  };
+
+  return (
+    <LoginPrompt>
+      {loading ? (
+        <Box className="flex-1 items-center justify-center p-5">
+          <Spinner size="large" />
         </Box>
-      )}
+      ) : profile ? (
+        <Box className="flex-1">
+          <FlatList
+            data={getCurrentData()}
+            renderItem={({ item }) => <PostItem post={item} />}
+            keyExtractor={(item) => item.id}
+            ListHeaderComponent={renderHeader}
+            ListEmptyComponent={renderEmptyComponent}
+          />
+        </Box>
+      ) : null}
 
       {/* 診断名追加モーダル */}
       <DiagnosisModal
@@ -983,8 +980,6 @@ export default function ProfileScreen() {
         initialEndYear={endYear}
         initialEndMonth={endMonth}
       />
-        </ScrollView>
-      ) : null}
     </LoginPrompt>
   );
 }
