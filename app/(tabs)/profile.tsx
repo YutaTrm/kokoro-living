@@ -3,16 +3,21 @@ import { useEffect, useState } from 'react';
 import { Alert, FlatList, ScrollView } from 'react-native';
 
 import LoginPrompt from '@/components/LoginPrompt';
+import PostItem from '@/components/PostItem';
 import DatePickerModal from '@/components/profile/DatePickerModal';
 import DiagnosisModal from '@/components/profile/DiagnosisModal';
 import MedicalSection from '@/components/profile/MedicalSection';
+import MedicationModal from '@/components/profile/MedicationModal';
 import ProfileHeader from '@/components/profile/ProfileHeader';
-import PostItem from '@/components/PostItem';
+import StatusModal from '@/components/profile/StatusModal';
+import TreatmentModal from '@/components/profile/TreatmentModal';
 import { Text } from '@/components/Themed';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonText } from '@/components/ui/button';
 import { HStack } from '@/components/ui/hstack';
 import { Spinner } from '@/components/ui/spinner';
+import { Textarea, TextareaInput } from '@/components/ui/textarea';
+import { VStack } from '@/components/ui/vstack';
 import { supabase } from '@/src/lib/supabase';
 
 interface UserProfile {
@@ -20,6 +25,7 @@ interface UserProfile {
   userName: string | null;
   accountName: string | null;
   createdAt: string | null;
+  bio: string | null;
 }
 
 interface MedicalRecord {
@@ -44,6 +50,12 @@ interface MedicationData {
 
 interface TreatmentData {
   treatments: { name: string } | null;
+  start_date: string;
+  end_date: string | null;
+}
+
+interface StatusData {
+  statuses: { name: string } | null;
   start_date: string;
   end_date: string | null;
 }
@@ -75,6 +87,9 @@ export default function ProfileScreen() {
   const [diagnoses, setDiagnoses] = useState<MedicalRecord[]>([]);
   const [medications, setMedications] = useState<MedicalRecord[]>([]);
   const [treatments, setTreatments] = useState<MedicalRecord[]>([]);
+  const [statuses, setStatuses] = useState<MedicalRecord[]>([]);
+
+  const [bio, setBio] = useState('');
 
   const [userPosts, setUserPosts] = useState<Post[]>([]);
   const [likedPosts, setLikedPosts] = useState<Post[]>([]);
@@ -83,13 +98,18 @@ export default function ProfileScreen() {
   const [showDiagnosisModal, setShowDiagnosisModal] = useState(false);
   const [showMedicationModal, setShowMedicationModal] = useState(false);
   const [showTreatmentModal, setShowTreatmentModal] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
 
   const [diagnosisMasters, setDiagnosisMasters] = useState<MasterData[]>([]);
   const [medicationMasters, setMedicationMasters] = useState<MasterData[]>([]);
   const [treatmentMasters, setTreatmentMasters] = useState<MasterData[]>([]);
+  const [statusMasters, setStatusMasters] = useState<MasterData[]>([]);
 
   // 日付選択用のstate（年月選択）
   const [selectedDiagnosisId, setSelectedDiagnosisId] = useState<string | null>(null);
+  const [selectedStatusId, setSelectedStatusId] = useState<string | null>(null);
+  const [selectedTreatmentId, setSelectedTreatmentId] = useState<string | null>(null);
+  const [selectedMedicationId, setSelectedMedicationId] = useState<string | null>(null);
   const [showDateModal, setShowDateModal] = useState(false);
   const [startYear, setStartYear] = useState<string>(new Date().getFullYear().toString());
   const [startMonth, setStartMonth] = useState<string>((new Date().getMonth() + 1).toString());
@@ -132,6 +152,19 @@ export default function ProfileScreen() {
       // 治療法マスター
       const { data: treatData } = await supabase.from('treatments').select('id, name');
       if (treatData) setTreatmentMasters(treatData);
+
+      // ステータスマスター（display_order > 0のみ、display_order順）
+      const { data: statusData, error: statusError } = await supabase
+        .from('statuses')
+        .select('id, name')
+        .gt('display_order', 0)
+        .order('display_order', { ascending: true });
+
+      if (statusError) {
+        console.error('ステータス読み込みエラー:', statusError);
+      }
+
+      if (statusData) setStatusMasters(statusData);
     } catch (error) {
       console.error('マスターデータ読み込みエラー:', error);
     }
@@ -194,6 +227,185 @@ export default function ProfileScreen() {
     }
   };
 
+  const selectStatusForDate = (statusId: string) => {
+    setSelectedStatusId(statusId);
+    setSelectedDiagnosisId(null); // 診断名をクリア
+    setShowStatusModal(false);
+    // リセット
+    const now = new Date();
+    setStartYear(now.getFullYear().toString());
+    setStartMonth((now.getMonth() + 1).toString());
+    setEndYear('');
+    setEndMonth('');
+    setShowDateModal(true);
+  };
+
+  const saveStatusWithDate = async (startDate: string, endDate: string | null) => {
+    try {
+      if (!selectedStatusId) return;
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase.from('user_statuses').insert({
+        user_id: user.id,
+        status_id: selectedStatusId,
+        start_date: startDate,
+        end_date: endDate,
+      });
+
+      if (error) {
+        Alert.alert('エラー', '追加に失敗しました');
+        return;
+      }
+
+      setShowDateModal(false);
+      setSelectedStatusId(null);
+      loadMedicalRecords();
+    } catch (error) {
+      Alert.alert('エラー', '予期しないエラーが発生しました');
+    }
+  };
+
+  const deleteStatus = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('user_statuses')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        Alert.alert('エラー', '削除に失敗しました');
+        return;
+      }
+
+      loadMedicalRecords();
+    } catch (error) {
+      Alert.alert('エラー', '予期しないエラーが発生しました');
+    }
+  };
+
+  const selectTreatmentForDate = (treatmentId: string) => {
+    setSelectedTreatmentId(treatmentId);
+    setSelectedDiagnosisId(null);
+    setSelectedStatusId(null);
+    setSelectedMedicationId(null);
+    setShowTreatmentModal(false);
+    const now = new Date();
+    setStartYear(now.getFullYear().toString());
+    setStartMonth((now.getMonth() + 1).toString());
+    setEndYear('');
+    setEndMonth('');
+    setShowDateModal(true);
+  };
+
+  const saveTreatmentWithDate = async (startDate: string, endDate: string | null) => {
+    try {
+      if (!selectedTreatmentId) return;
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase.from('user_treatments').insert({
+        user_id: user.id,
+        treatment_id: selectedTreatmentId,
+        start_date: startDate,
+        end_date: endDate,
+      });
+
+      if (error) {
+        Alert.alert('エラー', '追加に失敗しました');
+        return;
+      }
+
+      setShowDateModal(false);
+      setSelectedTreatmentId(null);
+      loadMedicalRecords();
+    } catch (error) {
+      Alert.alert('エラー', '予期しないエラーが発生しました');
+    }
+  };
+
+  const deleteTreatment = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('user_treatments')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        Alert.alert('エラー', '削除に失敗しました');
+        return;
+      }
+
+      loadMedicalRecords();
+    } catch (error) {
+      Alert.alert('エラー', '予期しないエラーが発生しました');
+    }
+  };
+
+  const selectMedicationForDate = (medicationId: string) => {
+    setSelectedMedicationId(medicationId);
+    setSelectedDiagnosisId(null);
+    setSelectedStatusId(null);
+    setSelectedTreatmentId(null);
+    setShowMedicationModal(false);
+    const now = new Date();
+    setStartYear(now.getFullYear().toString());
+    setStartMonth((now.getMonth() + 1).toString());
+    setEndYear('');
+    setEndMonth('');
+    setShowDateModal(true);
+  };
+
+  const saveMedicationWithDate = async (startDate: string, endDate: string | null) => {
+    try {
+      if (!selectedMedicationId) return;
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // medicationMastersはingredientsとproductsの両方を含むので、どちらかを判定
+      const isIngredient = medicationMasters.find(m => m.id === selectedMedicationId);
+
+      const { error } = await supabase.from('user_medications').insert({
+        user_id: user.id,
+        ingredient_id: selectedMedicationId, // とりあえずingredient_idとして保存
+        start_date: startDate,
+        end_date: endDate,
+      });
+
+      if (error) {
+        Alert.alert('エラー', '追加に失敗しました');
+        return;
+      }
+
+      setShowDateModal(false);
+      setSelectedMedicationId(null);
+      loadMedicalRecords();
+    } catch (error) {
+      Alert.alert('エラー', '予期しないエラーが発生しました');
+    }
+  };
+
+  const deleteMedication = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('user_medications')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        Alert.alert('エラー', '削除に失敗しました');
+        return;
+      }
+
+      loadMedicalRecords();
+    } catch (error) {
+      Alert.alert('エラー', '予期しないエラーが発生しました');
+    }
+  };
+
   const loadMedicalRecords = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -241,6 +453,21 @@ export default function ProfileScreen() {
           name: t.treatments?.name || '',
           startDate: t.start_date,
           endDate: t.end_date,
+        })));
+      }
+
+      // ステータスを取得
+      const { data: statusesData } = await supabase
+        .from('user_statuses')
+        .select('id, statuses(name), start_date, end_date')
+        .eq('user_id', user.id);
+
+      if (statusesData) {
+        setStatuses(statusesData.map((s: StatusData & { id: string }) => ({
+          id: s.id,
+          name: s.statuses?.name || '',
+          startDate: s.start_date,
+          endDate: s.end_date,
         })));
       }
     } catch (error) {
@@ -397,7 +624,7 @@ export default function ProfileScreen() {
       // usersテーブルからプロフィール情報を取得
       const { data: userData, error: userError } = await supabase
         .from('users')
-        .select('display_name, created_at')
+        .select('display_name, created_at, bio')
         .eq('user_id', user.id)
         .single();
 
@@ -410,9 +637,11 @@ export default function ProfileScreen() {
         userName: user.user_metadata?.name || userData?.display_name || null,
         accountName: user.user_metadata?.user_name || null,
         createdAt: userData?.created_at || user.created_at || null,
+        bio: userData?.bio || null,
       };
 
       setProfile(userProfile);
+      setBio(userData?.bio || '');
     } catch (error) {
       console.error('プロフィール読み込みエラー:', error);
     } finally {
@@ -430,6 +659,28 @@ export default function ProfileScreen() {
       setProfile(null);
       // ホームタブにリダイレクト
       router.push('/(tabs)');
+    } catch (error) {
+      Alert.alert('エラー', '予期しないエラーが発生しました');
+    }
+  };
+
+  const handleSaveBio = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase
+        .from('users')
+        .update({ bio })
+        .eq('user_id', user.id);
+
+      if (error) {
+        Alert.alert('エラー', 'bioの保存に失敗しました');
+        return;
+      }
+
+      Alert.alert('成功', 'bioを保存しました');
+      loadUserProfile();
     } catch (error) {
       Alert.alert('エラー', '予期しないエラーが発生しました');
     }
@@ -499,14 +750,38 @@ export default function ProfileScreen() {
             title="服薬"
             records={medications}
             onAdd={() => setShowMedicationModal(true)}
-            onDelete={() => {}}
+            onDelete={deleteMedication}
           />
           <MedicalSection
             title="治療"
             records={treatments}
             onAdd={() => setShowTreatmentModal(true)}
-            onDelete={() => {}}
+            onDelete={deleteTreatment}
           />
+          <MedicalSection
+            title="ステータス"
+            records={statuses}
+            onAdd={() => setShowStatusModal(true)}
+            onDelete={deleteStatus}
+          />
+
+          {/* Bio編集 */}
+          <Box className="px-5 py-4">
+            <VStack space="sm">
+              <Text className="text-base font-semibold">自由記述</Text>
+              <Textarea size="md" className="min-h-32">
+                <TextareaInput
+                  placeholder="自己紹介など"
+                  value={bio}
+                  onChangeText={setBio}
+                  maxLength={500}
+                />
+              </Textarea>
+              <Button onPress={handleSaveBio} size="sm" className="self-end">
+                <ButtonText>保存</ButtonText>
+              </Button>
+            </VStack>
+          </Box>
         </>
       )}
 
@@ -567,11 +842,46 @@ export default function ProfileScreen() {
         onSelect={selectDiagnosisForDate}
       />
 
+      {/* ステータス追加モーダル */}
+      <StatusModal
+        isOpen={showStatusModal}
+        onClose={() => setShowStatusModal(false)}
+        statusMasters={statusMasters}
+        existingStatuses={statuses}
+        onSelect={selectStatusForDate}
+      />
+
+      {/* 治療追加モーダル */}
+      <TreatmentModal
+        isOpen={showTreatmentModal}
+        onClose={() => setShowTreatmentModal(false)}
+        treatmentMasters={treatmentMasters}
+        existingTreatments={treatments}
+        onSelect={selectTreatmentForDate}
+      />
+
+      {/* 服薬追加モーダル */}
+      <MedicationModal
+        isOpen={showMedicationModal}
+        onClose={() => setShowMedicationModal(false)}
+        medicationMasters={medicationMasters}
+        existingMedications={medications}
+        onSelect={selectMedicationForDate}
+      />
+
       {/* 日付選択モーダル（年月選択） */}
       <DatePickerModal
         isOpen={showDateModal}
         onClose={() => setShowDateModal(false)}
-        onSave={saveDiagnosisWithDate}
+        onSave={
+          selectedDiagnosisId
+            ? saveDiagnosisWithDate
+            : selectedStatusId
+            ? saveStatusWithDate
+            : selectedTreatmentId
+            ? saveTreatmentWithDate
+            : saveMedicationWithDate
+        }
         initialStartYear={startYear}
         initialStartMonth={startMonth}
         initialEndYear={endYear}

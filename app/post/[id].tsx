@@ -43,6 +43,7 @@ export default function PostDetailScreen() {
   const [repliesCount, setRepliesCount] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [tags, setTags] = useState<{ diagnoses: string[]; treatments: string[]; medications: string[] }>({
     diagnoses: [],
     treatments: [],
@@ -50,6 +51,7 @@ export default function PostDetailScreen() {
   });
 
   useEffect(() => {
+    checkLoginStatus();
     if (id) {
       loadPostDetail();
       loadReplies();
@@ -58,7 +60,18 @@ export default function PostDetailScreen() {
       checkIfBookmarked();
       loadTags();
     }
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(!!session);
+    });
+
+    return () => subscription.unsubscribe();
   }, [id]);
+
+  const checkLoginStatus = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    setIsLoggedIn(!!session);
+  };
 
   const loadPostDetail = async () => {
     try {
@@ -303,6 +316,10 @@ export default function PostDetailScreen() {
   };
 
   const handleReply = () => {
+    if (!isLoggedIn) {
+      Alert.alert('エラー', 'ログインしてください');
+      return;
+    }
     router.push(`/reply/${id}`);
   };
 

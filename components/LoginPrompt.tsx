@@ -9,8 +9,6 @@ import { HStack } from '@/components/ui/hstack';
 import { Spinner } from '@/components/ui/spinner';
 import { supabase } from '@/src/lib/supabase';
 
-WebBrowser.maybeCompleteAuthSession();
-
 interface LoginPromptProps {
   children: React.ReactNode;
 }
@@ -37,51 +35,68 @@ export default function LoginPrompt({ children }: LoginPromptProps) {
 
   const handleXLogin = async () => {
     try {
+      console.log('[LoginPrompt] 認証開始');
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'twitter',
         options: {
-          redirectTo: 'kokoroliving://',
+          redirectTo: 'kokoroliving://auth/callback',
         },
       });
 
       if (error) {
-        console.error('ログインエラー:', error);
+        console.error('[LoginPrompt] ログインエラー:', error);
         Alert.alert('ログインエラー', error.message);
         return;
       }
 
+      console.log('[LoginPrompt] 認証URL取得:', data?.url);
       if (data?.url) {
         const result = await WebBrowser.openAuthSessionAsync(
           data.url,
-          'kokoroliving://'
+          'kokoroliving://auth/callback'
         );
+
+        console.log('[LoginPrompt] WebBrowser結果:', result);
 
         if (result.type === 'success') {
           const url = result.url;
+          console.log('[LoginPrompt] コールバックURL:', url);
           const hashPart = url.split('#')[1];
           const queryPart = url.split('?')[1];
+          console.log('[LoginPrompt] ハッシュ部分:', hashPart);
+          console.log('[LoginPrompt] クエリ部分:', queryPart);
           const params = new URLSearchParams(hashPart || queryPart);
           const accessToken = params.get('access_token');
           const refreshToken = params.get('refresh_token');
 
+          console.log('[LoginPrompt] トークン取得:', { accessToken: !!accessToken, refreshToken: !!refreshToken });
+
           if (accessToken && refreshToken) {
+            console.log('[LoginPrompt] セッション設定中...');
             const { error: sessionError } = await supabase.auth.setSession({
               access_token: accessToken,
               refresh_token: refreshToken,
             });
 
             if (sessionError) {
+              console.error('[LoginPrompt] セッションエラー:', sessionError);
               Alert.alert('エラー', 'ログインに失敗しました: ' + sessionError.message);
             } else {
+              console.log('[LoginPrompt] ログイン成功');
               Alert.alert('成功', 'ログインしました');
             }
           } else {
+            console.error('[LoginPrompt] トークンが見つかりません');
             Alert.alert('エラー', 'トークンを取得できませんでした');
           }
+        } else if (result.type === 'cancel') {
+          console.log('[LoginPrompt] ユーザーがキャンセル');
+        } else {
+          console.log('[LoginPrompt] その他の結果:', result.type);
         }
       }
     } catch (error) {
-      console.error('エラー:', error);
+      console.error('[LoginPrompt] エラー:', error);
       Alert.alert('エラー', '予期しないエラーが発生しました');
     }
   };

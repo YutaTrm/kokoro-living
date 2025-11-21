@@ -1,19 +1,14 @@
 import { useRouter } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
-import { Alert, FlatList, RefreshControl } from 'react-native';
+import { FlatList, RefreshControl } from 'react-native';
 
-import XLogo from '@/components/icons/XLogo';
 import PostItem from '@/components/PostItem';
 import { Text } from '@/components/Themed';
 import { Box } from '@/components/ui/box';
-import { Button, ButtonIcon, ButtonText } from '@/components/ui/button';
-import { HStack } from '@/components/ui/hstack';
+import { Button, ButtonIcon } from '@/components/ui/button';
 import { AddIcon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
 import { supabase } from '@/src/lib/supabase';
-
-WebBrowser.maybeCompleteAuthSession();
 
 interface Post {
   id: string;
