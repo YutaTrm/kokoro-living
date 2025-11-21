@@ -221,15 +221,26 @@ export default function TabOneScreen() {
           const url = result.url;
           console.log('コールバックURL（完全）:', url);
 
-          // URLからトークンを取得してセッションを確立
-          const hashPart = url.split('#')[1];
-          const queryPart = url.split('?')[1];
-          console.log('ハッシュ部分:', hashPart);
-          console.log('クエリ部分:', queryPart);
+          // URLからトークンを取得
+          let accessToken: string | null = null;
+          let refreshToken: string | null = null;
 
-          const params = new URLSearchParams(hashPart || queryPart);
-          const accessToken = params.get('access_token');
-          const refreshToken = params.get('refresh_token');
+          // ハッシュフラグメントとクエリパラメータの両方を試す
+          if (url.includes('#')) {
+            const hashPart = url.split('#')[1];
+            console.log('ハッシュ部分:', hashPart);
+            const params = new URLSearchParams(hashPart);
+            accessToken = params.get('access_token');
+            refreshToken = params.get('refresh_token');
+          }
+
+          if (!accessToken && url.includes('?')) {
+            const queryPart = url.split('?')[1]?.split('#')[0]; // #の前まで取得
+            console.log('クエリ部分:', queryPart);
+            const params = new URLSearchParams(queryPart);
+            accessToken = params.get('access_token');
+            refreshToken = params.get('refresh_token');
+          }
 
           console.log('access_token:', accessToken ? '取得成功' : '取得失敗');
           console.log('refresh_token:', refreshToken ? '取得成功' : '取得失敗');
@@ -250,7 +261,8 @@ export default function TabOneScreen() {
             }
           } else {
             console.error('トークンが見つかりません');
-            Alert.alert('エラー', 'トークンを取得できませんでした');
+            console.error('URL全体:', url);
+            Alert.alert('エラー', 'トークンを取得できませんでした。コンソールを確認してください。');
           }
         } else if (result.type === 'cancel') {
           console.log('ユーザーがキャンセルしました');

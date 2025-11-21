@@ -1,0 +1,2 @@
+-- RLSを一時的に無効化（テスト用）
+ALTER TABLE users DISABLE ROW LEVEL SECURITY;
