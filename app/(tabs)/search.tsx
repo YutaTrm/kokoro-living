@@ -16,6 +16,7 @@ interface Post {
   id: string;
   content: string;
   created_at: string;
+  parent_post_id: string | null;
   user: {
     display_name: string;
     user_id: string;
@@ -163,11 +164,10 @@ export default function SearchScreen() {
       // experienced_atがnullの場合は最後に表示
       const nullsLast = sortBy === 'experienced_at';
 
-      // 基本クエリ
+      // 基本クエリ（返信も含む）
       let query = supabase
         .from('posts')
-        .select('id, content, created_at, updated_at, experienced_at, user_id')
-        .is('parent_post_id', null); // 返信は除外
+        .select('id, content, created_at, updated_at, experienced_at, user_id, parent_post_id');
 
       // フリーワード検索
       if (searchQuery.trim()) {
@@ -262,6 +262,7 @@ export default function SearchScreen() {
             id: post.id,
             content: post.content,
             created_at: post.created_at,
+            parent_post_id: post.parent_post_id,
             user: {
               display_name: usersMap.get(post.user_id)?.display_name || 'Unknown',
               user_id: post.user_id,

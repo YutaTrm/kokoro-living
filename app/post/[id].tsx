@@ -1,8 +1,10 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { Bookmark, Clock, Edit, Heart, MessageCircle } from 'lucide-react-native';
+import { ChevronDown, Clock, CornerDownRight, Edit } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView as RNScrollView } from 'react-native';
 
+import PostActionButtons from '@/components/PostActionButtons';
+import ReplyItem from '@/components/ReplyItem';
 import { Text } from '@/components/Themed';
 import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
@@ -17,6 +19,7 @@ interface Post {
   content: string;
   created_at: string;
   user_id: string;
+  parent_post_id?: string | null;
   experienced_at?: string | null;
   user: {
     display_name: string;
@@ -29,11 +32,15 @@ interface Reply {
   id: string;
   content: string;
   created_at: string;
+  parent_post_id: string | null;
   user: {
     display_name: string;
     user_id: string;
     avatar_url?: string | null;
   };
+  childReplies?: Reply[];
+  hasMoreReplies?: boolean;
+  deeperRepliesCount?: number;
 }
 
 export default function PostDetailScreen() {
@@ -41,6 +48,7 @@ export default function PostDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [loading, setLoading] = useState(true);
   const [post, setPost] = useState<Post | null>(null);
+  const [parentPost, setParentPost] = useState<Post | null>(null);
   const [replies, setReplies] = useState<Reply[]>([]);
   const [likesCount, setLikesCount] = useState(0);
   const [repliesCount, setRepliesCount] = useState(0);
@@ -53,6 +61,8 @@ export default function PostDetailScreen() {
     treatments: [],
     medications: [],
   });
+  const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set());
+  const [loadingDeeperReplies, setLoadingDeeperReplies] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     checkLoginStatus();
@@ -83,7 +93,7 @@ export default function PostDetailScreen() {
     try {
       const { data: postData, error: postError } = await supabase
         .from('posts')
-        .select('id, content, created_at, user_id, experienced_at')
+        .select('id, content, created_at, user_id, experienced_at, parent_post_id')
         .eq('id', id)
         .single();
 
@@ -104,6 +114,32 @@ export default function PostDetailScreen() {
           avatar_url: userData?.avatar_url || null,
         },
       });
+
+      // 親投稿がある場合は取得（返信詳細ページの場合）
+      if (postData.parent_post_id) {
+        const { data: parentData } = await supabase
+          .from('posts')
+          .select('id, content, created_at, user_id')
+          .eq('id', postData.parent_post_id)
+          .single();
+
+        if (parentData) {
+          const { data: parentUserData } = await supabase
+            .from('users')
+            .select('user_id, display_name, avatar_url')
+            .eq('user_id', parentData.user_id)
+            .single();
+
+          setParentPost({
+            ...parentData,
+            user: {
+              display_name: parentUserData?.display_name || 'Unknown',
+              user_id: parentData.user_id,
+              avatar_url: parentUserData?.avatar_url || null,
+            },
+          });
+        }
+      }
     } catch (error) {
       console.error('投稿取得エラー:', error);
       Alert.alert('エラー', '投稿の取得に失敗しました');
@@ -114,9 +150,10 @@ export default function PostDetailScreen() {
 
   const loadReplies = async () => {
     try {
+      // 直接の返信（1階層目）を取得
       const { data: repliesData, error: repliesError } = await supabase
         .from('posts')
-        .select('id, content, created_at, user_id')
+        .select('id, content, created_at, user_id, parent_post_id')
         .eq('parent_post_id', id)
         .order('created_at', { ascending: true });
 
@@ -128,8 +165,104 @@ export default function PostDetailScreen() {
         return;
       }
 
-      // ユーザー情報を取得
-      const userIds = [...new Set(repliesData.map(r => r.user_id))];
+      // 返信への返信（2階層目）を取得
+      const replyIds = repliesData.map(r => r.id);
+      const { data: childRepliesData } = await supabase
+        .from('posts')
+        .select('id, content, created_at, user_id, parent_post_id')
+        .in('parent_post_id', replyIds)
+        .order('created_at', { ascending: true });
+
+      // 2階層目の返信IDを収集して、3階層目の存在確認
+      const childReplyIds = (childRepliesData || []).map(r => r.id);
+      let deeperRepliesCounts = new Map<string, number>();
+
+      if (childReplyIds.length > 0) {
+        // 3階層目の返信数をカウント
+        const { data: deeperCounts } = await supabase
+          .from('posts')
+          .select('parent_post_id')
+          .in('parent_post_id', childReplyIds);
+
+        (deeperCounts || []).forEach((item: { parent_post_id: string }) => {
+          const count = deeperRepliesCounts.get(item.parent_post_id) || 0;
+          deeperRepliesCounts.set(item.parent_post_id, count + 1);
+        });
+      }
+
+      // すべてのユーザーIDを収集
+      const allUserIds = [
+        ...new Set([
+          ...repliesData.map(r => r.user_id),
+          ...(childRepliesData || []).map(r => r.user_id),
+        ]),
+      ];
+
+      const { data: usersData } = await supabase
+        .from('users')
+        .select('user_id, display_name, avatar_url')
+        .in('user_id', allUserIds);
+
+      const usersMap = new Map(
+        (usersData || []).map(u => [u.user_id, { display_name: u.display_name, avatar_url: u.avatar_url }])
+      );
+
+      // 子返信をマップ化
+      const childRepliesMap = new Map<string, Reply[]>();
+      (childRepliesData || []).forEach((reply: { id: string; content: string; created_at: string; user_id: string; parent_post_id: string }) => {
+        const parentId = reply.parent_post_id;
+        if (!childRepliesMap.has(parentId)) {
+          childRepliesMap.set(parentId, []);
+        }
+        const deeperCount = deeperRepliesCounts.get(reply.id) || 0;
+        childRepliesMap.get(parentId)?.push({
+          id: reply.id,
+          content: reply.content,
+          created_at: reply.created_at,
+          parent_post_id: reply.parent_post_id,
+          user: {
+            display_name: usersMap.get(reply.user_id)?.display_name || 'Unknown',
+            user_id: reply.user_id,
+            avatar_url: usersMap.get(reply.user_id)?.avatar_url || null,
+          },
+          hasMoreReplies: deeperCount > 0,
+          deeperRepliesCount: deeperCount,
+        });
+      });
+
+      const formattedReplies: Reply[] = repliesData.map((reply: { id: string; content: string; created_at: string; user_id: string; parent_post_id: string }) => ({
+        id: reply.id,
+        content: reply.content,
+        created_at: reply.created_at,
+        parent_post_id: reply.parent_post_id,
+        user: {
+          display_name: usersMap.get(reply.user_id)?.display_name || 'Unknown',
+          user_id: reply.user_id,
+          avatar_url: usersMap.get(reply.user_id)?.avatar_url || null,
+        },
+        childReplies: childRepliesMap.get(reply.id) || [],
+      }));
+
+      setReplies(formattedReplies);
+      setRepliesCount(formattedReplies.length);
+    } catch (error) {
+      console.error('返信取得エラー:', error);
+    }
+  };
+
+  const loadDeeperReplies = async (parentReplyId: string, parentContent: string) => {
+    setLoadingDeeperReplies(prev => new Set(prev).add(parentReplyId));
+
+    try {
+      const { data: deeperRepliesData } = await supabase
+        .from('posts')
+        .select('id, content, created_at, user_id, parent_post_id')
+        .eq('parent_post_id', parentReplyId)
+        .order('created_at', { ascending: true });
+
+      if (!deeperRepliesData || deeperRepliesData.length === 0) return;
+
+      const userIds = deeperRepliesData.map(r => r.user_id);
       const { data: usersData } = await supabase
         .from('users')
         .select('user_id, display_name, avatar_url')
@@ -139,21 +272,52 @@ export default function PostDetailScreen() {
         (usersData || []).map(u => [u.user_id, { display_name: u.display_name, avatar_url: u.avatar_url }])
       );
 
-      const formattedReplies: Reply[] = repliesData.map((reply: any) => ({
+      // 4階層目以降の存在確認
+      const deeperIds = deeperRepliesData.map(r => r.id);
+      const { data: evenDeeperCounts } = await supabase
+        .from('posts')
+        .select('parent_post_id')
+        .in('parent_post_id', deeperIds);
+
+      const evenDeeperCountsMap = new Map<string, number>();
+      (evenDeeperCounts || []).forEach((item: { parent_post_id: string }) => {
+        const count = evenDeeperCountsMap.get(item.parent_post_id) || 0;
+        evenDeeperCountsMap.set(item.parent_post_id, count + 1);
+      });
+
+      const newDeeperReplies: Reply[] = deeperRepliesData.map((reply: { id: string; content: string; created_at: string; user_id: string; parent_post_id: string }) => ({
         id: reply.id,
         content: reply.content,
         created_at: reply.created_at,
+        parent_post_id: reply.parent_post_id,
         user: {
           display_name: usersMap.get(reply.user_id)?.display_name || 'Unknown',
           user_id: reply.user_id,
           avatar_url: usersMap.get(reply.user_id)?.avatar_url || null,
         },
+        hasMoreReplies: (evenDeeperCountsMap.get(reply.id) || 0) > 0,
+        deeperRepliesCount: evenDeeperCountsMap.get(reply.id) || 0,
       }));
 
-      setReplies(formattedReplies);
-      setRepliesCount(formattedReplies.length);
+      // repliesを更新して、該当の2階層目返信にchildRepliesを追加
+      setReplies(prev => prev.map(reply => ({
+        ...reply,
+        childReplies: reply.childReplies?.map(child =>
+          child.id === parentReplyId
+            ? { ...child, childReplies: newDeeperReplies }
+            : child
+        ),
+      })));
+
+      setExpandedReplies(prev => new Set(prev).add(parentReplyId));
     } catch (error) {
-      console.error('返信取得エラー:', error);
+      console.error('深い返信取得エラー:', error);
+    } finally {
+      setLoadingDeeperReplies(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(parentReplyId);
+        return newSet;
+      });
     }
   };
 
@@ -174,32 +338,31 @@ export default function PostDetailScreen() {
 
   const loadTags = async () => {
     try {
-      // 診断名を取得
       const { data: diagnosesData } = await supabase
         .from('post_diagnoses')
         .select('user_diagnoses(diagnoses(name))')
         .eq('post_id', id);
 
-      const diagnoses = diagnosesData?.map((d: any) => d.user_diagnoses?.diagnoses?.name).filter(Boolean) || [];
+      type DiagnosisRow = { user_diagnoses: { diagnoses: { name: string } } | null };
+      const diagnoses = (diagnosesData as DiagnosisRow[] | null)?.map(d => d.user_diagnoses?.diagnoses?.name).filter(Boolean) as string[] || [];
 
-      // 治療法を取得
       const { data: treatmentsData } = await supabase
         .from('post_treatments')
         .select('user_treatments(treatments(name))')
         .eq('post_id', id);
 
-      const treatments = treatmentsData?.map((t: any) => t.user_treatments?.treatments?.name).filter(Boolean) || [];
+      type TreatmentRow = { user_treatments: { treatments: { name: string } } | null };
+      const treatments = (treatmentsData as TreatmentRow[] | null)?.map(t => t.user_treatments?.treatments?.name).filter(Boolean) as string[] || [];
 
-      // 服薬を取得
       const { data: medicationsData } = await supabase
         .from('post_medications')
         .select('user_medications(ingredients(name), products(name))')
         .eq('post_id', id);
 
-      const medicationsWithDuplicates = medicationsData?.map((m: any) =>
+      type MedicationRow = { user_medications: { ingredients: { name: string } } | null };
+      const medicationsWithDuplicates = (medicationsData as MedicationRow[] | null)?.map(m =>
         m.user_medications?.ingredients?.name
-      ).filter(Boolean) || [];
-      // 重複を除去
+      ).filter(Boolean) as string[] || [];
       const medications = [...new Set(medicationsWithDuplicates)];
 
       setTags({ diagnoses, treatments, medications });
@@ -213,7 +376,7 @@ export default function PostDetailScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('likes')
         .select('id')
         .eq('post_id', id)
@@ -222,7 +385,7 @@ export default function PostDetailScreen() {
 
       setIsLiked(!!data);
     } catch (error) {
-      // エラーは無視（いいねしていない場合）
+      // エラーは無視
     }
   };
 
@@ -231,7 +394,7 @@ export default function PostDetailScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('bookmarks')
         .select('id')
         .eq('post_id', id)
@@ -240,7 +403,7 @@ export default function PostDetailScreen() {
 
       setIsBookmarked(!!data);
     } catch (error) {
-      // エラーは無視（ブックマークしていない場合）
+      // エラーは無視
     }
   };
 
@@ -253,7 +416,6 @@ export default function PostDetailScreen() {
       }
 
       if (isLiked) {
-        // いいねを解除
         const { error } = await supabase
           .from('likes')
           .delete()
@@ -265,7 +427,6 @@ export default function PostDetailScreen() {
           setLikesCount(prev => prev - 1);
         }
       } else {
-        // いいねを追加
         const { error } = await supabase
           .from('likes')
           .insert({ post_id: id, user_id: user.id });
@@ -289,7 +450,6 @@ export default function PostDetailScreen() {
       }
 
       if (isBookmarked) {
-        // ブックマークを解除
         const { error } = await supabase
           .from('bookmarks')
           .delete()
@@ -300,7 +460,6 @@ export default function PostDetailScreen() {
           setIsBookmarked(false);
         }
       } else {
-        // ブックマークを追加
         const { error } = await supabase
           .from('bookmarks')
           .insert({ post_id: id, user_id: user.id });
@@ -332,6 +491,12 @@ export default function PostDetailScreen() {
     return `${year}/${month}当時`;
   };
 
+  const truncateText = (text: string, maxLength: number = 30) => {
+    const firstLine = text.split('\n')[0];
+    if (firstLine.length <= maxLength) return firstLine;
+    return firstLine.substring(0, maxLength) + '...';
+  };
+
   const handleReply = () => {
     if (!isLoggedIn) {
       Alert.alert('エラー', 'ログインしてください');
@@ -348,7 +513,14 @@ export default function PostDetailScreen() {
     router.push(`/user/${userId}`);
   };
 
+  const handleParentPress = () => {
+    if (post?.parent_post_id) {
+      router.push(`/post/${post.parent_post_id}`);
+    }
+  };
+
   const isOwnPost = currentUserId && post && currentUserId === post.user_id;
+  const isReply = post?.parent_post_id;
 
   if (loading) {
     return (
@@ -369,135 +541,196 @@ export default function PostDetailScreen() {
     );
   }
 
+  // 再帰的に深い返信をレンダリングする関数
+  const renderDeeperReplies = (childReplies: Reply[], parentContent: string, depth: number) => {
+    return childReplies.map((deepReply, index) => {
+      const isLastInGroup = index === childReplies.length - 1;
+      const hasChildren = (deepReply.childReplies?.length ?? 0) > 0 || deepReply.hasMoreReplies;
+
+      return (
+        <Box key={deepReply.id}>
+          <ReplyItem
+            reply={deepReply}
+            parentPostContent={parentContent}
+            showVerticalLine={!isLastInGroup || hasChildren}
+            depth={depth}
+            onReplyCreated={loadReplies}
+          />
+          {/* さらに深い返信がある場合 */}
+          {deepReply.hasMoreReplies && !expandedReplies.has(deepReply.id) && (
+            <Pressable
+              onPress={() => loadDeeperReplies(deepReply.id, deepReply.content)}
+              className="px-4 py-2 ml-10"
+            >
+              <HStack space="xs" className="items-center">
+                {loadingDeeperReplies.has(deepReply.id) ? (
+                  <Spinner size="small" />
+                ) : (
+                  <>
+                    <ChevronDown size={16} color="#666" />
+                    <Text className="text-sm text-primary-500">
+                      さらに表示する（{deepReply.deeperRepliesCount}件）
+                    </Text>
+                  </>
+                )}
+              </HStack>
+            </Pressable>
+          )}
+          {/* 展開された深い返信 */}
+          {deepReply.childReplies && expandedReplies.has(deepReply.id) && (
+            renderDeeperReplies(deepReply.childReplies, deepReply.content, depth + 1)
+          )}
+        </Box>
+      );
+    });
+  };
+
   return (
     <>
       <Stack.Screen options={{ title: 'ポスト' }} />
       <RNScrollView className="flex-1 bg-background-0">
         {/* 投稿詳細 */}
-      <Box className="px-4 py-4 border-b border-outline-200">
-        <HStack space="sm" className="items-start mb-3">
-          <Pressable onPress={() => handleUserPress(post.user_id)}>
-            <Avatar size="md">
-              {post.user.avatar_url ? (
-                <AvatarImage source={{ uri: post.user.avatar_url }} />
-              ) : (
-                <AvatarFallbackText>{post.user.display_name}</AvatarFallbackText>
-              )}
-            </Avatar>
-          </Pressable>
-          <VStack>
-            <Text className="font-semibold text-base">{post.user.display_name}</Text>
-            <Text className="text-sm text-typography-500">{formatDate(post.created_at)}</Text>
-          </VStack>
-        </HStack>
-
-        <Text className="text-lg leading-6 mb-2">{post.content}</Text>
-
-        {/* 体験日時表示 */}
-        {post.experienced_at && (
-          <HStack space="xs" className="items-center mb-2">
-            <Clock size={16} color="#666" />
-            <Text className="text-sm text-typography-500">{formatExperiencedAt(post.experienced_at)}</Text>
-          </HStack>
-        )}
-
-        {/* タグ表示（改行） */}
-        {(tags.diagnoses.length > 0 || tags.treatments.length > 0 || tags.medications.length > 0) && (
-          <Box className="mb-2 flex-row flex-wrap gap-2">
-            {tags.diagnoses.map((tag, index) => (
-              <Box key={`d-${index}`} className="bg-blue-100 px-3 py-1 rounded">
-                <Text className="text-xs text-blue-700">{tag}</Text>
-              </Box>
-            ))}
-            {tags.treatments.map((tag, index) => (
-              <Box key={`t-${index}`} className="bg-green-100 px-3 py-1 rounded">
-                <Text className="text-xs text-green-700">{tag}</Text>
-              </Box>
-            ))}
-            {tags.medications.map((tag, index) => (
-              <Box key={`m-${index}`} className="bg-purple-100 px-3 py-1 rounded">
-                <Text className="text-xs text-purple-700">{tag}</Text>
-              </Box>
-            ))}
-          </Box>
-        )}
-
-        {/* 統計情報 */}
-        <HStack space="lg" className="mb-3 justify-between items-center">
-          <HStack space="lg">
-            <Text className="text-sm text-typography-500">
-              <Text className="font-semibold text-typography-900">{repliesCount}</Text> 件の返信
-            </Text>
-            <Text className="text-sm text-typography-500">
-              <Text className="font-semibold text-typography-900">{likesCount}</Text> いいね
-            </Text>
-          </HStack>
-
-          {/* 編集ボタン（自分の投稿のみ） */}
-          {isOwnPost && (
-            <Pressable onPress={handleEdit}>
-              <Edit size={20} color="#666" />
+        <Box className="px-4 py-4 border-b border-outline-200">
+          {/* 返信インジケーター（返信詳細ページの場合） */}
+          {isReply && parentPost && (
+            <Pressable onPress={handleParentPress} className="mb-3">
+              <HStack space="xs" className="items-center">
+                <CornerDownRight size={14} color="#666" />
+                <Text className="text-sm text-typography-500" numberOfLines={1}>
+                  返信 {truncateText(parentPost.content)}
+                </Text>
+              </HStack>
             </Pressable>
           )}
-        </HStack>
 
-        {/* アクションボタン */}
-        <HStack space="lg" className="border-t border-outline-200 pt-3">
-          <Button variant="link" size="sm" onPress={handleReply} className="flex-1">
-            <HStack space="xs" className="items-center">
-              <MessageCircle size={20} color="gray" />
-              <ButtonText className="text-typography-500">返信</ButtonText>
-            </HStack>
-          </Button>
-
-          <Button variant="link" size="sm" onPress={handleLike} className="flex-1">
-            <HStack space="xs" className="items-center">
-              <Heart size={20} color={isLiked ? 'red' : 'gray'} fill={isLiked ? 'red' : 'none'} />
-              <ButtonText className={isLiked ? 'text-error-500' : 'text-typography-500'}>
-                いいね
-              </ButtonText>
-            </HStack>
-          </Button>
-
-          <Button variant="link" size="sm" onPress={handleBookmark} className="flex-1">
-            <HStack space="xs" className="items-center">
-              <Bookmark size={20} color={isBookmarked ? 'blue' : 'gray'} fill={isBookmarked ? 'blue' : 'none'} />
-              <ButtonText className={isBookmarked ? 'text-primary-500' : 'text-typography-500'}>
-                保存
-              </ButtonText>
-            </HStack>
-          </Button>
-        </HStack>
-      </Box>
-
-      {/* 返信一覧 */}
-      {replies.length > 0 && (
-        <Box className="pt-3">
-          {replies.map((reply) => (
-            <Box key={reply.id} className="px-4 py-3 border-b border-outline-200">
-              <HStack space="sm" className="items-start">
-                <Pressable onPress={() => handleUserPress(reply.user.user_id)}>
-                  <Avatar size="sm">
-                    {reply.user.avatar_url ? (
-                      <AvatarImage source={{ uri: reply.user.avatar_url }} />
-                    ) : (
-                      <AvatarFallbackText>{reply.user.display_name}</AvatarFallbackText>
-                    )}
-                  </Avatar>
-                </Pressable>
-                <VStack className="flex-1" space="xs">
-                  <HStack space="xs" className="items-center">
-                    <Text className="font-semibold text-sm">{reply.user.display_name}</Text>
-                    <Text className="text-xs text-typography-500">·</Text>
-                    <Text className="text-xs text-typography-500">{formatDate(reply.created_at)}</Text>
-                  </HStack>
-                  <Text className="text-base leading-5">{reply.content}</Text>
+          {/* ヘッダー：ユーザー情報と編集ボタン */}
+          <HStack className="justify-between items-start mb-3">
+            <Pressable onPress={() => handleUserPress(post.user_id)} className="flex-1">
+              <HStack space="sm">
+                <Avatar size="md">
+                  {post.user.avatar_url ? (
+                    <AvatarImage source={{ uri: post.user.avatar_url }} />
+                  ) : (
+                    <AvatarFallbackText>{post.user.display_name}</AvatarFallbackText>
+                  )}
+                </Avatar>
+                <VStack>
+                  <Text className="font-semibold text-base">{post.user.display_name}</Text>
+                  <Text className="text-sm text-typography-500">{formatDate(post.created_at)}</Text>
                 </VStack>
               </HStack>
+            </Pressable>
+            {isOwnPost && (
+              <Pressable onPress={handleEdit} className="p-2">
+                <Edit size={20} color="#666" />
+              </Pressable>
+            )}
+          </HStack>
+
+          <Text className="text-lg leading-6 mb-2">{post.content}</Text>
+
+          {post.experienced_at && (
+            <HStack space="xs" className="items-center mb-2">
+              <Clock size={16} color="#666" />
+              <Text className="text-sm text-typography-500">{formatExperiencedAt(post.experienced_at)}</Text>
+            </HStack>
+          )}
+
+          {/* タグ表示（返信でない場合のみ） */}
+          {!isReply && (tags.diagnoses.length > 0 || tags.treatments.length > 0 || tags.medications.length > 0) && (
+            <Box className="mb-2 flex-row flex-wrap gap-2">
+              {tags.diagnoses.map((tag, index) => (
+                <Box key={`d-${index}`} className="bg-blue-100 px-3 py-1 rounded">
+                  <Text className="text-xs text-blue-700">{tag}</Text>
+                </Box>
+              ))}
+              {tags.treatments.map((tag, index) => (
+                <Box key={`t-${index}`} className="bg-green-100 px-3 py-1 rounded">
+                  <Text className="text-xs text-green-700">{tag}</Text>
+                </Box>
+              ))}
+              {tags.medications.map((tag, index) => (
+                <Box key={`m-${index}`} className="bg-purple-100 px-3 py-1 rounded">
+                  <Text className="text-xs text-purple-700">{tag}</Text>
+                </Box>
+              ))}
             </Box>
-          ))}
+          )}
+
+          <PostActionButtons
+            repliesCount={repliesCount}
+            likesCount={likesCount}
+            isLiked={isLiked}
+            isBookmarked={isBookmarked}
+            onReply={handleReply}
+            onLike={handleLike}
+            onBookmark={handleBookmark}
+            size="md"
+          />
         </Box>
-      )}
+
+        {/* 返信一覧 */}
+        {replies.length > 0 && (
+          <Box>
+            {replies.map((reply) => {
+              const hasChildReplies = (reply.childReplies?.length ?? 0) > 0;
+
+              return (
+                <Box key={reply.id}>
+                  {/* 1階層目の返信 */}
+                  <ReplyItem
+                    reply={reply}
+                    parentPostContent={post.content}
+                    showVerticalLine={hasChildReplies}
+                    depth={0}
+                    onReplyCreated={loadReplies}
+                  />
+                  {/* 2階層目の返信 */}
+                  {reply.childReplies?.map((childReply, index) => {
+                    const isLastChild = index === (reply.childReplies?.length ?? 0) - 1;
+                    const hasDeeper = childReply.hasMoreReplies || (childReply.childReplies?.length ?? 0) > 0;
+
+                    return (
+                      <Box key={childReply.id}>
+                        <ReplyItem
+                          reply={childReply}
+                          parentPostContent={reply.content}
+                          showVerticalLine={!isLastChild || hasDeeper}
+                          depth={1}
+                          onReplyCreated={loadReplies}
+                        />
+                        {/* 3階層目以降：さらに表示するボタン */}
+                        {childReply.hasMoreReplies && !expandedReplies.has(childReply.id) && (
+                          <Pressable
+                            onPress={() => loadDeeperReplies(childReply.id, childReply.content)}
+                            className="px-4 py-2 ml-10"
+                          >
+                            <HStack space="xs" className="items-center">
+                              {loadingDeeperReplies.has(childReply.id) ? (
+                                <Spinner size="small" />
+                              ) : (
+                                <>
+                                  <ChevronDown size={16} color="#666" />
+                                  <Text className="text-sm text-primary-500">
+                                    さらに表示する（{childReply.deeperRepliesCount}件）
+                                  </Text>
+                                </>
+                              )}
+                            </HStack>
+                          </Pressable>
+                        )}
+                        {/* 展開された3階層目以降の返信 */}
+                        {childReply.childReplies && expandedReplies.has(childReply.id) && (
+                          renderDeeperReplies(childReply.childReplies, childReply.content, 2)
+                        )}
+                      </Box>
+                    );
+                  })}
+                </Box>
+              );
+            })}
+          </Box>
+        )}
       </RNScrollView>
     </>
   );

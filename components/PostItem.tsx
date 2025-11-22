@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { CornerDownRight } from 'lucide-react-native';
 import { Pressable, ScrollView } from 'react-native';
 
 import { Text } from '@/components/Themed';
@@ -12,6 +13,7 @@ interface PostItemProps {
     id: string;
     content: string;
     created_at: string;
+    parent_post_id?: string | null;
     user: {
       display_name: string;
       user_id: string;
@@ -81,6 +83,14 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
 
           {/* 投稿内容 */}
           <VStack className="flex-1" space="xs">
+            {/* 返信インジケーター */}
+            {post.parent_post_id && (
+              <HStack space="xs" className="items-center mb-1">
+                <CornerDownRight size={12} color="#666" />
+                <Text className="text-xs text-typography-500">返信</Text>
+              </HStack>
+            )}
+
             {/* ユーザー名、時間、タグ */}
             <HStack space="xs" className="items-center flex-1">
               <Text className="font-semibold text-base">{post.user.display_name}</Text>
