@@ -253,9 +253,9 @@ export default function ReplyItem({
             {parentPostContent && reply.parent_post_id && (
               <Pressable onPress={handleParentPress}>
                 <HStack space="xs" className="items-center mb-1">
-                  <CornerDownRight size={12} color="#666" />
-                  <Text className="text-xs text-typography-500" numberOfLines={1}>
-                    返信 {truncateText(parentPostContent)}
+                  <CornerDownRight size={12} />
+                  <Text className="text-xs text-primary-300 pr-4" numberOfLines={1}>
+                    {truncateText(parentPostContent)}
                   </Text>
                 </HStack>
               </Pressable>

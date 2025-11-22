@@ -596,8 +596,8 @@ export default function PostDetailScreen() {
             <Pressable onPress={handleParentPress} className="mb-3">
               <HStack space="xs" className="items-center">
                 <CornerDownRight size={14} color="#666" />
-                <Text className="text-sm text-typography-500" numberOfLines={1}>
-                  返信 {truncateText(parentPost.content)}
+                <Text className="text-sm text-primary-300 pr-4" numberOfLines={1}>
+                  {truncateText(parentPost.content)}
                 </Text>
               </HStack>
             </Pressable>
