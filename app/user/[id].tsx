@@ -216,12 +216,16 @@ export default function UserDetailScreen() {
 
       const medicationsMap = new Map<string, string[]>();
       medicationsData?.forEach((m: any) => {
-        const name = m.user_medications?.products?.name || m.user_medications?.ingredients?.name;
+        const name = m.user_medications?.ingredients?.name;
         if (name) {
           if (!medicationsMap.has(m.post_id)) {
             medicationsMap.set(m.post_id, []);
           }
-          medicationsMap.get(m.post_id)?.push(name);
+          const medications = medicationsMap.get(m.post_id)!;
+          // 重複を避ける
+          if (!medications.includes(name)) {
+            medications.push(name);
+          }
         }
       });
 

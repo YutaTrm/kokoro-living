@@ -56,6 +56,7 @@ export default function TabLayout() {
         options={{
           title: '通知',
           tabBarIcon: ({ color }) => <Bell color={color} size={24} />,
+          href: null, // タブを非表示
         }}
       />
       <Tabs.Screen

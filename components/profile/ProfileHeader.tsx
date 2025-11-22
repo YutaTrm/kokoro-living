@@ -20,8 +20,11 @@ interface ProfileHeaderProps {
 
 export default function ProfileHeader({ profile, onLogout }: ProfileHeaderProps) {
   return (
-    <>
-      <HStack className="py-6 px-5" space="md">
+    <Box className="p-4 bg-">
+      <Heading size="md" className="text-primary-500">
+        ログイン中のアカウント
+      </Heading>
+      <HStack className="mt-2" space="md">
         {profile.avatarUrl && (
           <Avatar size="lg">
             <AvatarFallbackText>{profile.userName || 'User'}</AvatarFallbackText>
@@ -29,23 +32,23 @@ export default function ProfileHeader({ profile, onLogout }: ProfileHeaderProps)
           </Avatar>
         )}
         <VStack className="flex-1 justify-center" space="xs">
-          {profile.userName && <Heading size="xl">{profile.userName}</Heading>}
+          {profile.userName && <Heading size="xl" className="text-primary-300">{profile.userName}</Heading>}
           {profile.accountName && (
-            <Text className="text-sm opacity-60">@{profile.accountName}</Text>
+            <Text className="text-sm text-primary-300">@{profile.accountName}</Text>
           )}
           {profile.createdAt && (
-            <Text className="text-xs opacity-50">
-              登録日時: {new Date(profile.createdAt).toLocaleDateString('ja-JP')}
+            <Text className="text-sm text-primary-300">
+              アプリ登録日時: {new Date(profile.createdAt).toLocaleDateString('ja-JP')}
             </Text>
           )}
         </VStack>
       </HStack>
 
-      <Box className="px-5 mb-4">
+      <Box className="my-4">
         <Button onPress={onLogout} action="negative" className="w-full">
           <ButtonText>ログアウト</ButtonText>
         </Button>
       </Box>
-    </>
+    </Box>
   );
 }

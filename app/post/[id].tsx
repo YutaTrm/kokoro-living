@@ -196,9 +196,11 @@ export default function PostDetailScreen() {
         .select('user_medications(ingredients(name), products(name))')
         .eq('post_id', id);
 
-      const medications = medicationsData?.map((m: any) =>
-        m.user_medications?.products?.name || m.user_medications?.ingredients?.name
+      const medicationsWithDuplicates = medicationsData?.map((m: any) =>
+        m.user_medications?.ingredients?.name
       ).filter(Boolean) || [];
+      // 重複を除去
+      const medications = [...new Set(medicationsWithDuplicates)];
 
       setTags({ diagnoses, treatments, medications });
     } catch (error) {

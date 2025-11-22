@@ -123,6 +123,17 @@ export default function ProfileScreen() {
     loadUserProfile();
     loadMedicalRecords();
     loadMasterData();
+
+    // ログイン状態の変更を監視
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        // ログイン成功時にリロード
+        loadUserProfile();
+        loadMedicalRecords();
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -141,11 +152,18 @@ export default function ProfileScreen() {
       const { data: diagData } = await supabase.from('diagnoses').select('id, name');
       if (diagData) setDiagnosisMasters(diagData);
 
-      // 有効成分と製品マスター
-      const { data: ingData } = await supabase.from('ingredients').select('id, name');
-      const { data: prodData } = await supabase.from('products').select('id, name');
-      const combined = [...(ingData || []), ...(prodData || [])];
-      setMedicationMasters(combined);
+      // 製品マスター（製品名（成分名）の形式で表示）
+      const { data: prodData } = await supabase
+        .from('products')
+        .select('id, name, ingredient_id, ingredients(name)')
+        .order('name');
+
+      if (prodData) {
+        setMedicationMasters(prodData.map((p: any) => ({
+          id: p.id,
+          name: `${p.name}（${p.ingredients?.name || ''}）`,
+        })));
+      }
 
       // 治療法マスター
       const { data: treatData } = await supabase.from('treatments').select('id, name');
@@ -352,12 +370,22 @@ export default function ProfileScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // medicationMastersはingredientsとproductsの両方を含むので、どちらかを判定
-      const isIngredient = medicationMasters.find(m => m.id === selectedMedicationId);
+      // 選んだproduct_idからingredient_idを取得
+      const { data: productData } = await supabase
+        .from('products')
+        .select('ingredient_id')
+        .eq('id', selectedMedicationId)
+        .single();
+
+      if (!productData) {
+        Alert.alert('エラー', '製品情報の取得に失敗しました');
+        return;
+      }
 
       const { error } = await supabase.from('user_medications').insert({
         user_id: user.id,
-        ingredient_id: selectedMedicationId, // とりあえずingredient_idとして保存
+        ingredient_id: productData.ingredient_id,
+        product_id: selectedMedicationId,
         start_date: startDate,
         end_date: endDate,
       });
@@ -426,12 +454,23 @@ export default function ProfileScreen() {
       }
 
       if (medicationsData) {
-        setMedications(medicationsData.map((m: MedicationData & { id: string }) => ({
-          id: m.id,
-          name: m.products?.name || m.ingredients?.name || '',
-          startDate: m.start_date,
-          endDate: m.end_date,
-        })));
+        // 成分名でグループ化（同じ成分の複数製品をまとめる）
+        const ingredientMap = new Map<string, MedicalRecord>();
+        medicationsData.forEach((m: MedicationData & { id: string }) => {
+          const ingredientName = m.ingredients?.name || '';
+          if (ingredientName) {
+            // 既に存在しない場合のみ追加（重複除去）
+            if (!ingredientMap.has(ingredientName)) {
+              ingredientMap.set(ingredientName, {
+                id: m.id,
+                name: ingredientName,
+                startDate: m.start_date,
+                endDate: m.end_date,
+              });
+            }
+          }
+        });
+        setMedications(Array.from(ingredientMap.values()));
       }
 
       if (treatmentsData) {
@@ -717,8 +756,11 @@ export default function ProfileScreen() {
 
       medicationsTagsData?.forEach((m: any) => {
         if (m.post_id === postId) {
-          const name = m.user_medications?.products?.name || m.user_medications?.ingredients?.name;
-          if (name) medications.push(name);
+          const name = m.user_medications?.ingredients?.name;
+          // 重複を避ける
+          if (name && !medications.includes(name)) {
+            medications.push(name);
+          }
         }
       });
 
@@ -739,11 +781,11 @@ export default function ProfileScreen() {
         .eq('user_id', user.id);
 
       if (error) {
-        Alert.alert('エラー', 'bioの保存に失敗しました');
+        Alert.alert('エラー', '自由記述の保存に失敗しました');
         return;
       }
 
-      Alert.alert('成功', 'bioを保存しました');
+      Alert.alert('成功', '自由記述を保存しました');
       loadUserProfile();
     } catch (error) {
       Alert.alert('エラー', '予期しないエラーが発生しました');
@@ -908,7 +950,11 @@ export default function ProfileScreen() {
             ListEmptyComponent={renderEmptyComponent}
           />
         </Box>
-      ) : null}
+      ) : (
+        <Box className="flex-1 items-center justify-center p-5">
+          <Spinner size="large" />
+        </Box>
+      )}
 
       {/* 選択モーダル */}
       <SelectModal

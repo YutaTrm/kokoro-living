@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, ScrollView, TextInput } from 'react-native';
+import { FlatList, Pressable, RefreshControl, TextInput } from 'react-native';
 
 import PostItem from '@/components/PostItem';
+import MultiSelectModal from '@/components/search/MultiSelectModal';
 import { Text } from '@/components/Themed';
 import { Box } from '@/components/ui/box';
-import { Checkbox, CheckboxIcon, CheckboxIndicator, CheckboxLabel } from '@/components/ui/checkbox';
+import { Button, ButtonIcon } from '@/components/ui/button';
 import { HStack } from '@/components/ui/hstack';
-import { CheckIcon } from '@/components/ui/icon';
+import { AddIcon, CloseIcon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
 import { VStack } from '@/components/ui/vstack';
 import { supabase } from '@/src/lib/supabase';
@@ -47,6 +48,9 @@ export default function SearchScreen() {
   const [availableTags, setAvailableTags] = useState<TagOption[]>([]);
   const [loadingTags, setLoadingTags] = useState(true);
 
+  const [showTagModal, setShowTagModal] = useState(false);
+  const [currentTagType, setCurrentTagType] = useState<'diagnosis' | 'ingredient' | 'treatment' | 'status'>('diagnosis');
+
   const LIMIT = 20;
 
   useEffect(() => {
@@ -82,18 +86,17 @@ export default function SearchScreen() {
         });
       }
 
-      // 成分（ingredients）を取得（display_flag = true のみ）
-      const { data: ingredients } = await supabase
-        .from('ingredients')
-        .select('id, name')
-        .eq('display_flag', true)
+      // 服薬（製品名（成分名）の形式で表示）
+      const { data: products } = await supabase
+        .from('products')
+        .select('id, name, ingredients(name)')
         .order('name');
 
-      if (ingredients) {
-        ingredients.forEach((i) => {
+      if (products) {
+        products.forEach((product: any) => {
           tags.push({
-            id: `ingredient-${i.id}`,
-            name: i.name,
+            id: `ingredient-${product.id}`,
+            name: `${product.name}（${product.ingredients?.name || ''}）`,
             type: 'ingredient',
           });
         });
@@ -249,9 +252,11 @@ export default function SearchScreen() {
 
           const diagnoses = diagnosesData.data?.map((d: any) => d.user_diagnoses?.diagnoses?.name).filter(Boolean) || [];
           const treatments = treatmentsData.data?.map((t: any) => t.user_treatments?.treatments?.name).filter(Boolean) || [];
-          const medications = medicationsData.data?.map((m: any) =>
-            m.user_medications?.products?.name || m.user_medications?.ingredients?.name
+          const medicationsWithDuplicates = medicationsData.data?.map((m: any) =>
+            m.user_medications?.ingredients?.name
           ).filter(Boolean) || [];
+          // 重複を除去
+          const medications = [...new Set(medicationsWithDuplicates)];
 
           return {
             id: post.id,
@@ -318,7 +323,7 @@ export default function SearchScreen() {
         if (!hasAllDiagnoses) matches = false;
       }
 
-      // 成分チェック
+      // 服薬チェック
       if (matches && ingredientIds.length > 0) {
         const { data } = await supabase
           .from('post_medications')
@@ -376,10 +381,37 @@ export default function SearchScreen() {
     }
   };
 
-  const toggleTag = (tagId: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]
-    );
+  const openTagModal = (type: 'diagnosis' | 'ingredient' | 'treatment' | 'status') => {
+    setCurrentTagType(type);
+    setShowTagModal(true);
+  };
+
+  const handleTagsUpdate = (type: 'diagnosis' | 'ingredient' | 'treatment' | 'status', selectedIds: string[]) => {
+    // 現在のタイプ以外のタグは保持
+    const otherTags = selectedTags.filter(tag => {
+      if (type === 'diagnosis') return !tag.startsWith('diagnosis-');
+      if (type === 'ingredient') return !tag.startsWith('ingredient-');
+      if (type === 'treatment') return !tag.startsWith('treatment-');
+      if (type === 'status') return !tag.startsWith('status-');
+      return true;
+    });
+
+    // 新しく選択されたタグと結合
+    setSelectedTags([...otherTags, ...selectedIds]);
+  };
+
+  const removeTag = (tagId: string) => {
+    setSelectedTags((prev) => prev.filter((id) => id !== tagId));
+  };
+
+  const getSelectedTagsByType = (type: 'diagnosis' | 'ingredient' | 'treatment' | 'status') => {
+    const prefix = `${type}-`;
+    return selectedTags.filter(tag => tag.startsWith(prefix));
+  };
+
+  const getTagName = (tagId: string) => {
+    const tag = availableTags.find(t => t.id === tagId);
+    return tag?.name || '';
   };
 
   const renderFooter = () => {
@@ -452,113 +484,123 @@ export default function SearchScreen() {
           {loadingTags ? (
             <Spinner size="small" />
           ) : (
-            <ScrollView className="max-h-48">
-              <VStack space="lg">
-                {/* 診断名 */}
-                {availableTags.filter(t => t.type === 'diagnosis').length > 0 && (
-                  <Box>
-                    <Text className="text-xs font-semibold mb-2 text-typography-600">診断名</Text>
-                    <VStack space="xs">
-                      {availableTags
-                        .filter(t => t.type === 'diagnosis')
-                        .map((tag) => (
-                          <Pressable key={tag.id} onPress={() => toggleTag(tag.id)}>
-                            <Checkbox
-                              value={tag.id}
-                              isChecked={selectedTags.includes(tag.id)}
-                              onChange={() => toggleTag(tag.id)}
-                              size="sm"
-                            >
-                              <CheckboxIndicator>
-                                <CheckboxIcon as={CheckIcon} />
-                              </CheckboxIndicator>
-                              <CheckboxLabel className="text-sm">{tag.name}</CheckboxLabel>
-                            </Checkbox>
-                          </Pressable>
-                        ))}
-                    </VStack>
-                  </Box>
+            <VStack space="md">
+              {/* 診断名 */}
+              <Box>
+                <HStack className="items-center justify-between mb-2">
+                  <Text className="text-xs font-semibold text-typography-600">診断名</Text>
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    onPress={() => openTagModal('diagnosis')}
+                    className="h-6 px-2"
+                  >
+                    <ButtonIcon as={AddIcon} size="xs" />
+                  </Button>
+                </HStack>
+                {getSelectedTagsByType('diagnosis').length > 0 && (
+                  <HStack space="xs" className="flex-wrap">
+                    {getSelectedTagsByType('diagnosis').map((tagId) => (
+                      <Pressable
+                        key={tagId}
+                        onPress={() => removeTag(tagId)}
+                        className="bg-blue-100 px-2 py-1 rounded flex-row items-center mb-1"
+                      >
+                        <Text className="text-xs text-blue-700 mr-1">{getTagName(tagId)}</Text>
+                        <CloseIcon size="xs" color="#1d4ed8" />
+                      </Pressable>
+                    ))}
+                  </HStack>
                 )}
+              </Box>
 
-                {/* 成分 */}
-                {availableTags.filter(t => t.type === 'ingredient').length > 0 && (
-                  <Box>
-                    <Text className="text-xs font-semibold mb-2 text-typography-600">成分</Text>
-                    <VStack space="xs">
-                      {availableTags
-                        .filter(t => t.type === 'ingredient')
-                        .map((tag) => (
-                          <Pressable key={tag.id} onPress={() => toggleTag(tag.id)}>
-                            <Checkbox
-                              value={tag.id}
-                              isChecked={selectedTags.includes(tag.id)}
-                              onChange={() => toggleTag(tag.id)}
-                              size="sm"
-                            >
-                              <CheckboxIndicator>
-                                <CheckboxIcon as={CheckIcon} />
-                              </CheckboxIndicator>
-                              <CheckboxLabel className="text-sm">{tag.name}</CheckboxLabel>
-                            </Checkbox>
-                          </Pressable>
-                        ))}
-                    </VStack>
-                  </Box>
+              {/* 服薬 */}
+              <Box>
+                <HStack className="items-center justify-between mb-2">
+                  <Text className="text-xs font-semibold text-typography-600">服薬</Text>
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    onPress={() => openTagModal('ingredient')}
+                    className="h-6 px-2"
+                  >
+                    <ButtonIcon as={AddIcon} size="xs" />
+                  </Button>
+                </HStack>
+                {getSelectedTagsByType('ingredient').length > 0 && (
+                  <HStack space="xs" className="flex-wrap">
+                    {getSelectedTagsByType('ingredient').map((tagId) => (
+                      <Pressable
+                        key={tagId}
+                        onPress={() => removeTag(tagId)}
+                        className="bg-purple-100 px-2 py-1 rounded flex-row items-center mb-1"
+                      >
+                        <Text className="text-xs text-purple-700 mr-1">{getTagName(tagId)}</Text>
+                        <CloseIcon size="xs" color="#6d28d9" />
+                      </Pressable>
+                    ))}
+                  </HStack>
                 )}
+              </Box>
 
-                {/* 治療法 */}
-                {availableTags.filter(t => t.type === 'treatment').length > 0 && (
-                  <Box>
-                    <Text className="text-xs font-semibold mb-2 text-typography-600">治療法</Text>
-                    <VStack space="xs">
-                      {availableTags
-                        .filter(t => t.type === 'treatment')
-                        .map((tag) => (
-                          <Pressable key={tag.id} onPress={() => toggleTag(tag.id)}>
-                            <Checkbox
-                              value={tag.id}
-                              isChecked={selectedTags.includes(tag.id)}
-                              onChange={() => toggleTag(tag.id)}
-                              size="sm"
-                            >
-                              <CheckboxIndicator>
-                                <CheckboxIcon as={CheckIcon} />
-                              </CheckboxIndicator>
-                              <CheckboxLabel className="text-sm">{tag.name}</CheckboxLabel>
-                            </Checkbox>
-                          </Pressable>
-                        ))}
-                    </VStack>
-                  </Box>
+              {/* 治療法 */}
+              <Box>
+                <HStack className="items-center justify-between mb-2">
+                  <Text className="text-xs font-semibold text-typography-600">治療法</Text>
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    onPress={() => openTagModal('treatment')}
+                    className="h-6 px-2"
+                  >
+                    <ButtonIcon as={AddIcon} size="xs" />
+                  </Button>
+                </HStack>
+                {getSelectedTagsByType('treatment').length > 0 && (
+                  <HStack space="xs" className="flex-wrap">
+                    {getSelectedTagsByType('treatment').map((tagId) => (
+                      <Pressable
+                        key={tagId}
+                        onPress={() => removeTag(tagId)}
+                        className="bg-green-100 px-2 py-1 rounded flex-row items-center mb-1"
+                      >
+                        <Text className="text-xs text-green-700 mr-1">{getTagName(tagId)}</Text>
+                        <CloseIcon size="xs" color="#15803d" />
+                      </Pressable>
+                    ))}
+                  </HStack>
                 )}
+              </Box>
 
-                {/* ステータス */}
-                {availableTags.filter(t => t.type === 'status').length > 0 && (
-                  <Box>
-                    <Text className="text-xs font-semibold mb-2 text-typography-600">ステータス</Text>
-                    <VStack space="xs">
-                      {availableTags
-                        .filter(t => t.type === 'status')
-                        .map((tag) => (
-                          <Pressable key={tag.id} onPress={() => toggleTag(tag.id)}>
-                            <Checkbox
-                              value={tag.id}
-                              isChecked={selectedTags.includes(tag.id)}
-                              onChange={() => toggleTag(tag.id)}
-                              size="sm"
-                            >
-                              <CheckboxIndicator>
-                                <CheckboxIcon as={CheckIcon} />
-                              </CheckboxIndicator>
-                              <CheckboxLabel className="text-sm">{tag.name}</CheckboxLabel>
-                            </Checkbox>
-                          </Pressable>
-                        ))}
-                    </VStack>
-                  </Box>
+              {/* ステータス */}
+              <Box>
+                <HStack className="items-center justify-between mb-2">
+                  <Text className="text-xs font-semibold text-typography-600">ステータス</Text>
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    onPress={() => openTagModal('status')}
+                    className="h-6 px-2"
+                  >
+                    <ButtonIcon as={AddIcon} size="xs" />
+                  </Button>
+                </HStack>
+                {getSelectedTagsByType('status').length > 0 && (
+                  <HStack space="xs" className="flex-wrap">
+                    {getSelectedTagsByType('status').map((tagId) => (
+                      <Pressable
+                        key={tagId}
+                        onPress={() => removeTag(tagId)}
+                        className="bg-orange-100 px-2 py-1 rounded flex-row items-center mb-1"
+                      >
+                        <Text className="text-xs text-orange-700 mr-1">{getTagName(tagId)}</Text>
+                        <CloseIcon size="xs" color="#c2410c" />
+                      </Pressable>
+                    ))}
+                  </HStack>
                 )}
-              </VStack>
-            </ScrollView>
+              </Box>
+            </VStack>
           )}
         </Box>
       </VStack>
@@ -582,6 +624,23 @@ export default function SearchScreen() {
           ListEmptyComponent={renderEmpty}
         />
       )}
+
+      {/* タグ選択モーダル */}
+      <MultiSelectModal
+        isOpen={showTagModal}
+        onClose={() => setShowTagModal(false)}
+        title={
+          currentTagType === 'diagnosis' ? '診断名を選択' :
+          currentTagType === 'ingredient' ? '服薬を選択' :
+          currentTagType === 'treatment' ? '治療法を選択' :
+          'ステータスを選択'
+        }
+        options={availableTags
+          .filter(t => t.type === currentTagType)
+          .map(t => ({ id: t.id, name: t.name }))}
+        selectedIds={getSelectedTagsByType(currentTagType)}
+        onSave={(selectedIds) => handleTagsUpdate(currentTagType, selectedIds)}
+      />
     </Box>
   );
 }
