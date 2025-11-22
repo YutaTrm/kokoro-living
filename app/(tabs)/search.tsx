@@ -1,16 +1,20 @@
 import { useEffect, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, TextInput } from 'react-native';
+import { FlatList, Pressable, RefreshControl, TextInput, View } from 'react-native';
 
 import PostItem from '@/components/PostItem';
 import MultiSelectModal from '@/components/search/MultiSelectModal';
 import { Text } from '@/components/Themed';
 import { Box } from '@/components/ui/box';
-import { Button, ButtonIcon } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { HStack } from '@/components/ui/hstack';
-import { AddIcon, CloseIcon } from '@/components/ui/icon';
+import { Icon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
 import { VStack } from '@/components/ui/vstack';
 import { supabase } from '@/src/lib/supabase';
+import {
+  PlusIcon,
+  XIcon
+} from 'lucide-react-native';
 
 interface Post {
   id: string;
@@ -505,22 +509,23 @@ export default function SearchScreen() {
                     onPress={() => openTagModal('diagnosis')}
                     className="h-6 px-2"
                   >
-                    <ButtonIcon as={AddIcon} size="xs" />
+                    <Icon as={PlusIcon} size="xs" />
                   </Button>
                 </HStack>
                 {getSelectedTagsByType('diagnosis').length > 0 && (
-                  <HStack space="xs" className="flex-wrap">
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
                     {getSelectedTagsByType('diagnosis').map((tagId) => (
-                      <Pressable
+                      <View
                         key={tagId}
-                        onPress={() => removeTag(tagId)}
-                        className="bg-blue-100 px-2 py-1 rounded flex-row items-center mb-1"
+                        style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#dbeafe', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
                       >
-                        <Text className="text-xs text-blue-700 mr-1">{getTagName(tagId)}</Text>
-                        <CloseIcon size="xs" color="#1d4ed8" />
-                      </Pressable>
+                        <Pressable onPress={() => removeTag(tagId)} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <Text className="text-xs text-blue-700 mr-1">{getTagName(tagId)}</Text>
+                          <Icon as={XIcon} size="xs" />
+                        </Pressable>
+                      </View>
                     ))}
-                  </HStack>
+                  </View>
                 )}
               </Box>
 
@@ -534,22 +539,23 @@ export default function SearchScreen() {
                     onPress={() => openTagModal('ingredient')}
                     className="h-6 px-2"
                   >
-                    <ButtonIcon as={AddIcon} size="xs" />
+                    <Icon as={PlusIcon} size="xs" />
                   </Button>
                 </HStack>
                 {getSelectedTagsByType('ingredient').length > 0 && (
-                  <HStack space="xs" className="flex-wrap">
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
                     {getSelectedTagsByType('ingredient').map((tagId) => (
-                      <Pressable
+                      <View
                         key={tagId}
-                        onPress={() => removeTag(tagId)}
-                        className="bg-purple-100 px-2 py-1 rounded flex-row items-center mb-1"
+                        style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f3e8ff', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
                       >
-                        <Text className="text-xs text-purple-700 mr-1">{getTagName(tagId)}</Text>
-                        <CloseIcon size="xs" color="#6d28d9" />
-                      </Pressable>
+                        <Pressable onPress={() => removeTag(tagId)} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <Text className="text-xs text-purple-700 mr-1">{getTagName(tagId)}</Text>
+                          <Icon as={XIcon} size="xs" />
+                        </Pressable>
+                      </View>
                     ))}
-                  </HStack>
+                  </View>
                 )}
               </Box>
 
@@ -563,22 +569,23 @@ export default function SearchScreen() {
                     onPress={() => openTagModal('treatment')}
                     className="h-6 px-2"
                   >
-                    <ButtonIcon as={AddIcon} size="xs" />
+                    <Icon as={PlusIcon} size="xs" />
                   </Button>
                 </HStack>
                 {getSelectedTagsByType('treatment').length > 0 && (
-                  <HStack space="xs" className="flex-wrap">
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
                     {getSelectedTagsByType('treatment').map((tagId) => (
-                      <Pressable
+                      <View
                         key={tagId}
-                        onPress={() => removeTag(tagId)}
-                        className="bg-green-100 px-2 py-1 rounded flex-row items-center mb-1"
+                        style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#dcfce7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
                       >
-                        <Text className="text-xs text-green-700 mr-1">{getTagName(tagId)}</Text>
-                        <CloseIcon size="xs" color="#15803d" />
-                      </Pressable>
+                        <Pressable onPress={() => removeTag(tagId)} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <Text className="text-xs text-green-700 mr-1">{getTagName(tagId)}</Text>
+                          <Icon as={XIcon} size="xs" />
+                        </Pressable>
+                      </View>
                     ))}
-                  </HStack>
+                  </View>
                 )}
               </Box>
 
@@ -592,22 +599,23 @@ export default function SearchScreen() {
                     onPress={() => openTagModal('status')}
                     className="h-6 px-2"
                   >
-                    <ButtonIcon as={AddIcon} size="xs" />
+                    <Icon as={PlusIcon} size="xs" />
                   </Button>
                 </HStack>
                 {getSelectedTagsByType('status').length > 0 && (
-                  <HStack space="xs" className="flex-wrap">
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
                     {getSelectedTagsByType('status').map((tagId) => (
-                      <Pressable
+                      <View
                         key={tagId}
-                        onPress={() => removeTag(tagId)}
-                        className="bg-orange-100 px-2 py-1 rounded flex-row items-center mb-1"
+                        style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffedd5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
                       >
-                        <Text className="text-xs text-orange-700 mr-1">{getTagName(tagId)}</Text>
-                        <CloseIcon size="xs" color="#c2410c" />
-                      </Pressable>
+                        <Pressable onPress={() => removeTag(tagId)} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <Text className="text-xs text-orange-700 mr-1">{getTagName(tagId)}</Text>
+                          <Icon as={PlusIcon} size="xs" />
+                        </Pressable>
+                      </View>
                     ))}
-                  </HStack>
+                  </View>
                 )}
               </Box>
             </VStack>
