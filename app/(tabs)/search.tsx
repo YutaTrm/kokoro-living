@@ -37,7 +37,7 @@ type SortOption = 'created_at' | 'updated_at' | 'experienced_at';
 export default function SearchScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [posts, setPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -424,7 +424,16 @@ export default function SearchScreen() {
   };
 
   const renderEmpty = () => {
-    if (loading) return null;
+    // ローディング中はスピナーを表示
+    if (loading) {
+      return (
+        <Box className="py-8 items-center">
+          <Spinner size="large" />
+        </Box>
+      );
+    }
+
+    // ローディング完了後、データがない場合はメッセージを表示
     return (
       <Box className="py-8 items-center">
         <Text className="text-typography-500">検索結果がありません</Text>
@@ -606,24 +615,18 @@ export default function SearchScreen() {
       </VStack>
 
       {/* 検索結果 */}
-      {loading ? (
-        <Box className="flex-1 items-center justify-center">
-          <Spinner size="large" />
-        </Box>
-      ) : (
-        <FlatList
-          data={posts}
-          renderItem={({ item }) => <PostItem post={item} />}
-          keyExtractor={(item) => item.id}
-          onEndReached={handleLoadMore}
-          onEndReachedThreshold={0.5}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-          }
-          ListFooterComponent={renderFooter}
-          ListEmptyComponent={renderEmpty}
-        />
-      )}
+      <FlatList
+        data={posts}
+        renderItem={({ item }) => <PostItem post={item} />}
+        keyExtractor={(item) => item.id}
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.5}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+        ListFooterComponent={renderFooter}
+        ListEmptyComponent={renderEmpty}
+      />
 
       {/* タグ選択モーダル */}
       <MultiSelectModal

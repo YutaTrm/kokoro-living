@@ -4,6 +4,7 @@ import { Button, ButtonIcon } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
 import { AddIcon, TrashIcon } from '@/components/ui/icon';
+import { Spinner } from '@/components/ui/spinner';
 import { VStack } from '@/components/ui/vstack';
 
 interface MedicalRecord {
@@ -18,6 +19,7 @@ interface MedicalSectionProps {
   records: MedicalRecord[];
   onAdd: () => void;
   onDelete: (id: string) => void;
+  loading?: boolean;
 }
 
 const formatYearMonth = (dateStr: string | null): string => {
@@ -38,7 +40,49 @@ export default function MedicalSection({
   records,
   onAdd,
   onDelete,
+  loading = false,
 }: MedicalSectionProps) {
+  const renderContent = () => {
+    // ローディング中はスピナーを表示
+    if (loading) {
+      return (
+        <Box className="py-4 items-center">
+          <Spinner size="small" />
+        </Box>
+      );
+    }
+
+    // ローディング完了後、データがない場合はメッセージを表示
+    if (records.length === 0) {
+      return (
+        <Text className="text-sm opacity-50 text-center py-2">まだ登録がありません</Text>
+      );
+    }
+
+    // データがある場合は一覧を表示
+    return records.map((record) => (
+      <Box key={record.id} className="py-2 px-3 bg-background-50 rounded-lg mb-2">
+        <HStack className="justify-between items-center">
+          <VStack>
+            <Text className="text-base font-semibold">{record.name}</Text>
+            <Text className="text-sm opacity-60">
+              {formatDateRange(record.startDate, record.endDate)}
+            </Text>
+          </VStack>
+          <Button
+            onPress={() => onDelete(record.id)}
+            action="negative"
+            size="sm"
+            variant="link"
+            className="p-2"
+          >
+            <ButtonIcon as={TrashIcon} size="lg" />
+          </Button>
+        </HStack>
+      </Box>
+    ));
+  };
+
   return (
     <Box className="px-5 py-4 border-t border-outline-200">
       <HStack className="justify-between items-center mb-3">
@@ -47,30 +91,7 @@ export default function MedicalSection({
           <ButtonIcon as={AddIcon} size="md" />
         </Button>
       </HStack>
-      {records.map((record) => (
-        <Box key={record.id} className="py-2 px-3 bg-background-50 rounded-lg mb-2">
-          <HStack className="justify-between items-center">
-            <VStack>
-              <Text className="text-base font-semibold">{record.name}</Text>
-              <Text className="text-sm opacity-60">
-                {formatDateRange(record.startDate, record.endDate)}
-              </Text>
-            </VStack>
-            <Button
-              onPress={() => onDelete(record.id)}
-              action="negative"
-              size="sm"
-              variant="link"
-              className="p-2"
-            >
-              <ButtonIcon as={TrashIcon} size="lg" />
-            </Button>
-          </HStack>
-        </Box>
-      ))}
-      {records.length === 0 && (
-        <Text className="text-sm opacity-50 text-center py-2">まだ登録がありません</Text>
-      )}
+      {renderContent()}
     </Box>
   );
 }

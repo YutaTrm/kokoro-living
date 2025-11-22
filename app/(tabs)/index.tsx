@@ -28,6 +28,7 @@ export default function TabOneScreen() {
   const router = useRouter();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingPosts, setLoadingPosts] = useState(true);
   const [posts, setPosts] = useState<Post[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -52,6 +53,7 @@ export default function TabOneScreen() {
   };
 
   const loadPosts = async () => {
+    setLoadingPosts(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
@@ -189,6 +191,8 @@ export default function TabOneScreen() {
       setPosts(formattedPosts);
     } catch (error) {
       console.error('投稿取得エラー:', error);
+    } finally {
+      setLoadingPosts(false);
     }
   };
 
@@ -197,6 +201,25 @@ export default function TabOneScreen() {
     await loadPosts();
     setRefreshing(false);
   };
+
+  const renderEmptyComponent = () => {
+    // ローディング中はスピナーを表示
+    if (loadingPosts) {
+      return (
+        <Box className="flex-1 items-center justify-center pt-24">
+          <Spinner size="large" />
+        </Box>
+      );
+    }
+
+    // ローディング完了後、データがない場合はメッセージを表示
+    return (
+      <Box className="flex-1 items-center justify-center pt-24">
+        <Text className="text-base opacity-50">まだ投稿がありません</Text>
+      </Box>
+    );
+  };
+
   const handleXLogin = async () => {
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
@@ -298,11 +321,7 @@ export default function TabOneScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
-        ListEmptyComponent={
-          <Box className="flex-1 items-center justify-center pt-24">
-            <Text className="text-base opacity-50">まだ投稿がありません</Text>
-          </Box>
-        }
+        ListEmptyComponent={renderEmptyComponent}
       />
       {/* 投稿ボタンはログイン時のみ表示 */}
       {isLoggedIn && (

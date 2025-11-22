@@ -95,6 +95,11 @@ export default function ProfileScreen() {
   const [likedPosts, setLikedPosts] = useState<Post[]>([]);
   const [bookmarkedPosts, setBookmarkedPosts] = useState<Post[]>([]);
 
+  const [loadingPosts, setLoadingPosts] = useState(false);
+  const [loadingLikes, setLoadingLikes] = useState(false);
+  const [loadingBookmarks, setLoadingBookmarks] = useState(false);
+  const [loadingMedical, setLoadingMedical] = useState(true);
+
   const [showSelectModal, setShowSelectModal] = useState(false);
   const [selectModalType, setSelectModalType] = useState<'diagnosis' | 'medication' | 'treatment' | 'status'>('diagnosis');
 
@@ -422,6 +427,7 @@ export default function ProfileScreen() {
   };
 
   const loadMedicalRecords = async () => {
+    setLoadingMedical(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -498,10 +504,13 @@ export default function ProfileScreen() {
       }
     } catch (error) {
       console.error('医療情報読み込みエラー:', error);
+    } finally {
+      setLoadingMedical(false);
     }
   };
 
   const loadUserPosts = async () => {
+    setLoadingPosts(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -551,10 +560,13 @@ export default function ProfileScreen() {
       setUserPosts(formattedPosts);
     } catch (error) {
       console.error('投稿取得エラー:', error);
+    } finally {
+      setLoadingPosts(false);
     }
   };
 
   const loadLikedPosts = async () => {
+    setLoadingLikes(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -608,10 +620,13 @@ export default function ProfileScreen() {
       setLikedPosts(formattedPosts);
     } catch (error) {
       console.error('いいね取得エラー:', error);
+    } finally {
+      setLoadingLikes(false);
     }
   };
 
   const loadBookmarkedPosts = async () => {
+    setLoadingBookmarks(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -665,6 +680,8 @@ export default function ProfileScreen() {
       setBookmarkedPosts(formattedPosts);
     } catch (error) {
       console.error('ブックマーク取得エラー:', error);
+    } finally {
+      setLoadingBookmarks(false);
     }
   };
 
@@ -845,24 +862,28 @@ export default function ProfileScreen() {
             records={diagnoses}
             onAdd={() => openSelectModal('diagnosis')}
             onDelete={deleteDiagnosis}
+            loading={loadingMedical}
           />
           <MedicalSection
             title="服薬"
             records={medications}
             onAdd={() => openSelectModal('medication')}
             onDelete={deleteMedication}
+            loading={loadingMedical}
           />
           <MedicalSection
             title="治療"
             records={treatments}
             onAdd={() => openSelectModal('treatment')}
             onDelete={deleteTreatment}
+            loading={loadingMedical}
           />
           <MedicalSection
             title="ステータス"
             records={statuses}
             onAdd={() => openSelectModal('status')}
             onDelete={deleteStatus}
+            loading={loadingMedical}
           />
 
           {/* Bio編集 */}
@@ -919,6 +940,21 @@ export default function ProfileScreen() {
   const renderEmptyComponent = () => {
     if (activeTab === 'profile') return null;
 
+    // ローディング中はスピナーを表示
+    const isLoading =
+      (activeTab === 'posts' && loadingPosts) ||
+      (activeTab === 'likes' && loadingLikes) ||
+      (activeTab === 'bookmarks' && loadingBookmarks);
+
+    if (isLoading) {
+      return (
+        <Box className="py-8 items-center">
+          <Spinner size="large" />
+        </Box>
+      );
+    }
+
+    // ローディング完了後、データがない場合はメッセージを表示
     const messages = {
       posts: 'まだ投稿がありません',
       likes: 'まだいいねがありません',
@@ -934,27 +970,28 @@ export default function ProfileScreen() {
     );
   };
 
+  // ローディング中またはプロフィール未取得
+  if (loading || !profile) {
+    return (
+      <LoginPrompt>
+        <Box className="flex-1 items-center justify-center p-5">
+          <Spinner size="large" />
+        </Box>
+      </LoginPrompt>
+    );
+  }
+
   return (
     <LoginPrompt>
-      {loading ? (
-        <Box className="flex-1 items-center justify-center p-5">
-          <Spinner size="large" />
-        </Box>
-      ) : profile ? (
-        <Box className="flex-1">
-          <FlatList
-            data={getCurrentData()}
-            renderItem={({ item }) => <PostItem post={item} />}
-            keyExtractor={(item) => item.id}
-            ListHeaderComponent={renderHeader}
-            ListEmptyComponent={renderEmptyComponent}
-          />
-        </Box>
-      ) : (
-        <Box className="flex-1 items-center justify-center p-5">
-          <Spinner size="large" />
-        </Box>
-      )}
+      <Box className="flex-1">
+        <FlatList
+          data={getCurrentData()}
+          renderItem={({ item }) => <PostItem post={item} />}
+          keyExtractor={(item) => item.id}
+          ListHeaderComponent={renderHeader}
+          ListEmptyComponent={renderEmptyComponent}
+        />
+      </Box>
 
       {/* 選択モーダル */}
       <SelectModal
