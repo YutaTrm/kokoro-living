@@ -29,6 +29,7 @@ export default function CreatePostScreen() {
 
   const [availableTags, setAvailableTags] = useState<MedicalTag[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [isReply, setIsReply] = useState(false);
 
   // experienced_at用の状態管理
   const currentDate = new Date();
@@ -124,7 +125,7 @@ export default function CreatePostScreen() {
       // 投稿内容を取得
       const { data: post, error: postError } = await supabase
         .from('posts')
-        .select('content, experienced_at')
+        .select('content, experienced_at, parent_post_id')
         .eq('id', postId)
         .single();
 
@@ -135,6 +136,7 @@ export default function CreatePostScreen() {
       }
 
       setContent(post.content);
+      setIsReply(!!post.parent_post_id);
 
       // experienced_atを設定
       if (post.experienced_at) {
@@ -344,7 +346,8 @@ export default function CreatePostScreen() {
             </Text>
           </Box>
 
-          {/* 体験日時選択 */}
+          {/* 体験日時選択（返信の場合は非表示） */}
+          {!isReply && (
           <Box>
             <Heading size="sm" className="mb-3">
               体験日時（任意）
@@ -403,100 +406,103 @@ export default function CreatePostScreen() {
               </Box>
             </HStack>
           </Box>
+          )}
 
-          {/* タグ選択 */}
-          <Box>
-            <Heading size="sm" className="mb-3">
-              タグを選択（任意）
-            </Heading>
-            {loadingTags ? (
-              <Spinner size="large" />
-            ) : availableTags.length > 0 ? (
-              <VStack space="lg">
-                {/* 診断名グループ */}
-                {availableTags.filter(t => t.type === 'diagnosis').length > 0 && (
-                  <Box>
-                    <Text className="text-sm font-semibold mb-2 text-typography-700">診断名</Text>
-                    <VStack space="sm">
-                      {availableTags
-                        .filter(t => t.type === 'diagnosis')
-                        .map((tag) => (
-                          <Pressable key={tag.id} onPress={() => toggleTag(tag.id)}>
-                            <Checkbox
-                              value={tag.id}
-                              isChecked={selectedTags.includes(tag.id)}
-                              onChange={() => toggleTag(tag.id)}
-                              size="md"
-                            >
-                              <CheckboxIndicator>
-                                <CheckboxIcon as={CheckIcon} />
-                              </CheckboxIndicator>
-                              <CheckboxLabel>{tag.name}</CheckboxLabel>
-                            </Checkbox>
-                          </Pressable>
-                        ))}
-                    </VStack>
-                  </Box>
-                )}
+          {/* タグ選択（返信の場合は非表示） */}
+          {!isReply && (
+            <Box>
+              <Heading size="sm" className="mb-3">
+                タグを選択（任意）
+              </Heading>
+              {loadingTags ? (
+                <Spinner size="large" />
+              ) : availableTags.length > 0 ? (
+                <VStack space="lg">
+                  {/* 診断名グループ */}
+                  {availableTags.filter(t => t.type === 'diagnosis').length > 0 && (
+                    <Box>
+                      <Text className="text-sm font-semibold mb-2 text-typography-700">診断名</Text>
+                      <VStack space="sm">
+                        {availableTags
+                          .filter(t => t.type === 'diagnosis')
+                          .map((tag) => (
+                            <Pressable key={tag.id} onPress={() => toggleTag(tag.id)}>
+                              <Checkbox
+                                value={tag.id}
+                                isChecked={selectedTags.includes(tag.id)}
+                                onChange={() => toggleTag(tag.id)}
+                                size="md"
+                              >
+                                <CheckboxIndicator>
+                                  <CheckboxIcon as={CheckIcon} />
+                                </CheckboxIndicator>
+                                <CheckboxLabel>{tag.name}</CheckboxLabel>
+                              </Checkbox>
+                            </Pressable>
+                          ))}
+                      </VStack>
+                    </Box>
+                  )}
 
-                {/* 治療法グループ */}
-                {availableTags.filter(t => t.type === 'treatment').length > 0 && (
-                  <Box>
-                    <Text className="text-sm font-semibold mb-2 text-typography-700">治療法</Text>
-                    <VStack space="sm">
-                      {availableTags
-                        .filter(t => t.type === 'treatment')
-                        .map((tag) => (
-                          <Pressable key={tag.id} onPress={() => toggleTag(tag.id)}>
-                            <Checkbox
-                              value={tag.id}
-                              isChecked={selectedTags.includes(tag.id)}
-                              onChange={() => toggleTag(tag.id)}
-                              size="md"
-                            >
-                              <CheckboxIndicator>
-                                <CheckboxIcon as={CheckIcon} />
-                              </CheckboxIndicator>
-                              <CheckboxLabel>{tag.name}</CheckboxLabel>
-                            </Checkbox>
-                          </Pressable>
-                        ))}
-                    </VStack>
-                  </Box>
-                )}
+                  {/* 治療法グループ */}
+                  {availableTags.filter(t => t.type === 'treatment').length > 0 && (
+                    <Box>
+                      <Text className="text-sm font-semibold mb-2 text-typography-700">治療法</Text>
+                      <VStack space="sm">
+                        {availableTags
+                          .filter(t => t.type === 'treatment')
+                          .map((tag) => (
+                            <Pressable key={tag.id} onPress={() => toggleTag(tag.id)}>
+                              <Checkbox
+                                value={tag.id}
+                                isChecked={selectedTags.includes(tag.id)}
+                                onChange={() => toggleTag(tag.id)}
+                                size="md"
+                              >
+                                <CheckboxIndicator>
+                                  <CheckboxIcon as={CheckIcon} />
+                                </CheckboxIndicator>
+                                <CheckboxLabel>{tag.name}</CheckboxLabel>
+                              </Checkbox>
+                            </Pressable>
+                          ))}
+                      </VStack>
+                    </Box>
+                  )}
 
-                {/* 服薬グループ */}
-                {availableTags.filter(t => t.type === 'medication').length > 0 && (
-                  <Box>
-                    <Text className="text-sm font-semibold mb-2 text-typography-700">服薬</Text>
-                    <VStack space="sm">
-                      {availableTags
-                        .filter(t => t.type === 'medication')
-                        .map((tag) => (
-                          <Pressable key={tag.id} onPress={() => toggleTag(tag.id)}>
-                            <Checkbox
-                              value={tag.id}
-                              isChecked={selectedTags.includes(tag.id)}
-                              onChange={() => toggleTag(tag.id)}
-                              size="md"
-                            >
-                              <CheckboxIndicator>
-                                <CheckboxIcon as={CheckIcon} />
-                              </CheckboxIndicator>
-                              <CheckboxLabel>{tag.name}</CheckboxLabel>
-                            </Checkbox>
-                          </Pressable>
-                        ))}
-                    </VStack>
-                  </Box>
-                )}
-              </VStack>
-            ) : (
-              <Text className="text-sm text-typography-500">
-                タグを追加するには、プロフィールで情報を登録してください
-              </Text>
-            )}
-          </Box>
+                  {/* 服薬グループ */}
+                  {availableTags.filter(t => t.type === 'medication').length > 0 && (
+                    <Box>
+                      <Text className="text-sm font-semibold mb-2 text-typography-700">服薬</Text>
+                      <VStack space="sm">
+                        {availableTags
+                          .filter(t => t.type === 'medication')
+                          .map((tag) => (
+                            <Pressable key={tag.id} onPress={() => toggleTag(tag.id)}>
+                              <Checkbox
+                                value={tag.id}
+                                isChecked={selectedTags.includes(tag.id)}
+                                onChange={() => toggleTag(tag.id)}
+                                size="md"
+                              >
+                                <CheckboxIndicator>
+                                  <CheckboxIcon as={CheckIcon} />
+                                </CheckboxIndicator>
+                                <CheckboxLabel>{tag.name}</CheckboxLabel>
+                              </Checkbox>
+                            </Pressable>
+                          ))}
+                      </VStack>
+                    </Box>
+                  )}
+                </VStack>
+              ) : (
+                <Text className="text-sm text-typography-500">
+                  タグを追加するには、プロフィールで情報を登録してください
+                </Text>
+              )}
+            </Box>
+          )}
         </VStack>
       </ScrollView>
     </Box>
