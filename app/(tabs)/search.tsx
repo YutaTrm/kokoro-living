@@ -8,10 +8,12 @@ import { Box } from '@/components/ui/box';
 import { Button } from '@/components/ui/button';
 import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
+import { Radio, RadioGroup, RadioIcon, RadioIndicator, RadioLabel } from '@/components/ui/radio';
 import { Spinner } from '@/components/ui/spinner';
 import { VStack } from '@/components/ui/vstack';
 import { supabase } from '@/src/lib/supabase';
 import {
+  CircleIcon,
   PlusIcon,
   XIcon
 } from 'lucide-react-native';
@@ -38,6 +40,7 @@ interface TagOption {
 }
 
 type SortOption = 'created_at' | 'updated_at' | 'experienced_at';
+type TagFilterMode = 'and' | 'or';
 
 export default function SearchScreen() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -52,6 +55,7 @@ export default function SearchScreen() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<TagOption[]>([]);
   const [loadingTags, setLoadingTags] = useState(true);
+  const [tagFilterMode, setTagFilterMode] = useState<TagFilterMode>('and');
 
   const [showTagModal, setShowTagModal] = useState(false);
   const [currentTagType, setCurrentTagType] = useState<'diagnosis' | 'ingredient' | 'treatment' | 'status'>('diagnosis');
@@ -68,7 +72,7 @@ export default function SearchScreen() {
     setPosts([]);
     setHasMore(true);
     searchPosts(true);
-  }, [searchQuery, selectedTags, sortBy]);
+  }, [searchQuery, selectedTags, sortBy, tagFilterMode]);
 
   const loadAllTags = async () => {
     try {
@@ -222,7 +226,7 @@ export default function SearchScreen() {
       // タグフィルターがある場合は、さらにフィルタリング
       let filteredPosts = postsData;
       if (selectedTags.length > 0) {
-        filteredPosts = await filterPostsByTags(postsData, selectedTags);
+        filteredPosts = await filterPostsByTags(postsData, selectedTags, tagFilterMode);
       }
 
       // ユーザー情報を取得
@@ -296,8 +300,8 @@ export default function SearchScreen() {
     }
   };
 
-  const filterPostsByTags = async (postsData: any[], tags: string[]) => {
-    // 各投稿がすべてのタグ条件を満たすかチェック（AND条件）
+  const filterPostsByTags = async (postsData: any[], tags: string[], mode: TagFilterMode) => {
+    // AND: 全てのタグ条件を満たす / OR: どれか1つでも満たす
     const diagnosisIds = tags
       .filter(t => t.startsWith('diagnosis-'))
       .map(t => t.replace('diagnosis-', ''));
@@ -314,7 +318,7 @@ export default function SearchScreen() {
     const filteredPosts = [];
 
     for (const post of postsData) {
-      let matches = true;
+      const matchResults: boolean[] = [];
 
       // 診断名チェック
       if (diagnosisIds.length > 0) {
@@ -324,45 +328,62 @@ export default function SearchScreen() {
           .eq('post_id', post.id);
 
         const postDiagnosisIds = data?.map((d: any) => d.user_diagnoses?.diagnosis_id) || [];
-        const hasAllDiagnoses = diagnosisIds.every(id => postDiagnosisIds.includes(id));
-        if (!hasAllDiagnoses) matches = false;
+        if (mode === 'and') {
+          matchResults.push(diagnosisIds.every(id => postDiagnosisIds.includes(id)));
+        } else {
+          matchResults.push(diagnosisIds.some(id => postDiagnosisIds.includes(id)));
+        }
       }
 
       // 服薬チェック
-      if (matches && ingredientIds.length > 0) {
+      if (ingredientIds.length > 0) {
         const { data } = await supabase
           .from('post_medications')
           .select('user_medications(ingredient_id)')
           .eq('post_id', post.id);
 
         const postIngredientIds = data?.map((m: any) => m.user_medications?.ingredient_id).filter(Boolean) || [];
-        const hasAllIngredients = ingredientIds.every(id => postIngredientIds.includes(id));
-        if (!hasAllIngredients) matches = false;
+        if (mode === 'and') {
+          matchResults.push(ingredientIds.every(id => postIngredientIds.includes(id)));
+        } else {
+          matchResults.push(ingredientIds.some(id => postIngredientIds.includes(id)));
+        }
       }
 
       // 治療法チェック
-      if (matches && treatmentIds.length > 0) {
+      if (treatmentIds.length > 0) {
         const { data } = await supabase
           .from('post_treatments')
           .select('user_treatments(treatment_id)')
           .eq('post_id', post.id);
 
         const postTreatmentIds = data?.map((t: any) => t.user_treatments?.treatment_id) || [];
-        const hasAllTreatments = treatmentIds.every(id => postTreatmentIds.includes(id));
-        if (!hasAllTreatments) matches = false;
+        if (mode === 'and') {
+          matchResults.push(treatmentIds.every(id => postTreatmentIds.includes(id)));
+        } else {
+          matchResults.push(treatmentIds.some(id => postTreatmentIds.includes(id)));
+        }
       }
 
       // ステータスチェック
-      if (matches && statusIds.length > 0) {
+      if (statusIds.length > 0) {
         const { data } = await supabase
           .from('post_statuses')
           .select('user_statuses(status_id)')
           .eq('post_id', post.id);
 
         const postStatusIds = data?.map((s: any) => s.user_statuses?.status_id) || [];
-        const hasAllStatuses = statusIds.every(id => postStatusIds.includes(id));
-        if (!hasAllStatuses) matches = false;
+        if (mode === 'and') {
+          matchResults.push(statusIds.every(id => postStatusIds.includes(id)));
+        } else {
+          matchResults.push(statusIds.some(id => postStatusIds.includes(id)));
+        }
       }
+
+      // AND: 全てtrue / OR: どれか1つでもtrue
+      const matches = mode === 'and'
+        ? matchResults.every(r => r)
+        : matchResults.some(r => r);
 
       if (matches) {
         filteredPosts.push(post);
@@ -495,6 +516,25 @@ export default function SearchScreen() {
         {/* タグフィルター */}
         <Box>
           <Text className="text-sm font-semibold mb-2 text-typography-700">タグで絞り込み</Text>
+
+          {/* AND/OR切り替え */}
+          <RadioGroup value={tagFilterMode} onChange={(value) => setTagFilterMode(value as TagFilterMode)} className="mb-3">
+            <HStack space="lg">
+              <Radio value="and" size="sm">
+                <RadioIndicator>
+                  <RadioIcon as={CircleIcon} />
+                </RadioIndicator>
+                <RadioLabel className="text-sm">全て含む</RadioLabel>
+              </Radio>
+              <Radio value="or" size="sm">
+                <RadioIndicator>
+                  <RadioIcon as={CircleIcon} />
+                </RadioIndicator>
+                <RadioLabel className="text-sm">どれか含む</RadioLabel>
+              </Radio>
+            </HStack>
+          </RadioGroup>
+
           {loadingTags ? (
             <Spinner size="small" />
           ) : (
@@ -513,13 +553,13 @@ export default function SearchScreen() {
                   </Button>
                 </HStack>
                 {getSelectedTagsByType('diagnosis').length > 0 && (
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                  <View className="flex flex-row flex-wrap gap-2">
                     {getSelectedTagsByType('diagnosis').map((tagId) => (
                       <View
                         key={tagId}
-                        style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#dbeafe', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
+                        className="flex flex-row text-center rounded py-1 px-2 bg-fuchsia-400"
                       >
-                        <Pressable onPress={() => removeTag(tagId)} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Pressable onPress={() => removeTag(tagId)} className="flex flex-row items-center text-center">
                           <Text className="text-xs text-blue-700 mr-1">{getTagName(tagId)}</Text>
                           <Icon as={XIcon} size="xs" />
                         </Pressable>
@@ -543,13 +583,13 @@ export default function SearchScreen() {
                   </Button>
                 </HStack>
                 {getSelectedTagsByType('ingredient').length > 0 && (
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                  <View className="flex flex-row flex-wrap gap-2">
                     {getSelectedTagsByType('ingredient').map((tagId) => (
                       <View
                         key={tagId}
-                        style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f3e8ff', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
+                        className="flex flex-row text-center rounded py-1 px-2 bg-cyan-400"
                       >
-                        <Pressable onPress={() => removeTag(tagId)} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Pressable onPress={() => removeTag(tagId)} className="flex flex-row items-center text-center">
                           <Text className="text-xs text-purple-700 mr-1">{getTagName(tagId)}</Text>
                           <Icon as={XIcon} size="xs" />
                         </Pressable>
@@ -573,13 +613,13 @@ export default function SearchScreen() {
                   </Button>
                 </HStack>
                 {getSelectedTagsByType('treatment').length > 0 && (
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                  <View className="flex flex-row flex-wrap gap-2">
                     {getSelectedTagsByType('treatment').map((tagId) => (
                       <View
                         key={tagId}
-                        style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#dcfce7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
+                        className="flex flex-row text-center rounded py-1 px-2 bg-green-400"
                       >
-                        <Pressable onPress={() => removeTag(tagId)} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Pressable onPress={() => removeTag(tagId)} className="flex flex-row items-center text-center">
                           <Text className="text-xs text-green-700 mr-1">{getTagName(tagId)}</Text>
                           <Icon as={XIcon} size="xs" />
                         </Pressable>
@@ -603,15 +643,15 @@ export default function SearchScreen() {
                   </Button>
                 </HStack>
                 {getSelectedTagsByType('status').length > 0 && (
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                  <View className="flex flex-row flex-wrap gap-2">
                     {getSelectedTagsByType('status').map((tagId) => (
                       <View
                         key={tagId}
-                        style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffedd5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}
+                        className="flex flex-row text-center rounded py-1 px-2 bg-amber-400"
                       >
-                        <Pressable onPress={() => removeTag(tagId)} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Pressable onPress={() => removeTag(tagId)} className="flex flex-row items-center text-center">
                           <Text className="text-xs text-orange-700 mr-1">{getTagName(tagId)}</Text>
-                          <Icon as={PlusIcon} size="xs" />
+                          <Icon as={XIcon} size="xs" />
                         </Pressable>
                       </View>
                     ))}
