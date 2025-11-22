@@ -233,18 +233,11 @@ export default function ReplyItem({
               </Avatar>
             </Pressable>
             {/* 点線の縦線（子返信がある場合に表示） */}
-            {showVerticalLine && (
+            {/* {showVerticalLine && (
               <View
-                className="flex-1 mt-1"
-                style={{
-                  minHeight: 20,
-                  width: 2,
-                  borderLeftWidth: 2,
-                  borderLeftColor: '#d1d5db',
-                  borderStyle: 'dashed',
-                }}
+                className="flex-1 mt-1 border-primary-300 min-h-20 w-1 border-l border"
               />
-            )}
+            )} */}
           </View>
 
           {/* 返信内容 */}

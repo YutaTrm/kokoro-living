@@ -640,18 +640,18 @@ export default function PostDetailScreen() {
           {!isReply && (tags.diagnoses.length > 0 || tags.treatments.length > 0 || tags.medications.length > 0) && (
             <Box className="mb-2 flex-row flex-wrap gap-2">
               {tags.diagnoses.map((tag, index) => (
-                <Box key={`d-${index}`} className="bg-blue-100 px-3 py-1 rounded">
-                  <Text className="text-xs text-blue-700">{tag}</Text>
+                <Box key={`d-${index}`} className="text-center rounded py-1 px-2 bg-fuchsia-400">
+                  <Text className="text-xs">{tag}</Text>
                 </Box>
               ))}
               {tags.treatments.map((tag, index) => (
-                <Box key={`t-${index}`} className="bg-green-100 px-3 py-1 rounded">
-                  <Text className="text-xs text-green-700">{tag}</Text>
+                <Box key={`t-${index}`} className="text-center rounded py-1 px-2 bg-green-400">
+                  <Text className="text-xs">{tag}</Text>
                 </Box>
               ))}
               {tags.medications.map((tag, index) => (
-                <Box key={`m-${index}`} className="bg-purple-100 px-3 py-1 rounded">
-                  <Text className="text-xs text-purple-700">{tag}</Text>
+                <Box key={`m-${index}`} className="text-center rounded py-1 px-2 bg-cyan-400">
+                  <Text className="text-xs">{tag}</Text>
                 </Box>
               ))}
             </Box>

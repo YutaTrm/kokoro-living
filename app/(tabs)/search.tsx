@@ -560,7 +560,7 @@ export default function SearchScreen() {
                         className="flex flex-row text-center rounded py-1 px-2 bg-fuchsia-400"
                       >
                         <Pressable onPress={() => removeTag(tagId)} className="flex flex-row items-center text-center">
-                          <Text className="text-xs text-blue-700 mr-1">{getTagName(tagId)}</Text>
+                          <Text className="text-xs mr-1">{getTagName(tagId)}</Text>
                           <Icon as={XIcon} size="xs" />
                         </Pressable>
                       </View>
@@ -590,7 +590,7 @@ export default function SearchScreen() {
                         className="flex flex-row text-center rounded py-1 px-2 bg-cyan-400"
                       >
                         <Pressable onPress={() => removeTag(tagId)} className="flex flex-row items-center text-center">
-                          <Text className="text-xs text-purple-700 mr-1">{getTagName(tagId)}</Text>
+                          <Text className="text-xs mr-1">{getTagName(tagId)}</Text>
                           <Icon as={XIcon} size="xs" />
                         </Pressable>
                       </View>
@@ -620,7 +620,7 @@ export default function SearchScreen() {
                         className="flex flex-row text-center rounded py-1 px-2 bg-green-400"
                       >
                         <Pressable onPress={() => removeTag(tagId)} className="flex flex-row items-center text-center">
-                          <Text className="text-xs text-green-700 mr-1">{getTagName(tagId)}</Text>
+                          <Text className="text-xs mr-1">{getTagName(tagId)}</Text>
                           <Icon as={XIcon} size="xs" />
                         </Pressable>
                       </View>
@@ -650,7 +650,7 @@ export default function SearchScreen() {
                         className="flex flex-row text-center rounded py-1 px-2 bg-amber-400"
                       >
                         <Pressable onPress={() => removeTag(tagId)} className="flex flex-row items-center text-center">
-                          <Text className="text-xs text-orange-700 mr-1">{getTagName(tagId)}</Text>
+                          <Text className="text-xs mr-1">{getTagName(tagId)}</Text>
                           <Icon as={XIcon} size="xs" />
                         </Pressable>
                       </View>
