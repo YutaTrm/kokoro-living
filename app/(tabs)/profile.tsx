@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, FlatList } from 'react-native';
@@ -39,9 +40,10 @@ interface DiagnosisData {
 }
 
 interface MedicationData {
-  ingredients: { name: string } | null;
+  ingredient_id: string;
+  ingredients: { id: string; name: string } | null;
   products: { name: string } | null;
-  start_date: string;
+  start_date: string | null;
   end_date: string | null;
 }
 
@@ -60,6 +62,7 @@ interface StatusData {
 interface MasterData {
   id: string;
   name: string;
+  ingredientId?: string; // 服薬マスター用: 成分ID
 }
 
 interface Post {
@@ -98,7 +101,10 @@ export default function ProfileScreen() {
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [loadingLikes, setLoadingLikes] = useState(false);
   const [loadingBookmarks, setLoadingBookmarks] = useState(false);
-  const [loadingMedical, setLoadingMedical] = useState(true);
+  const [loadingDiagnoses, setLoadingDiagnoses] = useState(true);
+  const [loadingMedications, setLoadingMedications] = useState(true);
+  const [loadingTreatments, setLoadingTreatments] = useState(true);
+  const [loadingStatuses, setLoadingStatuses] = useState(true);
 
   const [showMultiSelectModal, setShowMultiSelectModal] = useState(false);
   const [selectModalType, setSelectModalType] = useState<'diagnosis' | 'medication' | 'treatment' | 'status'>('diagnosis');
@@ -117,9 +123,40 @@ export default function ProfileScreen() {
   const [endYear, setEndYear] = useState<string>('');
   const [endMonth, setEndMonth] = useState<string>('');
 
+  // キャッシュキー
+  const CACHE_KEYS = {
+    diagnoses: 'cache_diagnoses',
+    medications: 'cache_medications',
+    treatments: 'cache_treatments',
+    statuses: 'cache_statuses',
+  };
+
+  // キャッシュから読み込み
+  const loadFromCache = async () => {
+    try {
+      const [diagCache, medCache, treatCache, statusCache] = await Promise.all([
+        AsyncStorage.getItem(CACHE_KEYS.diagnoses),
+        AsyncStorage.getItem(CACHE_KEYS.medications),
+        AsyncStorage.getItem(CACHE_KEYS.treatments),
+        AsyncStorage.getItem(CACHE_KEYS.statuses),
+      ]);
+
+      if (diagCache) setDiagnoses(JSON.parse(diagCache));
+      if (medCache) setMedications(JSON.parse(medCache));
+      if (treatCache) setTreatments(JSON.parse(treatCache));
+      if (statusCache) setStatuses(JSON.parse(statusCache));
+    } catch (error) {
+      console.error('キャッシュ読み込みエラー:', error);
+    }
+  };
+
   useEffect(() => {
     loadUserProfile();
-    loadMedicalRecords();
+    loadFromCache(); // まずキャッシュを表示
+    loadDiagnoses();
+    loadMedications();
+    loadTreatments();
+    loadStatuses();
     loadMasterData();
 
     // ログイン状態の変更を監視
@@ -127,7 +164,10 @@ export default function ProfileScreen() {
       if (event === 'SIGNED_IN' && session) {
         // ログイン成功時にリロード
         loadUserProfile();
-        loadMedicalRecords();
+        loadDiagnoses();
+        loadMedications();
+        loadTreatments();
+        loadStatuses();
       }
     });
 
@@ -165,6 +205,7 @@ export default function ProfileScreen() {
           medicationList.push({
             id: `ingredient-${i.id}`,
             name: i.name,
+            ingredientId: i.id,
           });
         });
       }
@@ -181,6 +222,7 @@ export default function ProfileScreen() {
             medicationList.push({
               id: `product-${p.id}`,
               name: `${p.name}(${p.ingredients.name})`,
+              ingredientId: p.ingredient_id,
             });
           }
         });
@@ -214,7 +256,35 @@ export default function ProfileScreen() {
     setShowMultiSelectModal(true);
   };
 
-  // 既存の選択済みマスターIDを取得（名前でマッチング）
+  // 服薬の連動選択ハンドラ（同じ成分の薬を全て選択/解除）
+  const handleMedicationToggle = (toggledId: string, newSelectedIds: string[]): string[] => {
+    const toggledItem = medicationMasters.find(m => m.id === toggledId);
+    console.log('handleMedicationToggle:', { toggledId, toggledItem, newSelectedIds });
+
+    if (!toggledItem?.ingredientId) {
+      console.log('ingredientId not found');
+      return newSelectedIds;
+    }
+
+    const isSelected = newSelectedIds.includes(toggledId);
+    const sameIngredientIds = medicationMasters
+      .filter(m => m.ingredientId === toggledItem.ingredientId)
+      .map(m => m.id);
+
+    console.log('sameIngredientIds:', sameIngredientIds);
+
+    if (isSelected) {
+      // 選択時: 同じ成分の薬を全て追加
+      const combinedIds = [...new Set([...newSelectedIds, ...sameIngredientIds])];
+      console.log('combinedIds:', combinedIds);
+      return combinedIds;
+    } else {
+      // 解除時: 同じ成分の薬を全て削除
+      return newSelectedIds.filter(id => !sameIngredientIds.includes(id));
+    }
+  };
+
+  // 既存の選択済みマスターIDを取得
   const getSelectedIds = (type: 'diagnosis' | 'medication' | 'treatment' | 'status'): string[] => {
     switch (type) {
       case 'diagnosis':
@@ -222,11 +292,17 @@ export default function ProfileScreen() {
           .filter(m => diagnoses.some(d => d.name === m.name))
           .map(m => m.id);
       case 'medication':
-        // 服薬は成分名でマッチング
+        // 服薬は成分名でマッチング（表示名から成分名を抽出）
         return medicationMasters
           .filter(m => medications.some(med => {
-            const masterIngredientName = m.name.split('(')[0];
-            return med.name === masterIngredientName || med.name === m.name;
+            // med.nameは「成分名」または「成分名(製品名1、製品名2)」形式
+            const medIngredientName = med.name.split('(')[0];
+            // m.ingredientIdを使って成分名を取得
+            const masterIngredient = medicationMasters.find(
+              master => master.id === `ingredient-${m.ingredientId}`
+            );
+            const masterIngredientName = masterIngredient?.name || '';
+            return medIngredientName === masterIngredientName;
           }))
           .map(m => m.id);
       case 'treatment':
@@ -322,9 +398,16 @@ export default function ProfileScreen() {
       }
 
       setShowDateModal(false);
+      const typeToReload = editingRecordType;
       setEditingRecordId(null);
       setEditingRecordType(null);
-      loadMedicalRecords();
+      // 編集したタイプのみリロード
+      switch (typeToReload) {
+        case 'diagnosis': loadDiagnoses(); break;
+        case 'medication': loadMedications(); break;
+        case 'treatment': loadTreatments(); break;
+        case 'status': loadStatuses(); break;
+      }
     } catch (error) {
       Alert.alert('エラー', '予期しないエラーが発生しました');
     }
@@ -418,7 +501,13 @@ export default function ProfileScreen() {
       }
 
       setShowMultiSelectModal(false);
-      loadMedicalRecords();
+      // 追加したタイプのみリロード
+      switch (selectModalType) {
+        case 'diagnosis': loadDiagnoses(); break;
+        case 'medication': loadMedications(); break;
+        case 'treatment': loadTreatments(); break;
+        case 'status': loadStatuses(); break;
+      }
     } catch (error) {
       console.error('保存エラー:', error);
       Alert.alert('エラー', '保存に失敗しました');
@@ -437,7 +526,7 @@ export default function ProfileScreen() {
         return;
       }
 
-      loadMedicalRecords();
+      loadDiagnoses();
     } catch (error) {
       Alert.alert('エラー', '予期しないエラーが発生しました');
     }
@@ -456,7 +545,7 @@ export default function ProfileScreen() {
         return;
       }
 
-      loadMedicalRecords();
+      loadStatuses();
     } catch (error) {
       Alert.alert('エラー', '予期しないエラーが発生しました');
     }
@@ -475,7 +564,7 @@ export default function ProfileScreen() {
         return;
       }
 
-      loadMedicalRecords();
+      loadTreatments();
     } catch (error) {
       Alert.alert('エラー', '予期しないエラーが発生しました');
     }
@@ -484,102 +573,197 @@ export default function ProfileScreen() {
 
   const deleteMedication = async (id: string) => {
     try {
+      // まず削除対象のレコードからingredient_idを取得
+      const { data: targetRecord } = await supabase
+        .from('user_medications')
+        .select('ingredient_id')
+        .eq('id', id)
+        .single();
+
+      if (!targetRecord?.ingredient_id) {
+        Alert.alert('エラー', '削除対象が見つかりません');
+        return;
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // 同じ成分の全レコードを削除
       const { error } = await supabase
         .from('user_medications')
         .delete()
-        .eq('id', id);
+        .eq('user_id', user.id)
+        .eq('ingredient_id', targetRecord.ingredient_id);
 
       if (error) {
         Alert.alert('エラー', '削除に失敗しました');
         return;
       }
 
-      loadMedicalRecords();
+      loadMedications();
     } catch (error) {
       Alert.alert('エラー', '予期しないエラーが発生しました');
     }
   };
 
-  const loadMedicalRecords = async () => {
-    setLoadingMedical(true);
+  // 診断名を取得
+  const loadDiagnoses = async () => {
+    setLoadingDiagnoses(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // 診断名を取得
       const { data: diagnosesData } = await supabase
         .from('user_diagnoses')
         .select('id, diagnoses(name), start_date, end_date')
         .eq('user_id', user.id);
 
-      // 服薬を取得
+      if (diagnosesData) {
+        const formatted = diagnosesData.map((d: DiagnosisData & { id: string }) => ({
+          id: d.id,
+          name: d.diagnoses?.name || '',
+          startDate: d.start_date,
+          endDate: d.end_date,
+        }));
+        setDiagnoses(formatted);
+        await AsyncStorage.setItem(CACHE_KEYS.diagnoses, JSON.stringify(formatted));
+      }
+    } catch (error) {
+      console.error('診断名読み込みエラー:', error);
+    } finally {
+      setLoadingDiagnoses(false);
+    }
+  };
+
+  // 服薬を取得
+  const loadMedications = async () => {
+    setLoadingMedications(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
       const { data: medicationsData } = await supabase
         .from('user_medications')
-        .select('id, ingredients(name), products(name), start_date, end_date')
+        .select('id, ingredient_id, ingredients(id, name), products(name), start_date, end_date')
         .eq('user_id', user.id);
 
-      // 治療を取得
+      const { data: allProducts } = await supabase
+        .from('products')
+        .select('ingredient_id, name');
+
+      if (medicationsData) {
+        const productsByIngredient = new Map<string, string[]>();
+        if (allProducts) {
+          allProducts.forEach((p: { ingredient_id: string; name: string }) => {
+            const existing = productsByIngredient.get(p.ingredient_id);
+            if (existing) {
+              existing.push(p.name);
+            } else {
+              productsByIngredient.set(p.ingredient_id, [p.name]);
+            }
+          });
+        }
+
+        const ingredientMap = new Map<string, {
+          id: string;
+          ingredientName: string;
+          ingredientId: string;
+          startDate: string | null;
+          endDate: string | null;
+        }>();
+
+        medicationsData.forEach((m: MedicationData & { id: string; ingredient_id: string }) => {
+          const ingredientId = m.ingredient_id;
+          const ingredientName = m.ingredients?.name || '';
+
+          if (ingredientName && ingredientId && !ingredientMap.has(ingredientId)) {
+            ingredientMap.set(ingredientId, {
+              id: m.id,
+              ingredientName,
+              ingredientId,
+              startDate: m.start_date,
+              endDate: m.end_date,
+            });
+          }
+        });
+
+        const formatted: MedicalRecord[] = Array.from(ingredientMap.values()).map(item => {
+          const productNames = productsByIngredient.get(item.ingredientId) || [];
+          return {
+            id: item.id,
+            name: productNames.length > 0
+              ? `${item.ingredientName}(${productNames.join('、')})`
+              : item.ingredientName,
+            startDate: item.startDate,
+            endDate: item.endDate,
+          };
+        });
+
+        setMedications(formatted);
+        await AsyncStorage.setItem(CACHE_KEYS.medications, JSON.stringify(formatted));
+      }
+    } catch (error) {
+      console.error('服薬読み込みエラー:', error);
+    } finally {
+      setLoadingMedications(false);
+    }
+  };
+
+  // 治療を取得
+  const loadTreatments = async () => {
+    setLoadingTreatments(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
       const { data: treatmentsData } = await supabase
         .from('user_treatments')
         .select('id, treatments(name), start_date, end_date')
         .eq('user_id', user.id);
 
-      if (diagnosesData) {
-        setDiagnoses(diagnosesData.map((d: DiagnosisData & { id: string }) => ({
-          id: d.id,
-          name: d.diagnoses?.name || '',
-          startDate: d.start_date,
-          endDate: d.end_date,
-        })));
-      }
-
-      if (medicationsData) {
-        // 成分名でグループ化（同じ成分の複数製品をまとめる）
-        const ingredientMap = new Map<string, MedicalRecord>();
-        medicationsData.forEach((m: MedicationData & { id: string }) => {
-          const ingredientName = m.ingredients?.name || '';
-          if (ingredientName) {
-            // 既に存在しない場合のみ追加（重複除去）
-            if (!ingredientMap.has(ingredientName)) {
-              ingredientMap.set(ingredientName, {
-                id: m.id,
-                name: ingredientName,
-                startDate: m.start_date,
-                endDate: m.end_date,
-              });
-            }
-          }
-        });
-        setMedications(Array.from(ingredientMap.values()));
-      }
-
       if (treatmentsData) {
-        setTreatments(treatmentsData.map((t: TreatmentData & { id: string }) => ({
+        const formatted = treatmentsData.map((t: TreatmentData & { id: string }) => ({
           id: t.id,
           name: t.treatments?.name || '',
           startDate: t.start_date,
           endDate: t.end_date,
-        })));
+        }));
+        setTreatments(formatted);
+        await AsyncStorage.setItem(CACHE_KEYS.treatments, JSON.stringify(formatted));
       }
+    } catch (error) {
+      console.error('治療読み込みエラー:', error);
+    } finally {
+      setLoadingTreatments(false);
+    }
+  };
 
-      // ステータスを取得
+  // ステータスを取得
+  const loadStatuses = async () => {
+    setLoadingStatuses(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
       const { data: statusesData } = await supabase
         .from('user_statuses')
         .select('id, statuses(name), start_date, end_date')
         .eq('user_id', user.id);
 
       if (statusesData) {
-        setStatuses(statusesData.map((s: StatusData & { id: string }) => ({
+        const formatted = statusesData.map((s: StatusData & { id: string }) => ({
           id: s.id,
           name: s.statuses?.name || '',
           startDate: s.start_date,
           endDate: s.end_date,
-        })));
+        }));
+        setStatuses(formatted);
+        await AsyncStorage.setItem(CACHE_KEYS.statuses, JSON.stringify(formatted));
       }
     } catch (error) {
-      console.error('医療情報読み込みエラー:', error);
+      console.error('ステータス読み込みエラー:', error);
     } finally {
-      setLoadingMedical(false);
+      setLoadingStatuses(false);
     }
   };
 
@@ -937,7 +1121,7 @@ export default function ProfileScreen() {
             onAdd={() => openMultiSelectModal('diagnosis')}
             onDelete={deleteDiagnosis}
             onEdit={(id) => openDateEditModal(id, 'diagnosis')}
-            loading={loadingMedical}
+            loading={loadingDiagnoses}
           />
           <MedicalSection
             title="服薬"
@@ -945,7 +1129,7 @@ export default function ProfileScreen() {
             onAdd={() => openMultiSelectModal('medication')}
             onDelete={deleteMedication}
             onEdit={(id) => openDateEditModal(id, 'medication')}
-            loading={loadingMedical}
+            loading={loadingMedications}
           />
           <MedicalSection
             title="治療"
@@ -953,7 +1137,7 @@ export default function ProfileScreen() {
             onAdd={() => openMultiSelectModal('treatment')}
             onDelete={deleteTreatment}
             onEdit={(id) => openDateEditModal(id, 'treatment')}
-            loading={loadingMedical}
+            loading={loadingTreatments}
           />
           <MedicalSection
             title="ステータス"
@@ -961,7 +1145,7 @@ export default function ProfileScreen() {
             onAdd={() => openMultiSelectModal('status')}
             onDelete={deleteStatus}
             onEdit={(id) => openDateEditModal(id, 'status')}
-            loading={loadingMedical}
+            loading={loadingStatuses}
           />
 
           {/* Bio編集 */}
@@ -1081,6 +1265,7 @@ export default function ProfileScreen() {
           selectModalType === 'treatment' ? '治療を選択' :
           'ステータスを選択'
         }
+        subtitle={selectModalType === 'medication' ? '同じ成分の薬は同時に選択されます' : undefined}
         options={
           selectModalType === 'diagnosis' ? diagnosisMasters.map(d => ({ id: d.id, name: d.name })) :
           selectModalType === 'medication' ? medicationMasters.map(m => ({ id: m.id, name: m.name })) :
@@ -1089,6 +1274,7 @@ export default function ProfileScreen() {
         }
         selectedIds={getSelectedIds(selectModalType)}
         onSave={handleMultiSelectSave}
+        onToggle={selectModalType === 'medication' ? handleMedicationToggle : undefined}
       />
 
       {/* 日付編集モーダル（年月選択） */}

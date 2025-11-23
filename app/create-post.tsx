@@ -17,6 +17,8 @@ interface MedicalTag {
   id: string;
   name: string;
   type: 'diagnosis' | 'treatment' | 'medication';
+  ingredientId?: string; // 服薬用: 同じ成分のタグをグループ化
+  relatedIds?: string[]; // 服薬用: 同じ成分の全てのuser_medication ID
 }
 
 export default function CreatePostScreen() {
@@ -91,22 +93,70 @@ export default function CreatePostScreen() {
         });
       }
 
-      // 服薬を取得
+      // 服薬を取得（成分でグループ化）
       const { data: medications } = await supabase
         .from('user_medications')
-        .select('id, ingredients(name), products(name)')
+        .select('id, ingredient_id, ingredients(name), products(name)')
         .eq('user_id', user.id);
 
+      // 全製品マスターを取得（成分IDごとの製品名リスト用）
+      const { data: allProducts } = await supabase
+        .from('products')
+        .select('ingredient_id, name');
+
       if (medications) {
+        // 成分IDごとの製品名をマップ化
+        const productsByIngredient = new Map<string, string[]>();
+        if (allProducts) {
+          allProducts.forEach((p: { ingredient_id: string; name: string }) => {
+            const existing = productsByIngredient.get(p.ingredient_id);
+            if (existing) {
+              existing.push(p.name);
+            } else {
+              productsByIngredient.set(p.ingredient_id, [p.name]);
+            }
+          });
+        }
+
+        // 成分IDでグループ化
+        const ingredientMap = new Map<string, {
+          ids: string[];
+          ingredientId: string;
+          ingredientName: string;
+        }>();
+
         medications.forEach((m: any) => {
-          const name = m.products?.name || m.ingredients?.name;
-          if (name) {
-            tags.push({
-              id: m.id,
-              name: name,
-              type: 'medication',
-            });
+          const ingredientId = m.ingredient_id;
+          const ingredientName = m.ingredients?.name || '';
+
+          if (ingredientName && ingredientId) {
+            const existing = ingredientMap.get(ingredientId);
+            if (existing) {
+              existing.ids.push(m.id);
+            } else {
+              ingredientMap.set(ingredientId, {
+                ids: [m.id],
+                ingredientId,
+                ingredientName,
+              });
+            }
           }
+        });
+
+        // 「成分名(製品名1、製品名2)」形式でタグを追加
+        ingredientMap.forEach((item) => {
+          const productNames = productsByIngredient.get(item.ingredientId) || [];
+          const displayName = productNames.length > 0
+            ? `${item.ingredientName}(${productNames.join('、')})`
+            : item.ingredientName;
+
+          tags.push({
+            id: item.ids[0], // 代表ID
+            name: displayName,
+            type: 'medication',
+            ingredientId: item.ingredientId,
+            relatedIds: item.ids, // 同じ成分の全てのID
+          });
         });
       }
 
@@ -188,11 +238,27 @@ export default function CreatePostScreen() {
   };
 
   const toggleTag = (tagId: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tagId)
-        ? prev.filter((id) => id !== tagId)
-        : [...prev, tagId]
-    );
+    const tag = availableTags.find(t => t.id === tagId);
+
+    // 服薬の場合は関連する全てのIDを選択/解除
+    if (tag?.type === 'medication' && tag.relatedIds) {
+      setSelectedTags((prev) => {
+        const isSelected = prev.includes(tagId);
+        if (isSelected) {
+          // 解除: 関連する全てのIDを削除
+          return prev.filter((id) => !tag.relatedIds!.includes(id));
+        } else {
+          // 選択: 関連する全てのIDを追加
+          return [...new Set([...prev, ...tag.relatedIds!])];
+        }
+      });
+    } else {
+      setSelectedTags((prev) =>
+        prev.includes(tagId)
+          ? prev.filter((id) => id !== tagId)
+          : [...prev, tagId]
+      );
+    }
   };
 
   const handlePost = async () => {
@@ -477,21 +543,27 @@ export default function CreatePostScreen() {
                       <VStack space="sm">
                         {availableTags
                           .filter(t => t.type === 'medication')
-                          .map((tag) => (
-                            <Pressable key={tag.id} onPress={() => toggleTag(tag.id)}>
-                              <Checkbox
-                                value={tag.id}
-                                isChecked={selectedTags.includes(tag.id)}
-                                onChange={() => toggleTag(tag.id)}
-                                size="md"
-                              >
-                                <CheckboxIndicator>
-                                  <CheckboxIcon as={CheckIcon} />
-                                </CheckboxIndicator>
-                                <CheckboxLabel>{tag.name}</CheckboxLabel>
-                              </Checkbox>
-                            </Pressable>
-                          ))}
+                          .map((tag) => {
+                            // 関連IDのいずれかが選択されていればチェック状態
+                            const isChecked = tag.relatedIds
+                              ? tag.relatedIds.some(id => selectedTags.includes(id))
+                              : selectedTags.includes(tag.id);
+                            return (
+                              <Pressable key={tag.id} onPress={() => toggleTag(tag.id)}>
+                                <Checkbox
+                                  value={tag.id}
+                                  isChecked={isChecked}
+                                  onChange={() => toggleTag(tag.id)}
+                                  size="md"
+                                >
+                                  <CheckboxIndicator>
+                                    <CheckboxIcon as={CheckIcon} />
+                                  </CheckboxIndicator>
+                                  <CheckboxLabel>{tag.name}</CheckboxLabel>
+                                </Checkbox>
+                              </Pressable>
+                            );
+                          })}
                       </VStack>
                     </Box>
                   )}

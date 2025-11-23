@@ -26,18 +26,22 @@ interface MultiSelectModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
+  subtitle?: string;
   options: TagOption[];
   selectedIds: string[];
   onSave: (selectedIds: string[]) => void;
+  onToggle?: (id: string, newSelectedIds: string[]) => string[];
 }
 
 export default function MultiSelectModal({
   isOpen,
   onClose,
   title,
+  subtitle,
   options,
   selectedIds,
   onSave,
+  onToggle,
 }: MultiSelectModalProps) {
   const [tempSelectedIds, setTempSelectedIds] = useState<string[]>(selectedIds);
 
@@ -47,9 +51,14 @@ export default function MultiSelectModal({
   }, [selectedIds, isOpen]);
 
   const toggleSelection = (id: string) => {
-    setTempSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
+    setTempSelectedIds((prev) => {
+      const newIds = prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id];
+      // onToggleが指定されている場合は、連動選択を処理
+      if (onToggle) {
+        return onToggle(id, newIds);
+      }
+      return newIds;
+    });
   };
 
   const handleSave = () => {
@@ -67,7 +76,12 @@ export default function MultiSelectModal({
       <ModalBackdrop />
       <ModalContent className="max-h-[80%]">
         <ModalHeader>
-          <Heading size="lg">{title}</Heading>
+          <VStack space="xs" className="flex-1">
+            <Heading size="lg">{title}</Heading>
+            {subtitle && (
+              <Text className="text-xs text-typography-500">{subtitle}</Text>
+            )}
+          </VStack>
           <ModalCloseButton>
             <Icon as={CloseIcon} size="md" />
           </ModalCloseButton>
