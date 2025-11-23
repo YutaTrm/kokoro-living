@@ -12,7 +12,16 @@ import MultiSelectModal from '@/components/search/MultiSelectModal';
 import { Text } from '@/components/Themed';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonText } from '@/components/ui/button';
+import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
+import {
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+} from '@/components/ui/modal';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea, TextareaInput } from '@/components/ui/textarea';
 import { VStack } from '@/components/ui/vstack';
@@ -122,6 +131,11 @@ export default function ProfileScreen() {
   const [startMonth, setStartMonth] = useState<string>((new Date().getMonth() + 1).toString());
   const [endYear, setEndYear] = useState<string>('');
   const [endMonth, setEndMonth] = useState<string>('');
+
+  // 確認モーダル用のstate
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // キャッシュキー
   const CACHE_KEYS = {
@@ -980,7 +994,14 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleLogout = async () => {
+  // ログアウトモーダルを表示
+  const handleLogoutPress = () => {
+    setShowLogoutModal(true);
+  };
+
+  // ログアウト実行
+  const handleLogoutConfirm = async () => {
+    setShowLogoutModal(false);
     try {
       const { error } = await supabase.auth.signOut();
       if (error) {
@@ -988,10 +1009,36 @@ export default function ProfileScreen() {
         return;
       }
       setProfile(null);
-      // ホームタブにリダイレクト
       router.push('/(tabs)');
     } catch (error) {
       Alert.alert('エラー', '予期しないエラーが発生しました');
+    }
+  };
+
+  // 退会モーダルを表示
+  const handleDeleteAccountPress = () => {
+    setShowDeleteModal(true);
+  };
+
+  // 退会実行
+  const handleDeleteAccountConfirm = async () => {
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase.rpc('delete_user_account');
+      if (error) {
+        Alert.alert('エラー', '退会処理に失敗しました');
+        setIsDeleting(false);
+        setShowDeleteModal(false);
+        return;
+      }
+      setShowDeleteModal(false);
+      setProfile(null);
+      Alert.alert('退会完了', 'アカウントが削除されました');
+      router.push('/(tabs)');
+    } catch (error) {
+      Alert.alert('エラー', '予期しないエラーが発生しました');
+      setIsDeleting(false);
+      setShowDeleteModal(false);
     }
   };
 
@@ -1070,7 +1117,7 @@ export default function ProfileScreen() {
 
   const renderHeader = () => (
     <>
-      <ProfileHeader profile={profile!} onLogout={handleLogout} />
+      <ProfileHeader profile={profile!} onLogout={handleLogoutPress} onDeleteAccount={handleDeleteAccountPress} />
 
       {/* タブバー */}
       <HStack className="border-b border-outline-200">
@@ -1291,6 +1338,48 @@ export default function ProfileScreen() {
         initialEndYear={endYear}
         initialEndMonth={endMonth}
       />
+
+      {/* ログアウト確認モーダル */}
+      <Modal isOpen={showLogoutModal} onClose={() => setShowLogoutModal(false)} size="sm">
+        <ModalBackdrop />
+        <ModalContent>
+          <ModalHeader>
+            <Heading size="lg">ログアウト</Heading>
+          </ModalHeader>
+          <ModalBody>
+            <Text>ログアウトしますか？</Text>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="outline" onPress={() => setShowLogoutModal(false)} className="mr-2">
+              <ButtonText>キャンセル</ButtonText>
+            </Button>
+            <Button action="negative" onPress={handleLogoutConfirm}>
+              <ButtonText>ログアウト</ButtonText>
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* 退会確認モーダル */}
+      <Modal isOpen={showDeleteModal} onClose={() => !isDeleting && setShowDeleteModal(false)} size="sm">
+        <ModalBackdrop />
+        <ModalContent>
+          <ModalHeader>
+            <Heading size="lg">アプリ退会</Heading>
+          </ModalHeader>
+          <ModalBody>
+            <Text>退会すると、投稿やいいねなど全てのデータが削除されます。この操作は取り消せません。本当に退会しますか？</Text>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="outline" onPress={() => setShowDeleteModal(false)} isDisabled={isDeleting} className="mr-2">
+              <ButtonText>キャンセル</ButtonText>
+            </Button>
+            <Button action="negative" onPress={handleDeleteAccountConfirm} isDisabled={isDeleting}>
+              {isDeleting ? <Spinner size="small" /> : <ButtonText>退会</ButtonText>}
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </LoginPrompt>
   );
 }

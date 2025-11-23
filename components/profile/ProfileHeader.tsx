@@ -16,9 +16,10 @@ interface UserProfile {
 interface ProfileHeaderProps {
   profile: UserProfile;
   onLogout: () => void;
+  onDeleteAccount: () => void;
 }
 
-export default function ProfileHeader({ profile, onLogout }: ProfileHeaderProps) {
+export default function ProfileHeader({ profile, onLogout, onDeleteAccount }: ProfileHeaderProps) {
   return (
     <Box className="p-4 bg-">
       <Heading size="md" className="text-primary-500">
@@ -44,11 +45,14 @@ export default function ProfileHeader({ profile, onLogout }: ProfileHeaderProps)
         </VStack>
       </HStack>
 
-      <Box className="my-4">
-        <Button onPress={onLogout} action="negative" className="w-full">
+      <HStack className="my-4" space="sm">
+        <Button onPress={onLogout} variant="outline" action="negative" className="flex-1">
           <ButtonText>ログアウト</ButtonText>
         </Button>
-      </Box>
+        <Button onPress={onDeleteAccount} action="negative" className="flex-1">
+          <ButtonText>アプリ退会</ButtonText>
+        </Button>
+      </HStack>
     </Box>
   );
 }

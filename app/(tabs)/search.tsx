@@ -696,7 +696,7 @@ export default function SearchScreen() {
       <FlatList
         data={posts}
         renderItem={({ item }) => <PostItem post={item} />}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => `${item.id}-${index}`}
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
         refreshControl={
