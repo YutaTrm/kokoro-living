@@ -38,9 +38,10 @@ export default function TabLayout() {
         headerShown: useClientOnlyValue(false, true),
       }}>
       <Tabs.Screen
-        name="index"
+        name="(home)"
         options={{
           title: 'ホーム',
+          headerShown: false,
           tabBarIcon: ({ color }) => <House color={color} size={24} />,
         }}
       />
@@ -65,6 +66,14 @@ export default function TabLayout() {
           title: 'マイページ',
           tabBarIcon: ({ color }) => <User color={color} size={24} />,
         }}
+      />
+      <Tabs.Screen
+        name="(home)/post/[id]"
+        options={{ href: null }}
+      />
+      <Tabs.Screen
+        name="(home)/user/[id]"
+        options={{ href: null }}
       />
     </Tabs>
   );

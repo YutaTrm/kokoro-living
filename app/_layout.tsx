@@ -66,8 +66,6 @@ function RootLayoutNav() {
           <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
           <Stack.Screen name="create-post" options={{ presentation: 'modal', headerShown: false }} />
           <Stack.Screen name="reply/[id]" options={{ presentation: 'modal', headerShown: false }} />
-          <Stack.Screen name="post/[id]" options={{ title: 'ポスト', headerBackTitle: '' }} />
-          <Stack.Screen name="user/[id]" options={{ title: 'プロフィール', headerBackTitle: '' }} />
         </Stack>
       </ThemeProvider>
     </QueryClientProvider>
