@@ -5,7 +5,7 @@ import PostItem from '@/components/PostItem';
 import MultiSelectModal from '@/components/search/MultiSelectModal';
 import { Text } from '@/components/Themed';
 import { Box } from '@/components/ui/box';
-import { Button } from '@/components/ui/button';
+import { Button, ButtonIcon } from '@/components/ui/button';
 import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
 import { Radio, RadioGroup, RadioIcon, RadioIndicator, RadioLabel } from '@/components/ui/radio';
@@ -549,7 +549,7 @@ export default function SearchScreen() {
                     onPress={() => openTagModal('diagnosis')}
                     className="h-6 px-2"
                   >
-                    <Icon as={PlusIcon} size="xs" />
+                    <ButtonIcon as={PlusIcon} size="sm" />
                   </Button>
                 </HStack>
                 {getSelectedTagsByType('diagnosis').length > 0 && (
@@ -579,7 +579,7 @@ export default function SearchScreen() {
                     onPress={() => openTagModal('ingredient')}
                     className="h-6 px-2"
                   >
-                    <Icon as={PlusIcon} size="xs" />
+                    <ButtonIcon as={PlusIcon} size="sm" />
                   </Button>
                 </HStack>
                 {getSelectedTagsByType('ingredient').length > 0 && (
@@ -609,7 +609,7 @@ export default function SearchScreen() {
                     onPress={() => openTagModal('treatment')}
                     className="h-6 px-2"
                   >
-                    <Icon as={PlusIcon} size="xs" />
+                    <ButtonIcon as={PlusIcon} size="sm" />
                   </Button>
                 </HStack>
                 {getSelectedTagsByType('treatment').length > 0 && (
@@ -639,7 +639,7 @@ export default function SearchScreen() {
                     onPress={() => openTagModal('status')}
                     className="h-6 px-2"
                   >
-                    <Icon as={PlusIcon} size="xs" />
+                    <ButtonIcon as={PlusIcon} size="sm" />
                   </Button>
                 </HStack>
                 {getSelectedTagsByType('status').length > 0 && (

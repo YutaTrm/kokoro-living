@@ -5,7 +5,7 @@ import { Text } from '@/components/Themed';
 import { Button, ButtonText } from '@/components/ui/button';
 import { Checkbox, CheckboxIcon, CheckboxIndicator, CheckboxLabel } from '@/components/ui/checkbox';
 import { Heading } from '@/components/ui/heading';
-import { CloseIcon, Icon, CheckIcon } from '@/components/ui/icon';
+import { CheckIcon, CloseIcon, Icon } from '@/components/ui/icon';
 import {
   Modal,
   ModalBackdrop,
@@ -81,12 +81,12 @@ export default function MultiSelectModal({
                     value={option.id}
                     isChecked={tempSelectedIds.includes(option.id)}
                     onChange={() => toggleSelection(option.id)}
-                    size="sm"
+                    size="md"
                   >
                     <CheckboxIndicator>
                       <CheckboxIcon as={CheckIcon} />
                     </CheckboxIndicator>
-                    <CheckboxLabel className="text-sm">{option.name}</CheckboxLabel>
+                    <CheckboxLabel className="">{option.name}</CheckboxLabel>
                   </Checkbox>
                 </Pressable>
               ))}

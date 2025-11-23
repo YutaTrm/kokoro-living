@@ -87,8 +87,8 @@ export default function MedicalSection({
     <Box className="px-5 py-4 border-t border-outline-200">
       <HStack className="justify-between items-center mb-3">
         <Heading size="lg">{title}</Heading>
-        <Button onPress={onAdd} action="primary" size="sm" variant="solid" className="rounded">
-          <ButtonIcon as={AddIcon} size="md" />
+        <Button onPress={onAdd} action="primary" size="xs" variant="outline" className="rounded">
+          <ButtonIcon as={AddIcon} size="sm" />
         </Button>
       </HStack>
       {renderContent()}
