@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, FlatList } from 'react-native';
 
+import ConfirmModal from '@/components/ConfirmModal';
 import LoginPrompt from '@/components/LoginPrompt';
 import PostItem from '@/components/PostItem';
 import DatePickerModal from '@/components/profile/DatePickerModal';
@@ -12,19 +13,11 @@ import MultiSelectModal from '@/components/search/MultiSelectModal';
 import { Text } from '@/components/Themed';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonText } from '@/components/ui/button';
-import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
-import {
-  Modal,
-  ModalBackdrop,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-} from '@/components/ui/modal';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea, TextareaInput } from '@/components/ui/textarea';
 import { VStack } from '@/components/ui/vstack';
+import { usePostsData } from '@/src/hooks/usePostsData';
 import { supabase } from '@/src/lib/supabase';
 
 interface UserProfile {
@@ -74,20 +67,6 @@ interface MasterData {
   ingredientId?: string; // 服薬マスター用: 成分ID
 }
 
-interface Post {
-  id: string;
-  content: string;
-  created_at: string;
-  user: {
-    display_name: string;
-    user_id: string;
-    avatar_url?: string | null;
-  };
-  diagnoses: string[];
-  treatments: string[];
-  medications: string[];
-}
-
 type TabType = 'profile' | 'posts' | 'likes' | 'bookmarks';
 
 export default function ProfileScreen() {
@@ -103,13 +82,18 @@ export default function ProfileScreen() {
 
   const [bio, setBio] = useState('');
 
-  const [userPosts, setUserPosts] = useState<Post[]>([]);
-  const [likedPosts, setLikedPosts] = useState<Post[]>([]);
-  const [bookmarkedPosts, setBookmarkedPosts] = useState<Post[]>([]);
+  const {
+    userPosts,
+    likedPosts,
+    bookmarkedPosts,
+    loadingPosts,
+    loadingLikes,
+    loadingBookmarks,
+    loadUserPosts,
+    loadLikedPosts,
+    loadBookmarkedPosts,
+  } = usePostsData();
 
-  const [loadingPosts, setLoadingPosts] = useState(false);
-  const [loadingLikes, setLoadingLikes] = useState(false);
-  const [loadingBookmarks, setLoadingBookmarks] = useState(false);
   const [loadingDiagnoses, setLoadingDiagnoses] = useState(true);
   const [loadingMedications, setLoadingMedications] = useState(true);
   const [loadingTreatments, setLoadingTreatments] = useState(true);
@@ -231,7 +215,8 @@ export default function ProfileScreen() {
         .order('name');
 
       if (prodData) {
-        prodData.forEach((p: { id: string; name: string; ingredient_id: string; ingredients: { id: string; name: string } | null }) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        prodData.forEach((p: any) => {
           if (p.ingredients) {
             medicationList.push({
               id: `product-${p.id}`,
@@ -633,7 +618,8 @@ export default function ProfileScreen() {
         .eq('user_id', user.id);
 
       if (diagnosesData) {
-        const formatted = diagnosesData.map((d: DiagnosisData & { id: string }) => ({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const formatted = diagnosesData.map((d: any) => ({
           id: d.id,
           name: d.diagnoses?.name || '',
           startDate: d.start_date,
@@ -686,7 +672,8 @@ export default function ProfileScreen() {
           endDate: string | null;
         }>();
 
-        medicationsData.forEach((m: MedicationData & { id: string; ingredient_id: string }) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        medicationsData.forEach((m: any) => {
           const ingredientId = m.ingredient_id;
           const ingredientName = m.ingredients?.name || '';
 
@@ -736,7 +723,8 @@ export default function ProfileScreen() {
         .eq('user_id', user.id);
 
       if (treatmentsData) {
-        const formatted = treatmentsData.map((t: TreatmentData & { id: string }) => ({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const formatted = treatmentsData.map((t: any) => ({
           id: t.id,
           name: t.treatments?.name || '',
           startDate: t.start_date,
@@ -765,7 +753,8 @@ export default function ProfileScreen() {
         .eq('user_id', user.id);
 
       if (statusesData) {
-        const formatted = statusesData.map((s: StatusData & { id: string }) => ({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const formatted = statusesData.map((s: any) => ({
           id: s.id,
           name: s.statuses?.name || '',
           startDate: s.start_date,
@@ -778,182 +767,6 @@ export default function ProfileScreen() {
       console.error('ステータス読み込みエラー:', error);
     } finally {
       setLoadingStatuses(false);
-    }
-  };
-
-  const loadUserPosts = async () => {
-    setLoadingPosts(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: postsData, error: postsError } = await supabase
-        .from('posts')
-        .select('id, content, created_at, user_id')
-        .eq('user_id', user.id)
-        .is('parent_post_id', null)
-        .order('created_at', { ascending: false });
-
-      if (postsError) throw postsError;
-
-      if (!postsData || postsData.length === 0) {
-        setUserPosts([]);
-        return;
-      }
-
-      // ユーザー情報を取得
-      const { data: userData } = await supabase
-        .from('users')
-        .select('user_id, display_name, avatar_url')
-        .eq('user_id', user.id)
-        .single();
-
-      // タグを一括取得
-      const postIds = postsData.map(p => p.id);
-      const tagsMap = await fetchTagsForPosts(postIds);
-
-      const formattedPosts: Post[] = postsData.map((post: any) => {
-        const tags = tagsMap.get(post.id) || { diagnoses: [], treatments: [], medications: [] };
-        return {
-          id: post.id,
-          content: post.content,
-          created_at: post.created_at,
-          user: {
-            display_name: userData?.display_name || 'Unknown',
-            user_id: post.user_id,
-            avatar_url: userData?.avatar_url || null,
-          },
-          diagnoses: tags.diagnoses,
-          treatments: tags.treatments,
-          medications: tags.medications,
-        };
-      });
-
-      setUserPosts(formattedPosts);
-    } catch (error) {
-      console.error('投稿取得エラー:', error);
-    } finally {
-      setLoadingPosts(false);
-    }
-  };
-
-  const loadLikedPosts = async () => {
-    setLoadingLikes(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: likesData, error: likesError } = await supabase
-        .from('likes')
-        .select('post_id, posts!inner(id, content, created_at, user_id)')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (likesError) throw likesError;
-
-      if (!likesData || likesData.length === 0) {
-        setLikedPosts([]);
-        return;
-      }
-
-      // 投稿者のユーザー情報を取得
-      const postUserIds = [...new Set(likesData.map((like: any) => like.posts.user_id))];
-      const { data: usersData } = await supabase
-        .from('users')
-        .select('user_id, display_name, avatar_url')
-        .in('user_id', postUserIds);
-
-      // ユーザー情報をマップに変換
-      const usersMap = new Map(
-        (usersData || []).map(u => [u.user_id, { display_name: u.display_name, avatar_url: u.avatar_url }])
-      );
-
-      // タグを一括取得
-      const postIds = likesData.map((like: any) => like.posts.id);
-      const tagsMap = await fetchTagsForPosts(postIds);
-
-      const formattedPosts: Post[] = likesData.map((like: any) => {
-        const tags = tagsMap.get(like.posts.id) || { diagnoses: [], treatments: [], medications: [] };
-        return {
-          id: like.posts.id,
-          content: like.posts.content,
-          created_at: like.posts.created_at,
-          user: {
-            display_name: usersMap.get(like.posts.user_id)?.display_name || 'Unknown',
-            user_id: like.posts.user_id,
-            avatar_url: usersMap.get(like.posts.user_id)?.avatar_url || null,
-          },
-          diagnoses: tags.diagnoses,
-          treatments: tags.treatments,
-          medications: tags.medications,
-        };
-      });
-
-      setLikedPosts(formattedPosts);
-    } catch (error) {
-      console.error('いいね取得エラー:', error);
-    } finally {
-      setLoadingLikes(false);
-    }
-  };
-
-  const loadBookmarkedPosts = async () => {
-    setLoadingBookmarks(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: bookmarksData, error: bookmarksError } = await supabase
-        .from('bookmarks')
-        .select('post_id, posts!inner(id, content, created_at, user_id)')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (bookmarksError) throw bookmarksError;
-
-      if (!bookmarksData || bookmarksData.length === 0) {
-        setBookmarkedPosts([]);
-        return;
-      }
-
-      // 投稿者のユーザー情報を取得
-      const postUserIds = [...new Set(bookmarksData.map((bookmark: any) => bookmark.posts.user_id))];
-      const { data: usersData } = await supabase
-        .from('users')
-        .select('user_id, display_name, avatar_url')
-        .in('user_id', postUserIds);
-
-      // ユーザー情報をマップに変換
-      const usersMap = new Map(
-        (usersData || []).map(u => [u.user_id, { display_name: u.display_name, avatar_url: u.avatar_url }])
-      );
-
-      // タグを一括取得
-      const postIds = bookmarksData.map((bookmark: any) => bookmark.posts.id);
-      const tagsMap = await fetchTagsForPosts(postIds);
-
-      const formattedPosts: Post[] = bookmarksData.map((bookmark: any) => {
-        const tags = tagsMap.get(bookmark.posts.id) || { diagnoses: [], treatments: [], medications: [] };
-        return {
-          id: bookmark.posts.id,
-          content: bookmark.posts.content,
-          created_at: bookmark.posts.created_at,
-          user: {
-            display_name: usersMap.get(bookmark.posts.user_id)?.display_name || 'Unknown',
-            user_id: bookmark.posts.user_id,
-            avatar_url: usersMap.get(bookmark.posts.user_id)?.avatar_url || null,
-          },
-          diagnoses: tags.diagnoses,
-          treatments: tags.treatments,
-          medications: tags.medications,
-        };
-      });
-
-      setBookmarkedPosts(formattedPosts);
-    } catch (error) {
-      console.error('ブックマーク取得エラー:', error);
-    } finally {
-      setLoadingBookmarks(false);
     }
   };
 
@@ -1009,7 +822,7 @@ export default function ProfileScreen() {
         return;
       }
       setProfile(null);
-      router.push('/(tabs)');
+      router.replace('/');
     } catch (error) {
       Alert.alert('エラー', '予期しないエラーが発生しました');
     }
@@ -1034,62 +847,12 @@ export default function ProfileScreen() {
       setShowDeleteModal(false);
       setProfile(null);
       Alert.alert('退会完了', 'アカウントが削除されました');
-      router.push('/(tabs)');
+      router.replace('/');
     } catch (error) {
       Alert.alert('エラー', '予期しないエラーが発生しました');
       setIsDeleting(false);
       setShowDeleteModal(false);
     }
-  };
-
-  const fetchTagsForPosts = async (postIds: string[]): Promise<Map<string, { diagnoses: string[]; treatments: string[]; medications: string[] }>> => {
-    const { data: diagnosesTagsData } = await supabase
-      .from('post_diagnoses')
-      .select('post_id, user_diagnoses(diagnoses(name))')
-      .in('post_id', postIds);
-
-    const { data: treatmentsTagsData } = await supabase
-      .from('post_treatments')
-      .select('post_id, user_treatments(treatments(name))')
-      .in('post_id', postIds);
-
-    const { data: medicationsTagsData } = await supabase
-      .from('post_medications')
-      .select('post_id, user_medications(ingredients(name), products(name))')
-      .in('post_id', postIds);
-
-    const tagsMap = new Map<string, { diagnoses: string[]; treatments: string[]; medications: string[] }>();
-    postIds.forEach(postId => {
-      const diagnoses: string[] = [];
-      const treatments: string[] = [];
-      const medications: string[] = [];
-
-      diagnosesTagsData?.forEach((d: any) => {
-        if (d.post_id === postId && d.user_diagnoses?.diagnoses?.name) {
-          diagnoses.push(d.user_diagnoses.diagnoses.name);
-        }
-      });
-
-      treatmentsTagsData?.forEach((t: any) => {
-        if (t.post_id === postId && t.user_treatments?.treatments?.name) {
-          treatments.push(t.user_treatments.treatments.name);
-        }
-      });
-
-      medicationsTagsData?.forEach((m: any) => {
-        if (m.post_id === postId) {
-          const name = m.user_medications?.ingredients?.name;
-          // 重複を避ける
-          if (name && !medications.includes(name)) {
-            medications.push(name);
-          }
-        }
-      });
-
-      tagsMap.set(postId, { diagnoses, treatments, medications });
-    });
-
-    return tagsMap;
   };
 
   const handleSaveBio = async () => {
@@ -1340,46 +1103,25 @@ export default function ProfileScreen() {
       />
 
       {/* ログアウト確認モーダル */}
-      <Modal isOpen={showLogoutModal} onClose={() => setShowLogoutModal(false)} size="sm">
-        <ModalBackdrop />
-        <ModalContent>
-          <ModalHeader>
-            <Heading size="lg">ログアウト</Heading>
-          </ModalHeader>
-          <ModalBody>
-            <Text>ログアウトしますか？</Text>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="outline" onPress={() => setShowLogoutModal(false)} className="mr-2">
-              <ButtonText>キャンセル</ButtonText>
-            </Button>
-            <Button action="negative" onPress={handleLogoutConfirm}>
-              <ButtonText>ログアウト</ButtonText>
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+      <ConfirmModal
+        isOpen={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={handleLogoutConfirm}
+        title="ログアウト"
+        message="ログアウトしますか？"
+        confirmText="ログアウト"
+      />
 
       {/* 退会確認モーダル */}
-      <Modal isOpen={showDeleteModal} onClose={() => !isDeleting && setShowDeleteModal(false)} size="sm">
-        <ModalBackdrop />
-        <ModalContent>
-          <ModalHeader>
-            <Heading size="lg">アプリ退会</Heading>
-          </ModalHeader>
-          <ModalBody>
-            <Text>退会すると、投稿やいいねなど全てのデータが削除されます。この操作は取り消せません。本当に退会しますか？</Text>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="outline" onPress={() => setShowDeleteModal(false)} isDisabled={isDeleting} className="mr-2">
-              <ButtonText>キャンセル</ButtonText>
-            </Button>
-            <Button action="negative" onPress={handleDeleteAccountConfirm} isDisabled={isDeleting}>
-              {isDeleting ? <Spinner size="small" /> : <ButtonText>退会</ButtonText>}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDeleteAccountConfirm}
+        title="アプリ退会"
+        message="退会すると、投稿やいいねなど全てのデータが削除されます。この操作は取り消せません。本当に退会しますか？"
+        confirmText="退会"
+        isLoading={isDeleting}
+      />
     </LoginPrompt>
   );
 }

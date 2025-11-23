@@ -67,14 +67,6 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <User color={color} size={24} />,
         }}
       />
-      <Tabs.Screen
-        name="(home)/post/[id]"
-        options={{ href: null }}
-      />
-      <Tabs.Screen
-        name="(home)/user/[id]"
-        options={{ href: null }}
-      />
     </Tabs>
   );
 }

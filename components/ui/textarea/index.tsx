@@ -49,9 +49,9 @@ type ITextareaProps = React.ComponentProps<typeof UITextarea> &
 
 const Textarea = React.forwardRef<
   React.ComponentRef<typeof UITextarea>,
-  ITextareaProps
+  ITextareaProps & { children?: React.ReactNode }
 >(function Textarea(
-  { className, variant = 'default', size = 'md', ...props },
+  { className, variant = 'default', size = 'md', children, ...props },
   ref
 ) {
   return (
@@ -60,7 +60,9 @@ const Textarea = React.forwardRef<
       {...props}
       className={textareaStyle({ variant, class: className })}
       context={{ size }}
-    />
+    >
+      {children}
+    </UITextarea>
   );
 });
 
