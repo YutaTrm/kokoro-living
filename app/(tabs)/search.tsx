@@ -95,19 +95,39 @@ export default function SearchScreen() {
         });
       }
 
-      // 服薬（製品名（成分名）の形式で表示）
+      // 服薬（成分名リストを先に表示し、その下に製品名(成分名)リストを表示）
+      // まず成分名を取得
+      const { data: ingredients } = await supabase
+        .from('ingredients')
+        .select('id, name')
+        .eq('display_flag', true)
+        .order('name');
+
+      if (ingredients) {
+        ingredients.forEach((ingredient) => {
+          tags.push({
+            id: `ingredient-${ingredient.id}`,
+            name: ingredient.name,
+            type: 'ingredient',
+          });
+        });
+      }
+
+      // 次に製品名(成分名)を取得
       const { data: products } = await supabase
         .from('products')
-        .select('id, name, ingredients(name)')
+        .select('id, name, ingredient_id, ingredients(id, name)')
         .order('name');
 
       if (products) {
-        products.forEach((product: any) => {
-          tags.push({
-            id: `ingredient-${product.id}`,
-            name: `${product.name}（${product.ingredients?.name || ''}）`,
-            type: 'ingredient',
-          });
+        products.forEach((product: { id: string; name: string; ingredient_id: string; ingredients: { id: string; name: string } | null }) => {
+          if (product.ingredients) {
+            tags.push({
+              id: `ingredient-${product.ingredients.id}`,
+              name: `${product.name}(${product.ingredients.name})`,
+              type: 'ingredient',
+            });
+          }
         });
       }
 
@@ -422,8 +442,9 @@ export default function SearchScreen() {
       return true;
     });
 
-    // 新しく選択されたタグと結合
-    setSelectedTags([...otherTags, ...selectedIds]);
+    // 新しく選択されたタグと結合（重複を除去）
+    const uniqueSelectedIds = [...new Set(selectedIds)];
+    setSelectedTags([...otherTags, ...uniqueSelectedIds]);
   };
 
   const removeTag = (tagId: string) => {
@@ -436,6 +457,13 @@ export default function SearchScreen() {
   };
 
   const getTagName = (tagId: string) => {
+    // ingredientの場合、成分名のみを表示（製品名(成分名)ではなく成分名を優先）
+    if (tagId.startsWith('ingredient-')) {
+      // 同じIDで成分名のみのタグを探す（括弧がないもの）
+      const ingredientTags = availableTags.filter(t => t.id === tagId);
+      const ingredientOnly = ingredientTags.find(t => !t.name.includes('('));
+      if (ingredientOnly) return ingredientOnly.name;
+    }
     const tag = availableTags.find(t => t.id === tagId);
     return tag?.name || '';
   };

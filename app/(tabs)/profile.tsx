@@ -157,18 +157,43 @@ export default function ProfileScreen() {
       const { data: diagData } = await supabase.from('diagnoses').select('id, name');
       if (diagData) setDiagnosisMasters(diagData);
 
-      // 製品マスター（製品名（成分名）の形式で表示）
+      // 服薬マスター（成分名リストを先に表示し、その下に製品名(成分名)リストを表示）
+      const medicationList: MasterData[] = [];
+
+      // まず成分名を取得
+      const { data: ingredientData } = await supabase
+        .from('ingredients')
+        .select('id, name')
+        .eq('display_flag', true)
+        .order('name');
+
+      if (ingredientData) {
+        ingredientData.forEach((i: { id: string; name: string }) => {
+          medicationList.push({
+            id: `ingredient-${i.id}`,
+            name: i.name,
+          });
+        });
+      }
+
+      // 次に製品名(成分名)を取得
       const { data: prodData } = await supabase
         .from('products')
-        .select('id, name, ingredient_id, ingredients(name)')
+        .select('id, name, ingredient_id, ingredients(id, name)')
         .order('name');
 
       if (prodData) {
-        setMedicationMasters(prodData.map((p: any) => ({
-          id: p.id,
-          name: `${p.name}（${p.ingredients?.name || ''}）`,
-        })));
+        prodData.forEach((p: { id: string; name: string; ingredient_id: string; ingredients: { id: string; name: string } | null }) => {
+          if (p.ingredients) {
+            medicationList.push({
+              id: `product-${p.id}`,
+              name: `${p.name}(${p.ingredients.name})`,
+            });
+          }
+        });
       }
+
+      setMedicationMasters(medicationList);
 
       // 治療法マスター
       const { data: treatData } = await supabase.from('treatments').select('id, name');
@@ -375,22 +400,36 @@ export default function ProfileScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // 選んだproduct_idからingredient_idを取得
-      const { data: productData } = await supabase
-        .from('products')
-        .select('ingredient_id')
-        .eq('id', selectedMedicationId)
-        .single();
+      let ingredientId: string;
+      let productId: string | null = null;
 
-      if (!productData) {
-        Alert.alert('エラー', '製品情報の取得に失敗しました');
+      if (selectedMedicationId.startsWith('ingredient-')) {
+        // 成分名を直接選んだ場合
+        ingredientId = selectedMedicationId.replace('ingredient-', '');
+      } else if (selectedMedicationId.startsWith('product-')) {
+        // 製品名を選んだ場合、product_idからingredient_idを取得
+        const actualProductId = selectedMedicationId.replace('product-', '');
+        const { data: productData } = await supabase
+          .from('products')
+          .select('ingredient_id')
+          .eq('id', actualProductId)
+          .single();
+
+        if (!productData) {
+          Alert.alert('エラー', '製品情報の取得に失敗しました');
+          return;
+        }
+        ingredientId = productData.ingredient_id;
+        productId = actualProductId;
+      } else {
+        Alert.alert('エラー', '無効な選択です');
         return;
       }
 
       const { error } = await supabase.from('user_medications').insert({
         user_id: user.id,
-        ingredient_id: productData.ingredient_id,
-        product_id: selectedMedicationId,
+        ingredient_id: ingredientId,
+        product_id: productId,
         start_date: startDate,
         end_date: endDate,
       });
