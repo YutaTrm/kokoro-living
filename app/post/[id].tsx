@@ -1,6 +1,7 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { ChevronDown, Clock, CornerDownRight, Edit } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView as RNScrollView } from 'react-native';
 
 import PostActionButtons from '@/components/PostActionButtons';
@@ -65,16 +66,9 @@ export default function PostDetailScreen() {
   const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set());
   const [loadingDeeperReplies, setLoadingDeeperReplies] = useState<Set<string>>(new Set());
 
+  // 認証状態の監視
   useEffect(() => {
     checkLoginStatus();
-    if (id) {
-      loadPostDetail();
-      loadReplies();
-      loadLikesCount();
-      checkIfLiked();
-      checkIfBookmarked();
-      loadTags();
-    }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsLoggedIn(!!session);
@@ -82,7 +76,21 @@ export default function PostDetailScreen() {
     });
 
     return () => subscription.unsubscribe();
-  }, [id]);
+  }, []);
+
+  // 画面フォーカス時にデータをリロード（編集後の更新反映）
+  useFocusEffect(
+    useCallback(() => {
+      if (id) {
+        loadPostDetail();
+        loadReplies();
+        loadLikesCount();
+        checkIfLiked();
+        checkIfBookmarked();
+        loadTags();
+      }
+    }, [id])
+  );
 
   const checkLoginStatus = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -511,7 +519,12 @@ export default function PostDetailScreen() {
   };
 
   const handleUserPress = (userId: string) => {
-    router.push(`/user/${userId}`);
+    // 自分のアバターならマイページへ、他ユーザーならプロフィールページへ
+    if (userId === currentUserId) {
+      router.push('/(tabs)/profile');
+    } else {
+      router.push(`/user/${userId}`);
+    }
   };
 
   const handleParentPress = () => {
@@ -664,66 +677,19 @@ export default function PostDetailScreen() {
           />
         </Box>
 
-        {/* 返信一覧 */}
+        {/* 返信一覧（1階層目のみ表示） */}
         {replies.length > 0 && (
           <Box>
-            {replies.map((reply) => {
-              const hasChildReplies = (reply.childReplies?.length ?? 0) > 0;
-
-              return (
-                <Box key={reply.id}>
-                  {/* 1階層目の返信 */}
-                  <ReplyItem
-                    reply={reply}
-                    parentPostContent={post.content}
-                    showVerticalLine={hasChildReplies}
-                    depth={0}
-                    onReplyCreated={loadReplies}
-                  />
-                  {/* 2階層目の返信 */}
-                  {reply.childReplies?.map((childReply, index) => {
-                    const isLastChild = index === (reply.childReplies?.length ?? 0) - 1;
-                    const hasDeeper = childReply.hasMoreReplies || (childReply.childReplies?.length ?? 0) > 0;
-
-                    return (
-                      <Box key={childReply.id}>
-                        <ReplyItem
-                          reply={childReply}
-                          parentPostContent={reply.content}
-                          showVerticalLine={!isLastChild || hasDeeper}
-                          depth={1}
-                          onReplyCreated={loadReplies}
-                        />
-                        {/* 3階層目以降：さらに表示するボタン */}
-                        {childReply.hasMoreReplies && !expandedReplies.has(childReply.id) && (
-                          <Pressable
-                            onPress={() => loadDeeperReplies(childReply.id, childReply.content)}
-                            className="px-4 py-2 ml-10"
-                          >
-                            <HStack space="xs" className="items-center">
-                              {loadingDeeperReplies.has(childReply.id) ? (
-                                <Spinner size="small" />
-                              ) : (
-                                <>
-                                  <ChevronDown size={16} color="#666" />
-                                  <Text className="text-sm text-primary-500">
-                                    さらに表示する（{childReply.deeperRepliesCount}件）
-                                  </Text>
-                                </>
-                              )}
-                            </HStack>
-                          </Pressable>
-                        )}
-                        {/* 展開された3階層目以降の返信 */}
-                        {childReply.childReplies && expandedReplies.has(childReply.id) && (
-                          renderDeeperReplies(childReply.childReplies, childReply.content, 2)
-                        )}
-                      </Box>
-                    );
-                  })}
-                </Box>
-              );
-            })}
+            {replies.map((reply) => (
+              <ReplyItem
+                key={reply.id}
+                reply={reply}
+                parentPostContent={post.content}
+                showVerticalLine={false}
+                depth={0}
+                onReplyCreated={loadReplies}
+              />
+            ))}
           </Box>
         )}
       </RNScrollView>

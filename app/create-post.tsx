@@ -355,8 +355,13 @@ export default function CreatePostScreen() {
 
       await Promise.all(tagPromises.filter((p) => p !== null));
 
-      // タイムラインにリダイレクト（リロードされる）
-      router.replace('/(tabs)');
+      if (isEditMode) {
+        // 編集モード: 元の画面に戻る（投稿詳細ページでリロードされる）
+        router.back();
+      } else {
+        // 新規作成: タイムラインにリダイレクト
+        router.replace('/(tabs)');
+      }
     } catch (error) {
       console.error('投稿エラー:', error);
       Alert.alert('エラー', isEditMode ? '更新に失敗しました' : '投稿に失敗しました');

@@ -1,8 +1,10 @@
 import { useRouter } from 'expo-router';
 import { CornerDownRight } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView } from 'react-native';
 
 import Tag from '@/components/Tag';
+import { supabase } from '@/src/lib/supabase';
 import { Text } from '@/components/Themed';
 import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
@@ -29,6 +31,15 @@ interface PostItemProps {
 
 export default function PostItem({ post, disableAvatarTap = false }: PostItemProps) {
   const router = useRouter();
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUserId(user?.id ?? null);
+    };
+    getCurrentUser();
+  }, []);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -49,10 +60,15 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
     router.push(`/post/${post.id}`);
   };
 
-  const handleAvatarPress = (e: any) => {
+  const handleAvatarPress = (e: { stopPropagation: () => void }) => {
     if (disableAvatarTap) return;
     e.stopPropagation();
-    router.push(`/user/${post.user.user_id}`);
+    // 自分のアバターならマイページへ遷移
+    if (currentUserId === post.user.user_id) {
+      router.push('/(tabs)/profile');
+    } else {
+      router.push(`/user/${post.user.user_id}`);
+    }
   };
 
   const AvatarComponent = disableAvatarTap ? (

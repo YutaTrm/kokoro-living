@@ -42,6 +42,7 @@ export default function ReplyItem({
   const [isLiked, setIsLiked] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
     checkLoginStatus();
@@ -52,6 +53,7 @@ export default function ReplyItem({
   const checkLoginStatus = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     setIsLoggedIn(!!session);
+    setCurrentUserId(session?.user?.id ?? null);
   };
 
   const loadCounts = async () => {
@@ -127,7 +129,12 @@ export default function ReplyItem({
   };
 
   const handleAvatarPress = () => {
-    router.push(`/user/${reply.user.user_id}`);
+    // 自分のアバターならマイページへ遷移
+    if (currentUserId === reply.user.user_id) {
+      router.push('/(tabs)/profile');
+    } else {
+      router.push(`/user/${reply.user.user_id}`);
+    }
   };
 
   const handleParentPress = () => {
