@@ -488,7 +488,7 @@ export default function PostDetailScreen() {
     const date = new Date(dateString);
     const year = date.getFullYear();
     const month = date.getMonth() + 1;
-    return `${year}/${month}当時`;
+    return `${year}年${month}月頃`;
   };
 
   const truncateText = (text: string, maxLength: number = 30) => {

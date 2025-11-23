@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { TextInput, ScrollView, Alert } from 'react-native';
+import { Alert, ScrollView, TextInput } from 'react-native';
 
 import { Text } from '@/components/Themed';
 import { Box } from '@/components/ui/box';
@@ -150,7 +150,7 @@ export default function ReplyScreen() {
           {/* テキスト入力 */}
           <Box>
             <TextInput
-              className="text-base min-h-[120px] text-typography-900"
+              className="min-h-[120px] text-typography-900"
               placeholder="返信を入力"
               placeholderTextColor="#999"
               multiline
@@ -159,12 +159,8 @@ export default function ReplyScreen() {
               maxLength={maxLength}
               autoFocus
             />
-            <Text
-              className={`text-sm text-right mt-2 ${
-                remainingChars < 0 ? 'text-error-500' : 'text-typography-500'
-              }`}
-            >
-              {remainingChars}
+            <Text className="text-sm text-right mt-2" >
+              残り{remainingChars}文字
             </Text>
           </Box>
         </VStack>

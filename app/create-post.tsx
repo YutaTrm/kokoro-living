@@ -329,7 +329,7 @@ export default function CreatePostScreen() {
           <Box>
             <TextInput
               className="text-base min-h-[120px] text-typography-900"
-              placeholder="状態や感情を記述してください"
+              placeholder="状態や感情など自由に記述してください"
               placeholderTextColor="#999"
               multiline
               value={content}
