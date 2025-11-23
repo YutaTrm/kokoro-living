@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { FlatList, ScrollView as RNScrollView } from 'react-native';
 
 import PostItem from '@/components/PostItem';
+import Tag from '@/components/Tag';
 import { Text } from '@/components/Themed';
 import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
@@ -306,17 +307,9 @@ export default function UserDetailScreen() {
               <Box>
                 <Text className="text-xs text-typography-500 mb-1">診断名</Text>
                 <Box className="flex-row flex-wrap gap-1">
-                  {diagnoses.map((d) => {
-                    const isEnded = d.endDate !== null;
-                    return (
-                      <>
-                        {/* <Icon className="text-xs" as={FileCheck} /> */}
-                        <Box key={d.id} className="text-center rounded py-1 px-2 bg-fuchsia-400">
-                          <Text className="text-xs">{d.name}</Text>
-                        </Box>
-                      </>
-                    );
-                  })}
+                  {diagnoses.map((d) => (
+                    <Tag key={d.id} name={d.name} color="fuchsia-400" size="xs" />
+                  ))}
                 </Box>
               </Box>
             )}
@@ -326,14 +319,9 @@ export default function UserDetailScreen() {
               <Box>
                 <Text className="text-xs text-typography-500 mb-1">治療</Text>
                 <Box className="flex-row flex-wrap gap-1">
-                  {treatments.map((t) => {
-                    // const isEnded = t.endDate !== null;
-                    return (
-                      <Box key={t.id} className="text-center rounded py-1 px-2 bg-green-400">
-                        <Text className="text-xs">{t.name}</Text>
-                      </Box>
-                    );
-                  })}
+                  {treatments.map((t) => (
+                    <Tag key={t.id} name={t.name} color="green-400" size="xs" />
+                  ))}
                 </Box>
               </Box>
             )}
@@ -343,14 +331,9 @@ export default function UserDetailScreen() {
               <Box>
                 <Text className="text-xs text-typography-500 mb-1">服薬</Text>
                 <Box className="flex-row flex-wrap gap-1">
-                  {medications.map((m) => {
-                    const isEnded = m.endDate !== null;
-                    return (
-                      <Box key={m.id} className="text-center rounded py-1 px-2 bg-cyan-400">
-                        <Text className="text-xs">{m.name}</Text>
-                      </Box>
-                    );
-                  })}
+                  {medications.map((m) => (
+                    <Tag key={m.id} name={m.name} color="cyan-400" size="xs" />
+                  ))}
                 </Box>
               </Box>
             )}
@@ -360,14 +343,9 @@ export default function UserDetailScreen() {
               <Box>
                 <Text className="text-xs text-typography-500 mb-1">ステータス</Text>
                 <Box className="flex-row flex-wrap gap-1">
-                  {statuses.map((s) => {
-                    const isEnded = s.endDate !== null;
-                    return (
-                      <Box key={s.id} className="text-center rounded py-1 px-2 bg-amber-400">
-                        <Text className="text-xs">{s.name}</Text>
-                      </Box>
-                    );
-                  })}
+                  {statuses.map((s) => (
+                    <Tag key={s.id} name={s.name} color="amber-400" size="xs" />
+                  ))}
                 </Box>
               </Box>
             )}

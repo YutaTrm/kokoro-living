@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { CornerDownRight } from 'lucide-react-native';
 import { Pressable, ScrollView } from 'react-native';
 
+import Tag from '@/components/Tag';
 import { Text } from '@/components/Themed';
 import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
@@ -105,19 +106,13 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
                 >
                   <HStack space="xs" className="ml-1">
                     {post.diagnoses.map((tag, index) => (
-                      <Box key={`d-${index}`} className="text-center rounded py-1 px-2 bg-fuchsia-400">
-                        <Text className="text-xs">{tag}</Text>
-                      </Box>
+                      <Tag key={`d-${index}`} name={tag} color="fuchsia-400" size="xs" />
                     ))}
                     {post.treatments.map((tag, index) => (
-                      <Box key={`t-${index}`} className="text-center rounded py-1 px-2 bg-green-400">
-                        <Text className="text-xs">{tag}</Text>
-                      </Box>
+                      <Tag key={`t-${index}`} name={tag} color="green-400" size="xs" />
                     ))}
                     {post.medications.map((tag, index) => (
-                      <Box key={`m-${index}`} className="text-center rounded py-1 px-2 bg-cyan-400">
-                        <Text className="text-xs">{tag}</Text>
-                      </Box>
+                      <Tag key={`m-${index}`} name={tag} color="cyan-400" size="xs" />
                     ))}
                   </HStack>
                 </ScrollView>

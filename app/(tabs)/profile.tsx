@@ -7,7 +7,7 @@ import PostItem from '@/components/PostItem';
 import DatePickerModal from '@/components/profile/DatePickerModal';
 import MedicalSection from '@/components/profile/MedicalSection';
 import ProfileHeader from '@/components/profile/ProfileHeader';
-import SelectModal from '@/components/profile/SelectModal';
+import MultiSelectModal from '@/components/search/MultiSelectModal';
 import { Text } from '@/components/Themed';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonText } from '@/components/ui/button';
@@ -100,7 +100,7 @@ export default function ProfileScreen() {
   const [loadingBookmarks, setLoadingBookmarks] = useState(false);
   const [loadingMedical, setLoadingMedical] = useState(true);
 
-  const [showSelectModal, setShowSelectModal] = useState(false);
+  const [showMultiSelectModal, setShowMultiSelectModal] = useState(false);
   const [selectModalType, setSelectModalType] = useState<'diagnosis' | 'medication' | 'treatment' | 'status'>('diagnosis');
 
   const [diagnosisMasters, setDiagnosisMasters] = useState<MasterData[]>([]);
@@ -108,21 +108,14 @@ export default function ProfileScreen() {
   const [treatmentMasters, setTreatmentMasters] = useState<MasterData[]>([]);
   const [statusMasters, setStatusMasters] = useState<MasterData[]>([]);
 
-  // 日付選択用のstate（年月選択）
-  const [selectedDiagnosisId, setSelectedDiagnosisId] = useState<string | null>(null);
-  const [selectedStatusId, setSelectedStatusId] = useState<string | null>(null);
-  const [selectedTreatmentId, setSelectedTreatmentId] = useState<string | null>(null);
-  const [selectedMedicationId, setSelectedMedicationId] = useState<string | null>(null);
+  // 日付編集用のstate
+  const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
+  const [editingRecordType, setEditingRecordType] = useState<'diagnosis' | 'medication' | 'treatment' | 'status' | null>(null);
   const [showDateModal, setShowDateModal] = useState(false);
   const [startYear, setStartYear] = useState<string>(new Date().getFullYear().toString());
   const [startMonth, setStartMonth] = useState<string>((new Date().getMonth() + 1).toString());
   const [endYear, setEndYear] = useState<string>('');
   const [endMonth, setEndMonth] = useState<string>('');
-
-  // 年と月の選択肢を生成（過去80年分）
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 80 }, (_, i) => (currentYear - i).toString());
-  const months = Array.from({ length: 12 }, (_, i) => (i + 1).toString());
 
   useEffect(() => {
     loadUserProfile();
@@ -216,69 +209,219 @@ export default function ProfileScreen() {
     }
   };
 
-  const openSelectModal = (type: 'diagnosis' | 'medication' | 'treatment' | 'status') => {
+  const openMultiSelectModal = (type: 'diagnosis' | 'medication' | 'treatment' | 'status') => {
     setSelectModalType(type);
-    setShowSelectModal(true);
+    setShowMultiSelectModal(true);
   };
 
-  const handleSelectItem = (itemId: string, type: 'diagnosis' | 'medication' | 'treatment' | 'status') => {
-    // 選択したIDを保存
+  // 既存の選択済みマスターIDを取得（名前でマッチング）
+  const getSelectedIds = (type: 'diagnosis' | 'medication' | 'treatment' | 'status'): string[] => {
     switch (type) {
       case 'diagnosis':
-        setSelectedDiagnosisId(itemId);
+        return diagnosisMasters
+          .filter(m => diagnoses.some(d => d.name === m.name))
+          .map(m => m.id);
+      case 'medication':
+        // 服薬は成分名でマッチング
+        return medicationMasters
+          .filter(m => medications.some(med => {
+            const masterIngredientName = m.name.split('(')[0];
+            return med.name === masterIngredientName || med.name === m.name;
+          }))
+          .map(m => m.id);
+      case 'treatment':
+        return treatmentMasters
+          .filter(m => treatments.some(t => t.name === m.name))
+          .map(m => m.id);
+      case 'status':
+        return statusMasters
+          .filter(m => statuses.some(s => s.name === m.name))
+          .map(m => m.id);
+      default:
+        return [];
+    }
+  };
+
+  // 日付編集モーダルを開く
+  const openDateEditModal = (recordId: string, type: 'diagnosis' | 'medication' | 'treatment' | 'status') => {
+    let record: MedicalRecord | undefined;
+    switch (type) {
+      case 'diagnosis':
+        record = diagnoses.find(d => d.id === recordId);
         break;
       case 'medication':
-        setSelectedMedicationId(itemId);
+        record = medications.find(m => m.id === recordId);
         break;
       case 'treatment':
-        setSelectedTreatmentId(itemId);
+        record = treatments.find(t => t.id === recordId);
         break;
       case 'status':
-        setSelectedStatusId(itemId);
+        record = statuses.find(s => s.id === recordId);
         break;
     }
 
-    // 他の選択をクリア
-    if (type !== 'diagnosis') setSelectedDiagnosisId(null);
-    if (type !== 'medication') setSelectedMedicationId(null);
-    if (type !== 'treatment') setSelectedTreatmentId(null);
-    if (type !== 'status') setSelectedStatusId(null);
+    if (record) {
+      setEditingRecordId(recordId);
+      setEditingRecordType(type);
 
-    setShowSelectModal(false);
+      if (record.startDate) {
+        const [year, month] = record.startDate.split('-');
+        setStartYear(year);
+        setStartMonth(parseInt(month).toString());
+      } else {
+        const now = new Date();
+        setStartYear(now.getFullYear().toString());
+        setStartMonth((now.getMonth() + 1).toString());
+      }
 
-    // 日付選択モーダルを表示
-    const now = new Date();
-    setStartYear(now.getFullYear().toString());
-    setStartMonth((now.getMonth() + 1).toString());
-    setEndYear('');
-    setEndMonth('');
-    setShowDateModal(true);
+      if (record.endDate) {
+        const [year, month] = record.endDate.split('-');
+        setEndYear(year);
+        setEndMonth(parseInt(month).toString());
+      } else {
+        setEndYear('');
+        setEndMonth('');
+      }
+
+      setShowDateModal(true);
+    }
   };
 
-  const saveDiagnosisWithDate = async (startDate: string, endDate: string | null) => {
+  // 日付更新用（編集モーダルから呼ばれる）
+  const updateRecordDate = async (startDate: string, endDate: string | null) => {
     try {
-      if (!selectedDiagnosisId) return;
+      if (!editingRecordId || !editingRecordType) return;
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      let tableName = '';
+      switch (editingRecordType) {
+        case 'diagnosis':
+          tableName = 'user_diagnoses';
+          break;
+        case 'medication':
+          tableName = 'user_medications';
+          break;
+        case 'treatment':
+          tableName = 'user_treatments';
+          break;
+        case 'status':
+          tableName = 'user_statuses';
+          break;
+      }
 
-      const { error } = await supabase.from('user_diagnoses').insert({
-        user_id: user.id,
-        diagnosis_id: selectedDiagnosisId,
-        start_date: startDate,
-        end_date: endDate,
-      });
+      const { error } = await supabase
+        .from(tableName)
+        .update({
+          start_date: startDate,
+          end_date: endDate,
+        })
+        .eq('id', editingRecordId);
 
       if (error) {
-        Alert.alert('エラー', '追加に失敗しました');
+        Alert.alert('エラー', '更新に失敗しました');
         return;
       }
 
       setShowDateModal(false);
-      setSelectedDiagnosisId(null);
+      setEditingRecordId(null);
+      setEditingRecordType(null);
       loadMedicalRecords();
     } catch (error) {
       Alert.alert('エラー', '予期しないエラーが発生しました');
+    }
+  };
+
+  // 複数選択時の一括保存（日付はnull）
+  const handleMultiSelectSave = async (selectedIds: string[]) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // 既に選択されているマスターIDを取得
+      const existingMasterIds = getSelectedIds(selectModalType);
+
+      // 新しく追加されたIDのみ抽出
+      const newIds = selectedIds.filter(id => !existingMasterIds.includes(id));
+
+      console.log('handleMultiSelectSave:', { selectModalType, selectedIds, existingMasterIds, newIds });
+
+      if (newIds.length === 0) {
+        setShowMultiSelectModal(false);
+        return;
+      }
+
+      if (selectModalType === 'medication') {
+        // 服薬の特別処理
+        for (const id of newIds) {
+          let ingredientId: string;
+          let productId: string | null = null;
+
+          if (id.startsWith('ingredient-')) {
+            ingredientId = id.replace('ingredient-', '');
+          } else if (id.startsWith('product-')) {
+            const actualProductId = id.replace('product-', '');
+            const { data: productData } = await supabase
+              .from('products')
+              .select('ingredient_id')
+              .eq('id', actualProductId)
+              .single();
+
+            if (!productData) continue;
+            ingredientId = productData.ingredient_id;
+            productId = actualProductId;
+          } else {
+            continue;
+          }
+
+          const { error } = await supabase.from('user_medications').insert({
+            user_id: user.id,
+            ingredient_id: ingredientId,
+            product_id: productId,
+            start_date: null,
+            end_date: null,
+          });
+
+          if (error) {
+            console.error('服薬保存エラー:', error);
+          }
+        }
+      } else {
+        let tableName = '';
+        let idColumn = '';
+
+        switch (selectModalType) {
+          case 'diagnosis':
+            tableName = 'user_diagnoses';
+            idColumn = 'diagnosis_id';
+            break;
+          case 'treatment':
+            tableName = 'user_treatments';
+            idColumn = 'treatment_id';
+            break;
+          case 'status':
+            tableName = 'user_statuses';
+            idColumn = 'status_id';
+            break;
+        }
+
+        for (const id of newIds) {
+          const { error } = await supabase.from(tableName).insert({
+            user_id: user.id,
+            [idColumn]: id,
+            start_date: null,
+            end_date: null,
+          });
+
+          if (error) {
+            console.error(`${tableName}保存エラー:`, error);
+          }
+        }
+      }
+
+      setShowMultiSelectModal(false);
+      loadMedicalRecords();
+    } catch (error) {
+      console.error('保存エラー:', error);
+      Alert.alert('エラー', '保存に失敗しました');
     }
   };
 
@@ -301,33 +444,6 @@ export default function ProfileScreen() {
   };
 
 
-  const saveStatusWithDate = async (startDate: string, endDate: string | null) => {
-    try {
-      if (!selectedStatusId) return;
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { error } = await supabase.from('user_statuses').insert({
-        user_id: user.id,
-        status_id: selectedStatusId,
-        start_date: startDate,
-        end_date: endDate,
-      });
-
-      if (error) {
-        Alert.alert('エラー', '追加に失敗しました');
-        return;
-      }
-
-      setShowDateModal(false);
-      setSelectedStatusId(null);
-      loadMedicalRecords();
-    } catch (error) {
-      Alert.alert('エラー', '予期しないエラーが発生しました');
-    }
-  };
-
   const deleteStatus = async (id: string) => {
     try {
       const { error } = await supabase
@@ -347,33 +463,6 @@ export default function ProfileScreen() {
   };
 
 
-  const saveTreatmentWithDate = async (startDate: string, endDate: string | null) => {
-    try {
-      if (!selectedTreatmentId) return;
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { error } = await supabase.from('user_treatments').insert({
-        user_id: user.id,
-        treatment_id: selectedTreatmentId,
-        start_date: startDate,
-        end_date: endDate,
-      });
-
-      if (error) {
-        Alert.alert('エラー', '追加に失敗しました');
-        return;
-      }
-
-      setShowDateModal(false);
-      setSelectedTreatmentId(null);
-      loadMedicalRecords();
-    } catch (error) {
-      Alert.alert('エラー', '予期しないエラーが発生しました');
-    }
-  };
-
   const deleteTreatment = async (id: string) => {
     try {
       const { error } = await supabase
@@ -392,60 +481,6 @@ export default function ProfileScreen() {
     }
   };
 
-
-  const saveMedicationWithDate = async (startDate: string, endDate: string | null) => {
-    try {
-      if (!selectedMedicationId) return;
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      let ingredientId: string;
-      let productId: string | null = null;
-
-      if (selectedMedicationId.startsWith('ingredient-')) {
-        // 成分名を直接選んだ場合
-        ingredientId = selectedMedicationId.replace('ingredient-', '');
-      } else if (selectedMedicationId.startsWith('product-')) {
-        // 製品名を選んだ場合、product_idからingredient_idを取得
-        const actualProductId = selectedMedicationId.replace('product-', '');
-        const { data: productData } = await supabase
-          .from('products')
-          .select('ingredient_id')
-          .eq('id', actualProductId)
-          .single();
-
-        if (!productData) {
-          Alert.alert('エラー', '製品情報の取得に失敗しました');
-          return;
-        }
-        ingredientId = productData.ingredient_id;
-        productId = actualProductId;
-      } else {
-        Alert.alert('エラー', '無効な選択です');
-        return;
-      }
-
-      const { error } = await supabase.from('user_medications').insert({
-        user_id: user.id,
-        ingredient_id: ingredientId,
-        product_id: productId,
-        start_date: startDate,
-        end_date: endDate,
-      });
-
-      if (error) {
-        Alert.alert('エラー', '追加に失敗しました');
-        return;
-      }
-
-      setShowDateModal(false);
-      setSelectedMedicationId(null);
-      loadMedicalRecords();
-    } catch (error) {
-      Alert.alert('エラー', '予期しないエラーが発生しました');
-    }
-  };
 
   const deleteMedication = async (id: string) => {
     try {
@@ -899,29 +934,33 @@ export default function ProfileScreen() {
           <MedicalSection
             title="診断名"
             records={diagnoses}
-            onAdd={() => openSelectModal('diagnosis')}
+            onAdd={() => openMultiSelectModal('diagnosis')}
             onDelete={deleteDiagnosis}
+            onEdit={(id) => openDateEditModal(id, 'diagnosis')}
             loading={loadingMedical}
           />
           <MedicalSection
             title="服薬"
             records={medications}
-            onAdd={() => openSelectModal('medication')}
+            onAdd={() => openMultiSelectModal('medication')}
             onDelete={deleteMedication}
+            onEdit={(id) => openDateEditModal(id, 'medication')}
             loading={loadingMedical}
           />
           <MedicalSection
             title="治療"
             records={treatments}
-            onAdd={() => openSelectModal('treatment')}
+            onAdd={() => openMultiSelectModal('treatment')}
             onDelete={deleteTreatment}
+            onEdit={(id) => openDateEditModal(id, 'treatment')}
             loading={loadingMedical}
           />
           <MedicalSection
             title="ステータス"
             records={statuses}
-            onAdd={() => openSelectModal('status')}
+            onAdd={() => openMultiSelectModal('status')}
             onDelete={deleteStatus}
+            onEdit={(id) => openDateEditModal(id, 'status')}
             loading={loadingMedical}
           />
 
@@ -1032,50 +1071,35 @@ export default function ProfileScreen() {
         />
       </Box>
 
-      {/* 選択モーダル */}
-      <SelectModal
-        isOpen={showSelectModal}
-        onClose={() => setShowSelectModal(false)}
+      {/* 複数選択モーダル */}
+      <MultiSelectModal
+        isOpen={showMultiSelectModal}
+        onClose={() => setShowMultiSelectModal(false)}
         title={
           selectModalType === 'diagnosis' ? '診断名を選択' :
           selectModalType === 'medication' ? '服薬を選択' :
           selectModalType === 'treatment' ? '治療を選択' :
           'ステータスを選択'
         }
-        masters={
-          selectModalType === 'diagnosis' ? diagnosisMasters :
-          selectModalType === 'medication' ? medicationMasters :
-          selectModalType === 'treatment' ? treatmentMasters :
-          statusMasters
+        options={
+          selectModalType === 'diagnosis' ? diagnosisMasters.map(d => ({ id: d.id, name: d.name })) :
+          selectModalType === 'medication' ? medicationMasters.map(m => ({ id: m.id, name: m.name })) :
+          selectModalType === 'treatment' ? treatmentMasters.map(t => ({ id: t.id, name: t.name })) :
+          statusMasters.map(s => ({ id: s.id, name: s.name }))
         }
-        existingItems={
-          selectModalType === 'diagnosis' ? diagnoses :
-          selectModalType === 'medication' ? medications :
-          selectModalType === 'treatment' ? treatments :
-          statuses
-        }
-        onSelect={(id) => handleSelectItem(id, selectModalType)}
-        emptyMessage={
-          selectModalType === 'diagnosis' ? '追加可能な診断名がありません' :
-          selectModalType === 'medication' ? '追加可能な服薬がありません' :
-          selectModalType === 'treatment' ? '追加可能な治療がありません' :
-          '追加可能なステータスがありません'
-        }
+        selectedIds={getSelectedIds(selectModalType)}
+        onSave={handleMultiSelectSave}
       />
 
-      {/* 日付選択モーダル（年月選択） */}
+      {/* 日付編集モーダル（年月選択） */}
       <DatePickerModal
         isOpen={showDateModal}
-        onClose={() => setShowDateModal(false)}
-        onSave={
-          selectedDiagnosisId
-            ? saveDiagnosisWithDate
-            : selectedStatusId
-            ? saveStatusWithDate
-            : selectedTreatmentId
-            ? saveTreatmentWithDate
-            : saveMedicationWithDate
-        }
+        onClose={() => {
+          setShowDateModal(false);
+          setEditingRecordId(null);
+          setEditingRecordType(null);
+        }}
+        onSave={updateRecordDate}
         initialStartYear={startYear}
         initialStartMonth={startMonth}
         initialEndYear={endYear}

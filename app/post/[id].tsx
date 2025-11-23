@@ -5,6 +5,7 @@ import { Alert, Pressable, ScrollView as RNScrollView } from 'react-native';
 
 import PostActionButtons from '@/components/PostActionButtons';
 import ReplyItem from '@/components/ReplyItem';
+import Tag from '@/components/Tag';
 import { Text } from '@/components/Themed';
 import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
@@ -640,19 +641,13 @@ export default function PostDetailScreen() {
           {!isReply && (tags.diagnoses.length > 0 || tags.treatments.length > 0 || tags.medications.length > 0) && (
             <Box className="mb-2 flex-row flex-wrap gap-2">
               {tags.diagnoses.map((tag, index) => (
-                <Box key={`d-${index}`} className="text-center rounded py-1 px-2 bg-fuchsia-400">
-                  <Text className="text-xs">{tag}</Text>
-                </Box>
+                <Tag key={`d-${index}`} name={tag} color="fuchsia-400" size="xs" />
               ))}
               {tags.treatments.map((tag, index) => (
-                <Box key={`t-${index}`} className="text-center rounded py-1 px-2 bg-green-400">
-                  <Text className="text-xs">{tag}</Text>
-                </Box>
+                <Tag key={`t-${index}`} name={tag} color="green-400" size="xs" />
               ))}
               {tags.medications.map((tag, index) => (
-                <Box key={`m-${index}`} className="text-center rounded py-1 px-2 bg-cyan-400">
-                  <Text className="text-xs">{tag}</Text>
-                </Box>
+                <Tag key={`m-${index}`} name={tag} color="cyan-400" size="xs" />
               ))}
             </Box>
           )}

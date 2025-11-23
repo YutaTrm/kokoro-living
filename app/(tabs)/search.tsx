@@ -3,6 +3,7 @@ import { FlatList, Pressable, RefreshControl, TextInput, View } from 'react-nati
 
 import PostItem from '@/components/PostItem';
 import MultiSelectModal from '@/components/search/MultiSelectModal';
+import Tag from '@/components/Tag';
 import { Text } from '@/components/Themed';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonIcon } from '@/components/ui/button';
@@ -583,15 +584,15 @@ export default function SearchScreen() {
                 {getSelectedTagsByType('diagnosis').length > 0 && (
                   <View className="flex flex-row flex-wrap gap-2">
                     {getSelectedTagsByType('diagnosis').map((tagId) => (
-                      <View
+                      <Tag
                         key={tagId}
-                        className="flex flex-row text-center rounded py-1 px-2 bg-fuchsia-400"
+                        name={getTagName(tagId)}
+                        color="fuchsia-400"
+                        size="xs"
+                        onPress={() => removeTag(tagId)}
                       >
-                        <Pressable onPress={() => removeTag(tagId)} className="flex flex-row items-center text-center">
-                          <Text className="text-xs mr-1">{getTagName(tagId)}</Text>
-                          <Icon as={XIcon} size="xs" />
-                        </Pressable>
-                      </View>
+                        <Icon as={XIcon} size="xs" />
+                      </Tag>
                     ))}
                   </View>
                 )}
@@ -613,15 +614,15 @@ export default function SearchScreen() {
                 {getSelectedTagsByType('ingredient').length > 0 && (
                   <View className="flex flex-row flex-wrap gap-2">
                     {getSelectedTagsByType('ingredient').map((tagId) => (
-                      <View
+                      <Tag
                         key={tagId}
-                        className="flex flex-row text-center rounded py-1 px-2 bg-cyan-400"
+                        name={getTagName(tagId)}
+                        color="cyan-400"
+                        size="xs"
+                        onPress={() => removeTag(tagId)}
                       >
-                        <Pressable onPress={() => removeTag(tagId)} className="flex flex-row items-center text-center">
-                          <Text className="text-xs mr-1">{getTagName(tagId)}</Text>
-                          <Icon as={XIcon} size="xs" />
-                        </Pressable>
-                      </View>
+                        <Icon as={XIcon} size="xs" />
+                      </Tag>
                     ))}
                   </View>
                 )}
@@ -643,15 +644,15 @@ export default function SearchScreen() {
                 {getSelectedTagsByType('treatment').length > 0 && (
                   <View className="flex flex-row flex-wrap gap-2">
                     {getSelectedTagsByType('treatment').map((tagId) => (
-                      <View
+                      <Tag
                         key={tagId}
-                        className="flex flex-row text-center rounded py-1 px-2 bg-green-400"
+                        name={getTagName(tagId)}
+                        color="green-400"
+                        size="xs"
+                        onPress={() => removeTag(tagId)}
                       >
-                        <Pressable onPress={() => removeTag(tagId)} className="flex flex-row items-center text-center">
-                          <Text className="text-xs mr-1">{getTagName(tagId)}</Text>
-                          <Icon as={XIcon} size="xs" />
-                        </Pressable>
-                      </View>
+                        <Icon as={XIcon} size="xs" />
+                      </Tag>
                     ))}
                   </View>
                 )}
@@ -673,15 +674,15 @@ export default function SearchScreen() {
                 {getSelectedTagsByType('status').length > 0 && (
                   <View className="flex flex-row flex-wrap gap-2">
                     {getSelectedTagsByType('status').map((tagId) => (
-                      <View
+                      <Tag
                         key={tagId}
-                        className="flex flex-row text-center rounded py-1 px-2 bg-amber-400"
+                        name={getTagName(tagId)}
+                        color="amber-400"
+                        size="xs"
+                        onPress={() => removeTag(tagId)}
                       >
-                        <Pressable onPress={() => removeTag(tagId)} className="flex flex-row items-center text-center">
-                          <Text className="text-xs mr-1">{getTagName(tagId)}</Text>
-                          <Icon as={XIcon} size="xs" />
-                        </Pressable>
-                      </View>
+                        <Icon as={XIcon} size="xs" />
+                      </Tag>
                     ))}
                   </View>
                 )}
