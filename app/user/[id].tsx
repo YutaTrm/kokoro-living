@@ -309,14 +309,12 @@ export default function UserDetailScreen() {
                   {diagnoses.map((d) => {
                     const isEnded = d.endDate !== null;
                     return (
-                      <Box
-                        key={d.id}
-                        className={`px-2 py-1 rounded ${isEnded ? 'bg-gray-100' : 'bg-blue-100'}`}
-                      >
-                        <Text className={`text-xs ${isEnded ? 'text-gray-500' : 'text-blue-700'}`}>
-                          {d.name}
-                        </Text>
-                      </Box>
+                      <>
+                        {/* <Icon className="text-xs" as={FileCheck} /> */}
+                        <Box key={d.id} className="text-center rounded py-1 px-2 bg-fuchsia-400">
+                          <Text className="text-xs">{d.name}</Text>
+                        </Box>
+                      </>
                     );
                   })}
                 </Box>
@@ -329,15 +327,10 @@ export default function UserDetailScreen() {
                 <Text className="text-xs text-typography-500 mb-1">治療</Text>
                 <Box className="flex-row flex-wrap gap-1">
                   {treatments.map((t) => {
-                    const isEnded = t.endDate !== null;
+                    // const isEnded = t.endDate !== null;
                     return (
-                      <Box
-                        key={t.id}
-                        className={`px-2 py-1 rounded ${isEnded ? 'bg-gray-100' : 'bg-green-100'}`}
-                      >
-                        <Text className={`text-xs ${isEnded ? 'text-gray-500' : 'text-green-700'}`}>
-                          {t.name}
-                        </Text>
+                      <Box key={t.id} className="text-center rounded py-1 px-2 bg-green-400">
+                        <Text className="text-xs">{t.name}</Text>
                       </Box>
                     );
                   })}
@@ -353,13 +346,8 @@ export default function UserDetailScreen() {
                   {medications.map((m) => {
                     const isEnded = m.endDate !== null;
                     return (
-                      <Box
-                        key={m.id}
-                        className={`px-2 py-1 rounded ${isEnded ? 'bg-gray-100' : 'bg-purple-100'}`}
-                      >
-                        <Text className={`text-xs ${isEnded ? 'text-gray-500' : 'text-purple-700'}`}>
-                          {m.name}
-                        </Text>
+                      <Box key={m.id} className="text-center rounded py-1 px-2 bg-cyan-400">
+                        <Text className="text-xs">{m.name}</Text>
                       </Box>
                     );
                   })}
@@ -375,13 +363,8 @@ export default function UserDetailScreen() {
                   {statuses.map((s) => {
                     const isEnded = s.endDate !== null;
                     return (
-                      <Box
-                        key={s.id}
-                        className={`px-2 py-1 rounded ${isEnded ? 'bg-gray-100' : 'bg-orange-100'}`}
-                      >
-                        <Text className={`text-xs ${isEnded ? 'text-gray-500' : 'text-orange-700'}`}>
-                          {s.name}
-                        </Text>
+                      <Box key={s.id} className="text-center rounded py-1 px-2 bg-amber-400">
+                        <Text className="text-xs">{s.name}</Text>
                       </Box>
                     );
                   })}
