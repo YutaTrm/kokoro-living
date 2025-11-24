@@ -19,10 +19,11 @@ interface MedicalRecord {
 interface MedicalSectionProps {
   title: string;
   records: MedicalRecord[];
-  onAdd: () => void;
-  onDelete: (id: string) => void;
+  onAdd?: () => void;
+  onDelete?: (id: string) => void;
   onEdit?: (id: string) => void;
   loading?: boolean;
+  readonly?: boolean;
 }
 
 const formatYearMonth = (dateStr: string | null): string => {
@@ -45,6 +46,7 @@ export default function MedicalSection({
   onDelete,
   onEdit,
   loading = false,
+  readonly = false,
 }: MedicalSectionProps) {
   const renderContent = () => {
     // ローディング中はスピナーを表示
@@ -67,13 +69,13 @@ export default function MedicalSection({
     return records.map((record) => (
       <Box key={record.id} className="py-2 px-3 bg-background-50 rounded-lg mb-2">
         <HStack className="justify-between items-center">
-          <VStack>
+          <VStack className="flex-1">
             <Text className="text-base font-semibold">{record.name}</Text>
             <HStack space="xs" className="items-center">
               <Text className="text-sm opacity-60">
                 {formatDateRange(record.startDate, record.endDate)}
               </Text>
-              {onEdit && (
+              {!readonly && onEdit && (
                 <Button
                   onPress={() => onEdit(record.id)}
                   size="xs"
@@ -85,15 +87,17 @@ export default function MedicalSection({
               )}
             </HStack>
           </VStack>
-          <Button
-            onPress={() => onDelete(record.id)}
-            action="negative"
-            size="sm"
-            variant="link"
-            className="p-2"
-          >
-            <ButtonIcon as={TrashIcon} size="lg" />
-          </Button>
+          {!readonly && onDelete && (
+            <Button
+              onPress={() => onDelete(record.id)}
+              action="negative"
+              size="sm"
+              variant="link"
+              className="p-2"
+            >
+              <ButtonIcon as={TrashIcon} size="lg" />
+            </Button>
+          )}
         </HStack>
       </Box>
     ));
@@ -103,9 +107,11 @@ export default function MedicalSection({
     <Box className="px-5 py-4 border-t border-outline-200">
       <HStack className="justify-between items-center mb-3">
         <Heading size="lg">{title}</Heading>
-        <Button onPress={onAdd} action="primary" size="xs" variant="outline" className="rounded">
-          <ButtonIcon as={AddIcon} size="sm" />
-        </Button>
+        {!readonly && onAdd && (
+          <Button onPress={onAdd} action="primary" size="xs" variant="outline" className="rounded">
+            <ButtonIcon as={AddIcon} size="sm" />
+          </Button>
+        )}
       </HStack>
       {renderContent()}
     </Box>

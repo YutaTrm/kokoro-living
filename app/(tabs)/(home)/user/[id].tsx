@@ -1,12 +1,13 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { FlatList, ScrollView as RNScrollView } from 'react-native';
+import { FlatList } from 'react-native';
 
 import PostItem from '@/components/PostItem';
-import Tag from '@/components/Tag';
+import MedicalSection from '@/components/profile/MedicalSection';
 import { Text } from '@/components/Themed';
 import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
+import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
 import { Spinner } from '@/components/ui/spinner';
 import { VStack } from '@/components/ui/vstack';
@@ -42,7 +43,6 @@ interface Post {
 }
 
 export default function UserDetailScreen() {
-  const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -51,6 +51,7 @@ export default function UserDetailScreen() {
   const [medications, setMedications] = useState<MedicalRecord[]>([]);
   const [statuses, setStatuses] = useState<MedicalRecord[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [loadingMedical, setLoadingMedical] = useState(true);
 
   useEffect(() => {
     if (id) {
@@ -78,6 +79,7 @@ export default function UserDetailScreen() {
   };
 
   const loadMedicalRecords = async () => {
+    setLoadingMedical(true);
     try {
       // 診断名を取得
       const { data: diagnosesData } = await supabase
@@ -86,6 +88,7 @@ export default function UserDetailScreen() {
         .eq('user_id', id);
 
       if (diagnosesData) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setDiagnoses(
           diagnosesData.map((d: any) => ({
             id: d.id,
@@ -103,6 +106,7 @@ export default function UserDetailScreen() {
         .eq('user_id', id);
 
       if (treatmentsData) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setTreatments(
           treatmentsData.map((t: any) => ({
             id: t.id,
@@ -116,18 +120,66 @@ export default function UserDetailScreen() {
       // 服薬を取得
       const { data: medicationsData } = await supabase
         .from('user_medications')
-        .select('id, ingredients(name), products(name), start_date, end_date')
+        .select('id, ingredient_id, ingredients(id, name), products(name), start_date, end_date')
         .eq('user_id', id);
 
+      const { data: allProducts } = await supabase.from('products').select('ingredient_id, name');
+
       if (medicationsData) {
-        setMedications(
-          medicationsData.map((m: any) => ({
-            id: m.id,
-            name: m.products?.name || m.ingredients?.name || '',
-            startDate: m.start_date,
-            endDate: m.end_date,
-          }))
-        );
+        const productsByIngredient = new Map<string, string[]>();
+        if (allProducts) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          allProducts.forEach((p: any) => {
+            const existing = productsByIngredient.get(p.ingredient_id);
+            if (existing) {
+              existing.push(p.name);
+            } else {
+              productsByIngredient.set(p.ingredient_id, [p.name]);
+            }
+          });
+        }
+
+        const ingredientMap = new Map<
+          string,
+          {
+            id: string;
+            ingredientName: string;
+            ingredientId: string;
+            startDate: string | null;
+            endDate: string | null;
+          }
+        >();
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        medicationsData.forEach((m: any) => {
+          const ingredientId = m.ingredient_id;
+          const ingredientName = m.ingredients?.name || '';
+
+          if (ingredientName && ingredientId && !ingredientMap.has(ingredientId)) {
+            ingredientMap.set(ingredientId, {
+              id: m.id,
+              ingredientName,
+              ingredientId,
+              startDate: m.start_date,
+              endDate: m.end_date,
+            });
+          }
+        });
+
+        const formatted: MedicalRecord[] = Array.from(ingredientMap.values()).map((item) => {
+          const productNames = productsByIngredient.get(item.ingredientId) || [];
+          return {
+            id: item.id,
+            name:
+              productNames.length > 0
+                ? `${item.ingredientName}(${productNames.join('、')})`
+                : item.ingredientName,
+            startDate: item.startDate,
+            endDate: item.endDate,
+          };
+        });
+
+        setMedications(formatted);
       }
 
       // ステータスを取得
@@ -137,6 +189,7 @@ export default function UserDetailScreen() {
         .eq('user_id', id);
 
       if (statusesData) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setStatuses(
           statusesData.map((s: any) => ({
             id: s.id,
@@ -148,6 +201,8 @@ export default function UserDetailScreen() {
       }
     } catch (error) {
       console.error('医療情報取得エラー:', error);
+    } finally {
+      setLoadingMedical(false);
     }
   };
 
@@ -194,6 +249,7 @@ export default function UserDetailScreen() {
         .in('post_id', postIds);
 
       const diagnosesMap = new Map<string, string[]>();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       diagnosesData?.forEach((d: any) => {
         const name = d.user_diagnoses?.diagnoses?.name;
         if (name) {
@@ -205,6 +261,7 @@ export default function UserDetailScreen() {
       });
 
       const treatmentsMap = new Map<string, string[]>();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       treatmentsData?.forEach((t: any) => {
         const name = t.user_treatments?.treatments?.name;
         if (name) {
@@ -216,20 +273,21 @@ export default function UserDetailScreen() {
       });
 
       const medicationsMap = new Map<string, string[]>();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       medicationsData?.forEach((m: any) => {
         const name = m.user_medications?.ingredients?.name;
         if (name) {
           if (!medicationsMap.has(m.post_id)) {
             medicationsMap.set(m.post_id, []);
           }
-          const medications = medicationsMap.get(m.post_id)!;
-          // 重複を避ける
-          if (!medications.includes(name)) {
-            medications.push(name);
+          const meds = medicationsMap.get(m.post_id)!;
+          if (!meds.includes(name)) {
+            meds.push(name);
           }
         }
       });
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const formattedPosts: Post[] = postsData.map((post: any) => ({
         id: post.id,
         content: post.content,
@@ -250,10 +308,58 @@ export default function UserDetailScreen() {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long' });
+  const renderHeader = () => {
+    if (!profile) return null;
+
+    return (
+      <>
+        {/* プロフィールヘッダー */}
+        <Box className="p-4">
+          <Heading size="md" className="text-primary-500">
+            ユーザープロフィール
+          </Heading>
+          <HStack className="mt-2" space="md">
+            <Avatar size="lg">
+              <AvatarFallbackText>{profile.display_name}</AvatarFallbackText>
+              {profile.avatar_url && <AvatarImage source={{ uri: profile.avatar_url }} />}
+            </Avatar>
+            <VStack className="flex-1 justify-center" space="xs">
+              <Heading size="xl" className="text-primary-300">
+                {profile.display_name}
+              </Heading>
+              <Text className="text-sm text-primary-300">
+                登録日: {new Date(profile.created_at).toLocaleDateString('ja-JP')}
+              </Text>
+            </VStack>
+          </HStack>
+
+          {/* Bio */}
+          {profile.bio && (
+            <Box className="mt-3">
+              <Text className="text-base">{profile.bio}</Text>
+            </Box>
+          )}
+        </Box>
+
+        {/* 医療情報 */}
+        <MedicalSection title="診断名" records={diagnoses} loading={loadingMedical} readonly />
+        <MedicalSection title="服薬" records={medications} loading={loadingMedical} readonly />
+        <MedicalSection title="治療" records={treatments} loading={loadingMedical} readonly />
+        <MedicalSection title="ステータス" records={statuses} loading={loadingMedical} readonly />
+
+        {/* 投稿セクションヘッダー */}
+        <Box className="px-5 py-4 border-t border-outline-200">
+          <Heading size="lg">投稿</Heading>
+        </Box>
+      </>
+    );
   };
+
+  const renderEmptyPosts = () => (
+    <Box className="px-5 py-8">
+      <Text className="text-base text-center opacity-50">まだ投稿がありません</Text>
+    </Box>
+  );
 
   if (loading) {
     return (
@@ -274,101 +380,15 @@ export default function UserDetailScreen() {
   return (
     <>
       <Stack.Screen options={{ title: profile.display_name }} />
-      <RNScrollView className="flex-1 bg-background-0">
-        {/* プロフィールヘッダー */}
-        <Box className="px-4 py-4 border-b border-outline-200">
-          <HStack space="md" className="items-center mb-3">
-            <Avatar size="lg">
-              {profile.avatar_url ? (
-                <AvatarImage source={{ uri: profile.avatar_url }} />
-              ) : (
-                <AvatarFallbackText>{profile.display_name}</AvatarFallbackText>
-              )}
-            </Avatar>
-            <VStack className="flex-1">
-              <Text className="font-bold text-xl">{profile.display_name}</Text>
-              <Text className="text-sm text-typography-500">
-                登録日: {formatDate(profile.created_at)}
-              </Text>
-            </VStack>
-          </HStack>
-
-          {/* Bio */}
-          {profile.bio && (
-            <Box className="mb-3">
-              <Text className="text-base">{profile.bio}</Text>
-            </Box>
-          )}
-
-          {/* 医療情報 */}
-          <VStack space="sm">
-            {/* 診断名 */}
-            {diagnoses.length > 0 && (
-              <Box>
-                <Text className="text-xs text-typography-500 mb-1">診断名</Text>
-                <Box className="flex-row flex-wrap gap-1">
-                  {diagnoses.map((d) => (
-                    <Tag key={d.id} name={d.name} color="fuchsia-400" size="xs" />
-                  ))}
-                </Box>
-              </Box>
-            )}
-
-            {/* 治療 */}
-            {treatments.length > 0 && (
-              <Box>
-                <Text className="text-xs text-typography-500 mb-1">治療</Text>
-                <Box className="flex-row flex-wrap gap-1">
-                  {treatments.map((t) => (
-                    <Tag key={t.id} name={t.name} color="green-400" size="xs" />
-                  ))}
-                </Box>
-              </Box>
-            )}
-
-            {/* 服薬 */}
-            {medications.length > 0 && (
-              <Box>
-                <Text className="text-xs text-typography-500 mb-1">服薬</Text>
-                <Box className="flex-row flex-wrap gap-1">
-                  {medications.map((m) => (
-                    <Tag key={m.id} name={m.name} color="cyan-400" size="xs" />
-                  ))}
-                </Box>
-              </Box>
-            )}
-
-            {/* ステータス */}
-            {statuses.length > 0 && (
-              <Box>
-                <Text className="text-xs text-typography-500 mb-1">ステータス</Text>
-                <Box className="flex-row flex-wrap gap-1">
-                  {statuses.map((s) => (
-                    <Tag key={s.id} name={s.name} color="amber-400" size="xs" />
-                  ))}
-                </Box>
-              </Box>
-            )}
-          </VStack>
-        </Box>
-
-        {/* 投稿一覧 */}
-        <Box className="pt-3">
-          <Text className="px-4 font-semibold text-base mb-2">投稿</Text>
-          {posts.length === 0 ? (
-            <Box className="px-4 py-8">
-              <Text className="text-base text-center opacity-50">まだ投稿がありません</Text>
-            </Box>
-          ) : (
-            <FlatList
-              data={posts}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => <PostItem post={item} disableAvatarTap={true} />}
-              scrollEnabled={false}
-            />
-          )}
-        </Box>
-      </RNScrollView>
+      <Box className="flex-1 bg-background-0">
+        <FlatList
+          data={posts}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => <PostItem post={item} disableAvatarTap />}
+          ListHeaderComponent={renderHeader}
+          ListEmptyComponent={renderEmptyPosts}
+        />
+      </Box>
     </>
   );
 }
