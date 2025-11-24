@@ -1,6 +1,6 @@
 import { ChevronDownIcon, PlusIcon, XIcon } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { FlatList, RefreshControl, TextInput, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, TextInput, View } from 'react-native';
 
 import PostItem from '@/components/PostItem';
 import TagFilterModal from '@/components/search/TagFilterModal';
@@ -23,6 +23,7 @@ import {
   SelectTrigger,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import UserListItem from '@/components/UserListItem';
 import { useMedicationMasters } from '@/src/hooks/useMedicationMasters';
 import { supabase } from '@/src/lib/supabase';
 
@@ -47,12 +48,22 @@ interface TagOption {
   type: 'diagnosis' | 'ingredient' | 'treatment' | 'status';
 }
 
+interface UserResult {
+  user_id: string;
+  display_name: string;
+  avatar_url: string | null;
+  bio: string | null;
+}
+
+type SearchTab = 'users' | 'posts';
 type TagFilterMode = 'and' | 'or';
 type SortOption = 'created_at' | 'updated_at' | 'experienced_at';
 
 export default function SearchScreen() {
+  const [searchTab, setSearchTab] = useState<SearchTab>('users');
   const [searchQuery, setSearchQuery] = useState('');
   const [posts, setPosts] = useState<Post[]>([]);
+  const [users, setUsers] = useState<UserResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -151,11 +162,190 @@ export default function SearchScreen() {
   };
 
   const handleSearch = () => {
+    // 入力チェック
+    if (!searchQuery.trim() && selectedTags.length === 0) {
+      setHasSearched(false);
+      return;
+    }
+
     setHasSearched(true);
     setOffset(0);
     setPosts([]);
+    setUsers([]);
     setHasMore(true);
-    searchPosts(true);
+    if (searchTab === 'posts') {
+      searchPosts(true);
+    } else {
+      searchUsers(true);
+    }
+  };
+
+  const searchUsers = async (reset = false) => {
+    if (!reset && (!hasMore || loadingMore)) return;
+    if (reset && loading) return;
+
+    const currentOffset = reset ? 0 : offset;
+
+    try {
+      if (reset) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
+
+      // 基本クエリ
+      let query = supabase
+        .from('users')
+        .select('user_id, display_name, avatar_url, bio');
+
+      // キーワード検索（bio）
+      if (searchQuery.trim()) {
+        query = query.ilike('bio', `%${searchQuery.trim()}%`);
+      }
+
+      // ページネーション
+      query = query.range(currentOffset, currentOffset + LIMIT - 1);
+
+      const { data: usersData, error } = await query;
+
+      if (error) throw error;
+
+      let filteredUsers = usersData || [];
+
+      // タグフィルター
+      if (selectedTags.length > 0) {
+        filteredUsers = await filterUsersByTags(filteredUsers, selectedTags, tagFilterMode);
+      }
+
+      if (reset) {
+        // 重複を除去
+        const uniqueUsers = filteredUsers.filter(
+          (user, index, self) => index === self.findIndex((u) => u.user_id === user.user_id)
+        );
+        setUsers(uniqueUsers);
+        setHasMore(uniqueUsers.length === LIMIT);
+      } else {
+        setUsers((prev) => {
+          const combined = [...prev, ...filteredUsers];
+          // 重複を除去
+          return combined.filter(
+            (user, index, self) => index === self.findIndex((u) => u.user_id === user.user_id)
+          );
+        });
+        setHasMore(filteredUsers.length === LIMIT);
+      }
+      setOffset(currentOffset + LIMIT);
+    } catch (error) {
+      console.error('ユーザー検索エラー:', error);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+      setRefreshing(false);
+    }
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const filterUsersByTags = async (usersData: any[], tags: string[], mode: TagFilterMode) => {
+    const diagnosisIds = tags
+      .filter((t) => t.startsWith('diagnosis-'))
+      .map((t) => t.replace('diagnosis-', ''));
+
+    const ingredientIds = tags
+      .filter((t) => t.startsWith('ingredient-') || t.startsWith('product-'))
+      .map((t) => {
+        const med = medicationMasters.find((m) => m.id === t);
+        return med?.ingredientId || '';
+      })
+      .filter(Boolean);
+
+    const treatmentIds = tags
+      .filter((t) => t.startsWith('treatment-'))
+      .map((t) => t.replace('treatment-', ''));
+    const statusIds = tags
+      .filter((t) => t.startsWith('status-'))
+      .map((t) => t.replace('status-', ''));
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const filteredUsers: any[] = [];
+
+    for (const user of usersData) {
+      const matchResults: boolean[] = [];
+
+      // 診断名チェック
+      if (diagnosisIds.length > 0) {
+        const { data } = await supabase
+          .from('user_diagnoses')
+          .select('diagnosis_id')
+          .eq('user_id', user.user_id);
+
+        const userDiagnosisIds = data?.map((d) => d.diagnosis_id) || [];
+        if (mode === 'and') {
+          matchResults.push(diagnosisIds.every((id) => userDiagnosisIds.includes(id)));
+        } else {
+          matchResults.push(diagnosisIds.some((id) => userDiagnosisIds.includes(id)));
+        }
+      }
+
+      // 服薬チェック
+      if (ingredientIds.length > 0) {
+        const { data } = await supabase
+          .from('user_medications')
+          .select('ingredient_id')
+          .eq('user_id', user.user_id);
+
+        const userIngredientIds = data?.map((m) => m.ingredient_id).filter(Boolean) || [];
+        if (mode === 'and') {
+          matchResults.push(ingredientIds.every((id) => userIngredientIds.includes(id)));
+        } else {
+          matchResults.push(ingredientIds.some((id) => userIngredientIds.includes(id)));
+        }
+      }
+
+      // 治療法チェック
+      if (treatmentIds.length > 0) {
+        const { data } = await supabase
+          .from('user_treatments')
+          .select('treatment_id')
+          .eq('user_id', user.user_id);
+
+        const userTreatmentIds = data?.map((t) => t.treatment_id) || [];
+        if (mode === 'and') {
+          matchResults.push(treatmentIds.every((id) => userTreatmentIds.includes(id)));
+        } else {
+          matchResults.push(treatmentIds.some((id) => userTreatmentIds.includes(id)));
+        }
+      }
+
+      // ステータスチェック
+      if (statusIds.length > 0) {
+        const { data } = await supabase
+          .from('user_statuses')
+          .select('status_id')
+          .eq('user_id', user.user_id);
+
+        const userStatusIds = data?.map((s) => s.status_id) || [];
+        if (mode === 'and') {
+          matchResults.push(statusIds.every((id) => userStatusIds.includes(id)));
+        } else {
+          matchResults.push(statusIds.some((id) => userStatusIds.includes(id)));
+        }
+      }
+
+      // フィルター結果の判定
+      if (matchResults.length === 0) {
+        filteredUsers.push(user);
+      } else if (mode === 'and') {
+        if (matchResults.every((r) => r)) {
+          filteredUsers.push(user);
+        }
+      } else {
+        if (matchResults.some((r) => r)) {
+          filteredUsers.push(user);
+        }
+      }
+    }
+
+    return filteredUsers;
   };
 
   const searchPosts = async (reset = false) => {
@@ -394,13 +584,22 @@ export default function SearchScreen() {
     setRefreshing(true);
     setOffset(0);
     setPosts([]);
+    setUsers([]);
     setHasMore(true);
-    searchPosts(true);
+    if (searchTab === 'posts') {
+      searchPosts(true);
+    } else {
+      searchUsers(true);
+    }
   };
 
   const handleLoadMore = () => {
     if (!loadingMore && hasMore && hasSearched) {
-      searchPosts(false);
+      if (searchTab === 'posts') {
+        searchPosts(false);
+      } else {
+        searchUsers(false);
+      }
     }
   };
 
@@ -410,6 +609,17 @@ export default function SearchScreen() {
     setSortBy('created_at');
     setTagFilterMode('and');
     setPosts([]);
+    setUsers([]);
+    setHasSearched(false);
+    setOffset(0);
+    setHasMore(true);
+  };
+
+  const handleTabChange = (tab: SearchTab) => {
+    if (tab === searchTab) return;
+    setSearchTab(tab);
+    setPosts([]);
+    setUsers([]);
     setHasSearched(false);
     setOffset(0);
     setHasMore(true);
@@ -467,7 +677,7 @@ export default function SearchScreen() {
     if (!hasSearched) {
       return (
         <Box className="py-8 items-center">
-          <Text className="text-typography-500">キーワードかタグで検索してください</Text>
+          <Text className="text-typography-500">キーワードを入力するかタグを選んでください</Text>
         </Box>
       );
     }
@@ -481,6 +691,26 @@ export default function SearchScreen() {
 
   return (
     <Box className="flex-1 bg-background-0">
+      {/* 検索タブ */}
+      <HStack className="border-b border-outline-200">
+        <Pressable
+          onPress={() => handleTabChange('users')}
+          className={`flex-1 py-3 ${searchTab === 'users' ? 'border-b-2 border-primary-500' : ''}`}
+        >
+          <Text className={`text-center font-semibold ${searchTab === 'users' ? 'text-primary-500' : 'text-typography-500'}`}>
+            ユーザー
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => handleTabChange('posts')}
+          className={`flex-1 py-3 ${searchTab === 'posts' ? 'border-b-2 border-primary-500' : ''}`}
+        >
+          <Text className={`text-center font-semibold ${searchTab === 'posts' ? 'text-primary-500' : 'text-typography-500'}`}>
+            投稿
+          </Text>
+        </Pressable>
+      </HStack>
+
       {/* 検索フォーム */}
       <Box className="px-4 py-3 border-b border-outline-200">
         {/* タグで絞り込み */}
@@ -520,11 +750,13 @@ export default function SearchScreen() {
         </Box>
 
         {/* キーワード検索 + 検索ボタン */}
-        <Text className="text-sm font-semibold my-2 text-typography-700">キーワード検索</Text>
+        <Text className="text-sm font-semibold my-2 text-typography-700">
+          {searchTab === 'posts' ? '投稿内容で検索' : '自己紹介内容で検索'}
+        </Text>
         <HStack space="sm" className="mb-3">
           <TextInput
             className="flex-1 border border-outline-200 rounded-lg px-3 py-2 text-base text-typography-900"
-            placeholder="キーワードで検索..."
+            placeholder="キーワード"
             placeholderTextColor="#999"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -534,38 +766,42 @@ export default function SearchScreen() {
         </HStack>
 
         <HStack className="flex justify-between" space="sm">
-          {/* ソート選択 */}
-          <Box>
-            <HStack className="justify-end items-center">
-              <Text className="text-sm text-typography-600 mr-2">並び順:</Text>
-              <Select
-                selectedValue={sortBy}
-                onValueChange={(value) => setSortBy(value as SortOption)}
-              >
-                <SelectTrigger size="sm" className="w-28">
-                  <SelectInput
-                    placeholder="選択"
-                    value={
-                      sortBy === 'created_at' ? '投稿日' :
-                      sortBy === 'updated_at' ? '更新日' : '体験日'
-                    }
-                  />
-                  <SelectIcon as={ChevronDownIcon} className="mr-2" />
-                </SelectTrigger>
-                <SelectPortal>
-                  <SelectBackdrop />
-                  <SelectContent>
-                    <SelectDragIndicatorWrapper>
-                      <SelectDragIndicator />
-                    </SelectDragIndicatorWrapper>
-                    <SelectItem label="投稿日" value="created_at" />
-                    <SelectItem label="更新日" value="updated_at" />
-                    <SelectItem label="体験日" value="experienced_at" />
-                  </SelectContent>
-                </SelectPortal>
-              </Select>
-            </HStack>
-          </Box>
+          {/* ソート選択（投稿タブのみ表示） */}
+          {searchTab === 'posts' ? (
+            <Box>
+              <HStack className="justify-end items-center">
+                <Text className="text-sm text-typography-600 mr-2">並び順:</Text>
+                <Select
+                  selectedValue={sortBy}
+                  onValueChange={(value) => setSortBy(value as SortOption)}
+                >
+                  <SelectTrigger size="sm" className="w-28">
+                    <SelectInput
+                      placeholder="選択"
+                      value={
+                        sortBy === 'created_at' ? '投稿日' :
+                        sortBy === 'updated_at' ? '更新日' : '体験日'
+                      }
+                    />
+                    <SelectIcon as={ChevronDownIcon} className="mr-2" />
+                  </SelectTrigger>
+                  <SelectPortal>
+                    <SelectBackdrop />
+                    <SelectContent>
+                      <SelectDragIndicatorWrapper>
+                        <SelectDragIndicator />
+                      </SelectDragIndicatorWrapper>
+                      <SelectItem label="投稿日" value="created_at" />
+                      <SelectItem label="更新日" value="updated_at" />
+                      <SelectItem label="体験日" value="experienced_at" />
+                    </SelectContent>
+                  </SelectPortal>
+                </Select>
+              </HStack>
+            </Box>
+          ) : (
+            <Box />
+          )}
 
           <HStack className="flex grow justify-end gap-2">
             {/* 検索クリアボタン */}
@@ -580,18 +816,40 @@ export default function SearchScreen() {
       </Box>
 
       {/* 検索結果 */}
-      <FlatList
-        data={posts}
-        renderItem={({ item }) => <PostItem post={item} />}
-        keyExtractor={(item, index) => `${item.id}-${index}`}
-        onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.5}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
-        ListFooterComponent={renderFooter}
-        ListEmptyComponent={renderEmpty}
-      />
+      {searchTab === 'posts' ? (
+        <FlatList
+          data={posts}
+          renderItem={({ item }) => <PostItem post={item} />}
+          keyExtractor={(item, index) => `${item.id}-${index}`}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+          ListFooterComponent={renderFooter}
+          ListEmptyComponent={renderEmpty}
+        />
+      ) : (
+        <FlatList
+          data={users}
+          renderItem={({ item }) => (
+            <UserListItem
+              userId={item.user_id}
+              displayName={item.display_name}
+              avatarUrl={item.avatar_url}
+              bio={item.bio}
+            />
+          )}
+          keyExtractor={(item, index) => `${item.user_id}-${index}`}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+          ListFooterComponent={renderFooter}
+          ListEmptyComponent={renderEmpty}
+        />
+      )}
 
       {/* タグ選択モーダル */}
       <TagFilterModal
