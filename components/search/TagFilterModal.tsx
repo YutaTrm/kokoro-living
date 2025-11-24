@@ -1,6 +1,6 @@
+import { CircleIcon } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { ScrollView } from 'react-native';
-import { CircleIcon } from 'lucide-react-native';
 
 import { Text } from '@/components/Themed';
 import { Box } from '@/components/ui/box';
@@ -88,12 +88,13 @@ export default function TagFilterModal({
               value={tag.id}
               isChecked={localSelectedIds.includes(tag.id)}
               onChange={() => handleToggle(tag.id)}
-              size="sm"
+              size="md"
+              className="flex items-center"
             >
               <CheckboxIndicator>
                 <CheckboxIcon as={CheckIcon} />
               </CheckboxIndicator>
-              <CheckboxLabel className="text-sm">{tag.name}</CheckboxLabel>
+              <CheckboxLabel className="text-md mb-1 pt-[4px]">{tag.name}</CheckboxLabel>
             </Checkbox>
           ))}
         </VStack>
@@ -116,13 +117,13 @@ export default function TagFilterModal({
               onChange={(value) => setLocalFilterMode(value as TagFilterMode)}
             >
               <HStack space="lg">
-                <Radio value="and" size="sm">
+                <Radio value="and" size="md">
                   <RadioIndicator>
                     <RadioIcon as={CircleIcon} />
                   </RadioIndicator>
                   <RadioLabel className="text-sm">全て含む</RadioLabel>
                 </Radio>
-                <Radio value="or" size="sm">
+                <Radio value="or" size="md">
                   <RadioIndicator>
                     <RadioIcon as={CircleIcon} />
                   </RadioIndicator>
