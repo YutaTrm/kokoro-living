@@ -4,6 +4,7 @@ import { FlatList } from 'react-native';
 
 import PostItem from '@/components/PostItem';
 import MedicalSection from '@/components/profile/MedicalSection';
+import ProfileTabBar, { TabType } from '@/components/profile/ProfileTabBar';
 import { Text } from '@/components/Themed';
 import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
@@ -46,20 +47,32 @@ export default function UserDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [activeTab, setActiveTab] = useState<TabType>('profile');
   const [diagnoses, setDiagnoses] = useState<MedicalRecord[]>([]);
   const [treatments, setTreatments] = useState<MedicalRecord[]>([]);
   const [medications, setMedications] = useState<MedicalRecord[]>([]);
   const [statuses, setStatuses] = useState<MedicalRecord[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [likedPosts, setLikedPosts] = useState<Post[]>([]);
   const [loadingMedical, setLoadingMedical] = useState(true);
+  const [loadingPosts, setLoadingPosts] = useState(false);
+  const [loadingLikes, setLoadingLikes] = useState(false);
 
   useEffect(() => {
     if (id) {
       loadUserProfile();
       loadMedicalRecords();
-      loadUserPosts();
     }
   }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    if (activeTab === 'posts' && posts.length === 0) {
+      loadUserPosts();
+    } else if (activeTab === 'likes' && likedPosts.length === 0) {
+      loadLikedPosts();
+    }
+  }, [id, activeTab]);
 
   const loadUserProfile = async () => {
     try {
@@ -228,6 +241,7 @@ export default function UserDetailScreen() {
   };
 
   const loadUserPosts = async () => {
+    setLoadingPosts(true);
     try {
       const { data: postsData, error: postsError } = await supabase
         .from('posts')
@@ -326,6 +340,137 @@ export default function UserDetailScreen() {
       setPosts(formattedPosts);
     } catch (error) {
       console.error('投稿取得エラー:', error);
+    } finally {
+      setLoadingPosts(false);
+    }
+  };
+
+  const loadLikedPosts = async () => {
+    setLoadingLikes(true);
+    try {
+      // いいねした投稿のIDを取得
+      const { data: likesData, error: likesError } = await supabase
+        .from('likes')
+        .select('post_id')
+        .eq('user_id', id)
+        .order('created_at', { ascending: false });
+
+      if (likesError) throw likesError;
+
+      if (!likesData || likesData.length === 0) {
+        setLikedPosts([]);
+        return;
+      }
+
+      const postIds = likesData.map((l) => l.post_id);
+
+      // 投稿データを取得
+      const { data: postsData, error: postsError } = await supabase
+        .from('posts')
+        .select('id, content, created_at, user_id')
+        .in('id', postIds)
+        .is('parent_post_id', null);
+
+      if (postsError) throw postsError;
+
+      if (!postsData || postsData.length === 0) {
+        setLikedPosts([]);
+        return;
+      }
+
+      // ユーザー情報を取得
+      const userIds = [...new Set(postsData.map((p) => p.user_id))];
+      const { data: usersData } = await supabase
+        .from('users')
+        .select('user_id, display_name, avatar_url')
+        .in('user_id', userIds);
+
+      const usersMap = new Map(usersData?.map((u) => [u.user_id, u]) || []);
+
+      // タグを取得
+      const { data: diagnosesData } = await supabase
+        .from('post_diagnoses')
+        .select('post_id, user_diagnoses(diagnoses(name))')
+        .in('post_id', postIds);
+
+      const { data: treatmentsData } = await supabase
+        .from('post_treatments')
+        .select('post_id, user_treatments(treatments(name))')
+        .in('post_id', postIds);
+
+      const { data: medicationsData } = await supabase
+        .from('post_medications')
+        .select('post_id, user_medications(ingredients(name))')
+        .in('post_id', postIds);
+
+      const diagnosesMap = new Map<string, string[]>();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      diagnosesData?.forEach((d: any) => {
+        const name = d.user_diagnoses?.diagnoses?.name;
+        if (name) {
+          if (!diagnosesMap.has(d.post_id)) {
+            diagnosesMap.set(d.post_id, []);
+          }
+          diagnosesMap.get(d.post_id)?.push(name);
+        }
+      });
+
+      const treatmentsMap = new Map<string, string[]>();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      treatmentsData?.forEach((t: any) => {
+        const name = t.user_treatments?.treatments?.name;
+        if (name) {
+          if (!treatmentsMap.has(t.post_id)) {
+            treatmentsMap.set(t.post_id, []);
+          }
+          treatmentsMap.get(t.post_id)?.push(name);
+        }
+      });
+
+      const medicationsMap = new Map<string, string[]>();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      medicationsData?.forEach((m: any) => {
+        const name = m.user_medications?.ingredients?.name;
+        if (name) {
+          if (!medicationsMap.has(m.post_id)) {
+            medicationsMap.set(m.post_id, []);
+          }
+          const meds = medicationsMap.get(m.post_id)!;
+          if (!meds.includes(name)) {
+            meds.push(name);
+          }
+        }
+      });
+
+      // いいねの順序を保持するためにpostIdsの順序でソート
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const formattedPosts: Post[] = postIds
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .map((postId) => postsData.find((p: any) => p.id === postId))
+        .filter(Boolean)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .map((post: any) => {
+          const user = usersMap.get(post.user_id);
+          return {
+            id: post.id,
+            content: post.content,
+            created_at: post.created_at,
+            user: {
+              display_name: user?.display_name || 'Unknown',
+              user_id: post.user_id,
+              avatar_url: user?.avatar_url || null,
+            },
+            diagnoses: diagnosesMap.get(post.id) || [],
+            treatments: treatmentsMap.get(post.id) || [],
+            medications: medicationsMap.get(post.id) || [],
+          };
+        });
+
+      setLikedPosts(formattedPosts);
+    } catch (error) {
+      console.error('いいね取得エラー:', error);
+    } finally {
+      setLoadingLikes(false);
     }
   };
 
@@ -359,25 +504,48 @@ export default function UserDetailScreen() {
           )}
         </Box>
 
-        {/* 医療情報 */}
-        <MedicalSection title="診断名" records={diagnoses} loading={loadingMedical} readonly />
-        <MedicalSection title="服薬" records={medications} loading={loadingMedical} readonly />
-        <MedicalSection title="治療" records={treatments} loading={loadingMedical} readonly />
-        <MedicalSection title="ステータス" records={statuses} loading={loadingMedical} readonly />
+        {/* タブバー */}
+        <ProfileTabBar activeTab={activeTab} onTabChange={setActiveTab} showBookmarks={false} />
 
-        {/* 投稿セクションヘッダー */}
-        <Box className="p-4 border-t border-outline-200">
-          <Heading size="lg">投稿</Heading>
-        </Box>
+        {/* プロフィールタブの内容 */}
+        {activeTab === 'profile' && (
+          <>
+            <MedicalSection title="診断名" records={diagnoses} loading={loadingMedical} readonly />
+            <MedicalSection title="服薬" records={medications} loading={loadingMedical} readonly />
+            <MedicalSection title="治療" records={treatments} loading={loadingMedical} readonly />
+            <MedicalSection title="ステータス" records={statuses} loading={loadingMedical} readonly />
+          </>
+        )}
       </>
     );
   };
 
-  const renderEmptyPosts = () => (
-    <Box className="px-5 py-8">
-      <Text className="text-base text-center opacity-50">まだ投稿がありません</Text>
-    </Box>
-  );
+  const renderEmptyContent = () => {
+    if (activeTab === 'profile') return null;
+
+    const isLoading = activeTab === 'posts' ? loadingPosts : loadingLikes;
+    if (isLoading) {
+      return (
+        <Box className="px-5 py-8 items-center">
+          <Spinner size="small" />
+        </Box>
+      );
+    }
+
+    const message = activeTab === 'posts' ? 'まだ投稿がありません' : 'まだいいねがありません';
+    return (
+      <Box className="px-5 py-8">
+        <Text className="text-base text-center opacity-50">{message}</Text>
+      </Box>
+    );
+  };
+
+  const getListData = () => {
+    if (activeTab === 'profile') return [];
+    if (activeTab === 'posts') return posts;
+    if (activeTab === 'likes') return likedPosts;
+    return [];
+  };
 
   if (loading) {
     return (
@@ -400,11 +568,11 @@ export default function UserDetailScreen() {
       <Stack.Screen options={{ title: profile.display_name }} />
       <Box className="flex-1 bg-background-0">
         <FlatList
-          data={posts}
+          data={getListData()}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => <PostItem post={item} disableAvatarTap />}
           ListHeaderComponent={renderHeader}
-          ListEmptyComponent={renderEmptyPosts}
+          ListEmptyComponent={renderEmptyContent}
         />
       </Box>
     </>

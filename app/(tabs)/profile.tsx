@@ -11,6 +11,7 @@ import PostItem from '@/components/PostItem';
 import DatePickerModal from '@/components/profile/DatePickerModal';
 import MedicalSection from '@/components/profile/MedicalSection';
 import ProfileHeader from '@/components/profile/ProfileHeader';
+import ProfileTabBar, { TabType } from '@/components/profile/ProfileTabBar';
 import TextEditModal from '@/components/profile/TextEditModal';
 import MultiSelectModal from '@/components/search/MultiSelectModal';
 import { Text } from '@/components/Themed';
@@ -70,8 +71,6 @@ interface MasterData {
   name: string;
   ingredientId?: string; // 服薬マスター用: 成分ID
 }
-
-type TabType = 'profile' | 'posts' | 'likes' | 'bookmarks';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -930,44 +929,7 @@ export default function ProfileScreen() {
       />
 
       {/* タブバー */}
-      <HStack className="border-b border-outline-200">
-        <Button
-          onPress={() => setActiveTab('profile')}
-          variant="link"
-          className={`flex-1 rounded-none ${activeTab === 'profile' ? 'border-b-2 border-primary-500' : ''}`}
-        >
-          <ButtonText className={activeTab === 'profile' ? 'text-primary-600 font-semibold' : 'text-typography-500'}>
-            プロフィール
-          </ButtonText>
-        </Button>
-        <Button
-          onPress={() => setActiveTab('posts')}
-          variant="link"
-          className={`flex-1 rounded-none ${activeTab === 'posts' ? 'border-b-2 border-primary-500' : ''}`}
-        >
-          <ButtonText className={activeTab === 'posts' ? 'text-primary-600 font-semibold' : 'text-typography-500'}>
-            投稿
-          </ButtonText>
-        </Button>
-        <Button
-          onPress={() => setActiveTab('likes')}
-          variant="link"
-          className={`flex-1 rounded-none ${activeTab === 'likes' ? 'border-b-2 border-primary-500' : ''}`}
-        >
-          <ButtonText className={activeTab === 'likes' ? 'text-primary-600 font-semibold' : 'text-typography-500'}>
-            いいね
-          </ButtonText>
-        </Button>
-        <Button
-          onPress={() => setActiveTab('bookmarks')}
-          variant="link"
-          className={`flex-1 rounded-none ${activeTab === 'bookmarks' ? 'border-b-2 border-primary-500' : ''}`}
-        >
-          <ButtonText className={activeTab === 'bookmarks' ? 'text-primary-600 font-semibold' : 'text-typography-500'}>
-            ブックマーク
-          </ButtonText>
-        </Button>
-      </HStack>
+      <ProfileTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* プロフィールタブの内容 */}
       {activeTab === 'profile' && (
