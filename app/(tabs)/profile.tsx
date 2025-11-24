@@ -21,6 +21,7 @@ import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
+import { useFollow } from '@/src/hooks/useFollow';
 import { usePostsData } from '@/src/hooks/usePostsData';
 import { supabase } from '@/src/lib/supabase';
 
@@ -77,6 +78,8 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('profile');
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const { counts: followCounts } = useFollow(currentUserId);
 
   const [diagnoses, setDiagnoses] = useState<MedicalRecord[]>([]);
   const [medications, setMedications] = useState<MedicalRecord[]>([]);
@@ -791,8 +794,11 @@ export default function ProfileScreen() {
 
       if (authError || !user) {
         setLoading(false);
+        setCurrentUserId(null);
         return;
       }
+
+      setCurrentUserId(user.id);
 
       // usersテーブルからプロフィール情報を取得
       const { data: userData, error: userError } = await supabase
@@ -919,6 +925,18 @@ export default function ProfileScreen() {
   };
 
 
+  const handleFollowingPress = () => {
+    if (currentUserId) {
+      router.push(`/(tabs)/(home)/user/${currentUserId}/following`);
+    }
+  };
+
+  const handleFollowersPress = () => {
+    if (currentUserId) {
+      router.push(`/(tabs)/(home)/user/${currentUserId}/followers`);
+    }
+  };
+
   const renderHeader = () => (
     <>
       <ProfileHeader
@@ -926,6 +944,9 @@ export default function ProfileScreen() {
         onLogout={handleLogoutPress}
         onDeleteAccount={handleDeleteAccountPress}
         onEditName={() => setShowNameEditModal(true)}
+        followCounts={followCounts}
+        onFollowingPress={handleFollowingPress}
+        onFollowersPress={handleFollowersPress}
       />
 
       {/* タブバー */}

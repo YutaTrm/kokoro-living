@@ -1,7 +1,8 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { FlatList } from 'react-native';
+import { FlatList, Pressable } from 'react-native';
 
+import FollowButton from '@/components/FollowButton';
 import PostItem from '@/components/PostItem';
 import MedicalSection from '@/components/profile/MedicalSection';
 import ProfileTabBar, { TabType } from '@/components/profile/ProfileTabBar';
@@ -12,6 +13,7 @@ import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
 import { Spinner } from '@/components/ui/spinner';
 import { VStack } from '@/components/ui/vstack';
+import { useFollow } from '@/src/hooks/useFollow';
 import { supabase } from '@/src/lib/supabase';
 
 interface UserProfile {
@@ -45,6 +47,8 @@ interface Post {
 
 export default function UserDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
+  const { isFollowing, isLoading: followLoading, toggleFollow, counts, isOwnProfile, currentUserId } = useFollow(id ?? null);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('profile');
@@ -474,6 +478,11 @@ export default function UserDetailScreen() {
     }
   };
 
+  const handleFollowCountPress = (type: 'following' | 'followers') => {
+    if (!id) return;
+    router.push(`/(tabs)/(home)/user/${id}/${type}`);
+  };
+
   const renderHeader = () => {
     if (!profile) return null;
 
@@ -481,18 +490,45 @@ export default function UserDetailScreen() {
       <>
         {/* プロフィールヘッダー */}
         <Box className="p-4">
-          <HStack className="mt-2" space="md">
+          <HStack className="mt-2 items-start" space="md">
             <Avatar size="lg">
               <AvatarFallbackText>{profile.display_name}</AvatarFallbackText>
               {profile.avatar_url && <AvatarImage source={{ uri: profile.avatar_url }} />}
             </Avatar>
-            <VStack className="flex-1 justify-center" space="xs">
-              <Heading size="xl" className="text-primary-300">
-                {profile.display_name}
-              </Heading>
-              <Text className="text-sm text-primary-300">
-                登録日: {new Date(profile.created_at).toLocaleDateString('ja-JP')}
-              </Text>
+            <VStack className="flex-1" space="xs">
+              <HStack className="justify-between items-start">
+                <VStack>
+                  <Heading size="xl" className="text-primary-300">
+                    {profile.display_name}
+                  </Heading>
+                  <Text className="text-sm text-primary-300">
+                    登録日: {new Date(profile.created_at).toLocaleDateString('ja-JP')}
+                  </Text>
+                </VStack>
+              </HStack>
+              {/* フォロー数 */}
+              <HStack space="md" className="items-center mt-2">
+                <Pressable onPress={() => handleFollowCountPress('following')}>
+                  <HStack space="xs">
+                    <Text className="font-bold">{counts.followingCount}</Text>
+                    <Text className="text-typography-500">フォロー</Text>
+                  </HStack>
+                </Pressable>
+                <Pressable onPress={() => handleFollowCountPress('followers')}>
+                  <HStack space="xs">
+                    <Text className="font-bold">{counts.followersCount}</Text>
+                    <Text className="text-typography-500">フォロワー</Text>
+                  </HStack>
+                </Pressable>
+                {!isOwnProfile && currentUserId && (
+                  <FollowButton
+                    isFollowing={isFollowing}
+                    isLoading={followLoading}
+                    onToggle={toggleFollow}
+                    isLoggedIn={!!currentUserId}
+                  />
+                )}
+              </HStack>
             </VStack>
           </HStack>
 

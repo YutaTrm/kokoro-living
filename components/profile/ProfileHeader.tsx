@@ -1,5 +1,5 @@
 import { Pencil } from 'lucide-react-native';
-import { TouchableOpacity } from 'react-native';
+import { Pressable, TouchableOpacity } from 'react-native';
 
 import { Text } from '@/components/Themed';
 import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
@@ -18,11 +18,19 @@ interface UserProfile {
   createdAt: string | null;
 }
 
+interface FollowCounts {
+  followingCount: number;
+  followersCount: number;
+}
+
 interface ProfileHeaderProps {
   profile: UserProfile;
   onLogout: () => void;
   onDeleteAccount: () => void;
   onEditName: () => void;
+  followCounts?: FollowCounts;
+  onFollowingPress?: () => void;
+  onFollowersPress?: () => void;
 }
 
 export default function ProfileHeader({
@@ -30,6 +38,9 @@ export default function ProfileHeader({
   onLogout,
   onDeleteAccount,
   onEditName,
+  followCounts,
+  onFollowingPress,
+  onFollowersPress,
 }: ProfileHeaderProps) {
   return (
     <Box className="p-4">
@@ -63,6 +74,23 @@ export default function ProfileHeader({
             <Text className="text-sm text-primary-300">
               アプリ登録日時: {new Date(profile.createdAt).toLocaleDateString('ja-JP')}
             </Text>
+          )}
+          {/* フォロー数 */}
+          {followCounts && (
+            <HStack space="md" className="mt-1">
+              <Pressable onPress={onFollowingPress}>
+                <HStack space="xs">
+                  <Text className="font-bold">{followCounts.followingCount}</Text>
+                  <Text className="text-typography-500">フォロー</Text>
+                </HStack>
+              </Pressable>
+              <Pressable onPress={onFollowersPress}>
+                <HStack space="xs">
+                  <Text className="font-bold">{followCounts.followersCount}</Text>
+                  <Text className="text-typography-500">フォロワー</Text>
+                </HStack>
+              </Pressable>
+            </HStack>
           )}
         </VStack>
       </HStack>
