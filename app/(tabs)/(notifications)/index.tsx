@@ -184,11 +184,11 @@ export default function NotificationsScreen() {
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'like':
-        return <Heart size={16} color="#ef4444" fill="#ef4444" />;
+        return <Heart size={20} color="#ef4444" fill="#ef4444" />;
       case 'reply':
-        return <MessageCircle size={16} color="#3b82f6" />;
+        return <MessageCircle size={20} color="#3b82f6" />;
       case 'follow':
-        return <UserPlus size={16} color="#22c55e" />;
+        return <UserPlus size={20} color="#22c55e" />;
       default:
         return null;
     }
@@ -215,13 +215,14 @@ export default function NotificationsScreen() {
         className={`p-4 border-b border-outline-200 ${!item.is_read ? 'bg-primary-50' : ''}`}
         space="md"
       >
-        <Avatar size="sm">
-          <AvatarFallbackText>{item.actor.display_name}</AvatarFallbackText>
-          {item.actor.avatar_url && <AvatarImage source={{ uri: item.actor.avatar_url }} />}
-        </Avatar>
+        {getNotificationIcon(item.type)}
         <VStack className="flex-1" space="xs">
-          <HStack className="items-center" space="xs">
-            {getNotificationIcon(item.type)}
+          <Avatar size="sm">
+              <AvatarFallbackText>{item.actor.display_name}</AvatarFallbackText>
+              {item.actor.avatar_url && <AvatarImage source={{ uri: item.actor.avatar_url }} />}
+            </Avatar>
+          <HStack className="items-start" space="xs">
+
             <Text className="flex-1 text-sm">
               <Text className="font-semibold">{item.actor.display_name}</Text>
               {getNotificationMessage(item.type)}
@@ -235,7 +236,7 @@ export default function NotificationsScreen() {
               {item.post_content}
             </Text>
           )}
-          <Text className="text-xs text-typography-400">{formatDate(item.created_at)}</Text>
+          <Text className="text-xs text-typography-400 text-right">{formatDate(item.created_at)}</Text>
         </VStack>
       </HStack>
     </Pressable>
