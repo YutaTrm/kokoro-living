@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { TextInput } from 'react-native';
 
 import { Text } from '@/components/Themed';
 import { Button, ButtonText } from '@/components/ui/button';
@@ -35,16 +36,24 @@ export default function TextEditModal({
   maxLength = 500,
   multiline = true,
 }: TextEditModalProps) {
-  const [value, setValue] = useState(initialValue);
+  const [charCount, setCharCount] = useState(initialValue.length);
+  const valueRef = useRef(initialValue);
+  const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     if (isOpen) {
-      setValue(initialValue);
+      valueRef.current = initialValue;
+      setCharCount(initialValue.length);
     }
   }, [isOpen, initialValue]);
 
+  const handleChangeText = (text: string) => {
+    valueRef.current = text;
+    setCharCount(text.length);
+  };
+
   const handleSave = () => {
-    onSave(value);
+    onSave(valueRef.current);
     onClose();
   };
 
@@ -59,24 +68,26 @@ export default function TextEditModal({
           {multiline ? (
             <Textarea size="md" className="min-h-32">
               <TextareaInput
+                ref={inputRef}
                 placeholder={placeholder}
-                value={value}
-                onChangeText={setValue}
+                defaultValue={initialValue}
+                onChangeText={handleChangeText}
                 maxLength={maxLength}
               />
             </Textarea>
           ) : (
             <Input size="md">
               <InputField
+                ref={inputRef}
                 placeholder={placeholder}
-                value={value}
-                onChangeText={setValue}
+                defaultValue={initialValue}
+                onChangeText={handleChangeText}
                 maxLength={maxLength}
               />
             </Input>
           )}
           <Text className="text-xs text-typography-500 mt-1 text-right">
-            {value.length}/{maxLength}
+            {charCount}/{maxLength}
           </Text>
         </ModalBody>
         <ModalFooter>
