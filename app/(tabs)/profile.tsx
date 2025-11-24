@@ -22,6 +22,7 @@ import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
 import { useFollow } from '@/src/hooks/useFollow';
+import { useMedicationMasters } from '@/src/hooks/useMedicationMasters';
 import { usePostsData } from '@/src/hooks/usePostsData';
 import { supabase } from '@/src/lib/supabase';
 import { sortByStartDate } from '@/src/utils/sortByStartDate';
@@ -110,7 +111,7 @@ export default function ProfileScreen() {
   const [selectModalType, setSelectModalType] = useState<'diagnosis' | 'medication' | 'treatment' | 'status'>('diagnosis');
 
   const [diagnosisMasters, setDiagnosisMasters] = useState<MasterData[]>([]);
-  const [medicationMasters, setMedicationMasters] = useState<MasterData[]>([]);
+  const { medications: medicationMasters } = useMedicationMasters();
   const [treatmentMasters, setTreatmentMasters] = useState<MasterData[]>([]);
   const [statusMasters, setStatusMasters] = useState<MasterData[]>([]);
 
@@ -203,46 +204,7 @@ export default function ProfileScreen() {
         .order('display_order', { ascending: true });
       if (diagData) setDiagnosisMasters(diagData);
 
-      // 服薬マスター（成分名リストを先に表示し、その下に製品名(成分名)リストを表示）
-      const medicationList: MasterData[] = [];
-
-      // まず成分名を取得（display_flag=trueのみ、display_order順）
-      const { data: ingredientData } = await supabase
-        .from('ingredients')
-        .select('id, name')
-        .eq('display_flag', true)
-        .order('display_order', { ascending: true });
-
-      if (ingredientData) {
-        ingredientData.forEach((i: { id: string; name: string }) => {
-          medicationList.push({
-            id: `ingredient-${i.id}`,
-            name: i.name,
-            ingredientId: i.id,
-          });
-        });
-      }
-
-      // 次に製品名(成分名)を取得
-      const { data: prodData } = await supabase
-        .from('products')
-        .select('id, name, ingredient_id, ingredients(id, name)')
-        .order('name');
-
-      if (prodData) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        prodData.forEach((p: any) => {
-          if (p.ingredients) {
-            medicationList.push({
-              id: `product-${p.id}`,
-              name: `${p.name}(${p.ingredients.name})`,
-              ingredientId: p.ingredient_id,
-            });
-          }
-        });
-      }
-
-      setMedicationMasters(medicationList);
+      // 服薬マスターはuseMedicationMastersフックで取得
 
       // 治療法マスター（display_flag=trueのみ、display_order順）
       const { data: treatData } = await supabase

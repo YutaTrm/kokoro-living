@@ -23,6 +23,7 @@ import {
   SelectTrigger,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import { useMedicationMasters } from '@/src/hooks/useMedicationMasters';
 import { supabase } from '@/src/lib/supabase';
 
 interface Post {
@@ -67,11 +68,15 @@ export default function SearchScreen() {
 
   const [showTagModal, setShowTagModal] = useState(false);
 
+  const { medications: medicationMasters, loading: loadingMedications } = useMedicationMasters();
+
   const LIMIT = 20;
 
   useEffect(() => {
-    loadAllTags();
-  }, []);
+    if (!loadingMedications) {
+      loadAllTags();
+    }
+  }, [loadingMedications]);
 
   const loadAllTags = async () => {
     try {
@@ -94,22 +99,14 @@ export default function SearchScreen() {
         });
       }
 
-      // 服薬（成分名のみ）
-      const { data: ingredients } = await supabase
-        .from('ingredients')
-        .select('id, name')
-        .eq('display_flag', true)
-        .order('display_order', { ascending: true });
-
-      if (ingredients) {
-        ingredients.forEach((ingredient) => {
-          tags.push({
-            id: `ingredient-${ingredient.id}`,
-            name: ingredient.name,
-            type: 'ingredient',
-          });
+      // 服薬（useMedicationMastersフックから取得）
+      medicationMasters.forEach((med) => {
+        tags.push({
+          id: med.id,
+          name: med.name,
+          type: 'ingredient',
         });
-      }
+      });
 
       // 治療法を取得（display_flag = true のみ、display_order順）
       const { data: treatments } = await supabase
@@ -293,9 +290,16 @@ export default function SearchScreen() {
     const diagnosisIds = tags
       .filter((t) => t.startsWith('diagnosis-'))
       .map((t) => t.replace('diagnosis-', ''));
+
+    // 服薬タグからingredient_idを取得（ingredient-またはproduct-の両方に対応）
     const ingredientIds = tags
-      .filter((t) => t.startsWith('ingredient-'))
-      .map((t) => t.replace('ingredient-', ''));
+      .filter((t) => t.startsWith('ingredient-') || t.startsWith('product-'))
+      .map((t) => {
+        const med = medicationMasters.find((m) => m.id === t);
+        return med?.ingredientId || '';
+      })
+      .filter(Boolean);
+
     const treatmentIds = tags
       .filter((t) => t.startsWith('treatment-'))
       .map((t) => t.replace('treatment-', ''));
