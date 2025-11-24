@@ -13,14 +13,19 @@ export function useUnreadNotifications(userId: string | null) {
       return;
     }
 
-    const { count, error } = await supabase
-      .from('notifications')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .eq('is_read', false);
+    try {
+      const { count, error } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('is_read', false);
 
-    if (!error && count !== null) {
-      setUnreadCount(count);
+      if (!error && count !== null) {
+        setUnreadCount(count);
+      }
+    } catch {
+      // テーブルが存在しない場合などはエラーを無視
+      setUnreadCount(0);
     }
   }, [userId]);
 

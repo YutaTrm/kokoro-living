@@ -1,3 +1,4 @@
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { Heart, MessageCircle, UserPlus } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
@@ -10,6 +11,7 @@ import { Box } from '@/components/ui/box';
 import { HStack } from '@/components/ui/hstack';
 import { Spinner } from '@/components/ui/spinner';
 import { VStack } from '@/components/ui/vstack';
+import { useUnreadNotifications } from '@/src/hooks/useUnreadNotifications';
 import { supabase } from '@/src/lib/supabase';
 
 interface Notification {
@@ -23,6 +25,7 @@ interface Notification {
     display_name: string;
     avatar_url: string | null;
   };
+  post_content?: string | null;
 }
 
 export default function NotificationsScreen() {
@@ -31,6 +34,7 @@ export default function NotificationsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const { refetch: refetchBadge } = useUnreadNotifications(userId);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -38,11 +42,14 @@ export default function NotificationsScreen() {
     });
   }, []);
 
-  useEffect(() => {
-    if (userId) {
-      loadNotifications();
-    }
-  }, [userId]);
+  // フォーカス時に通知を読み込む
+  useFocusEffect(
+    useCallback(() => {
+      if (userId) {
+        loadNotifications();
+      }
+    }, [userId])
+  );
 
   const loadNotifications = async () => {
     if (!userId) return;
@@ -64,6 +71,48 @@ export default function NotificationsScreen() {
 
       if (error) throw error;
 
+      // 投稿内容を取得
+      const postIds = (data || []).map((n) => n.post_id).filter(Boolean) as string[];
+      let postsMap = new Map<string, string>();
+
+      if (postIds.length > 0) {
+        // いいね通知の場合は元の投稿、返信通知の場合は返信自体の親投稿を取得
+        const { data: postsData } = await supabase
+          .from('posts')
+          .select('id, content, parent_post_id')
+          .in('id', postIds);
+
+        if (postsData) {
+          // 返信の場合は親投稿のIDを収集
+          const parentPostIds = postsData
+            .filter((p) => p.parent_post_id)
+            .map((p) => p.parent_post_id) as string[];
+
+          let parentPostsMap = new Map<string, string>();
+          if (parentPostIds.length > 0) {
+            const { data: parentPostsData } = await supabase
+              .from('posts')
+              .select('id, content')
+              .in('id', parentPostIds);
+
+            if (parentPostsData) {
+              parentPostsData.forEach((p) => {
+                parentPostsMap.set(p.id, p.content);
+              });
+            }
+          }
+
+          postsData.forEach((p) => {
+            // 返信通知の場合は親投稿の内容を使用
+            if (p.parent_post_id && parentPostsMap.has(p.parent_post_id)) {
+              postsMap.set(p.id, parentPostsMap.get(p.parent_post_id)!);
+            } else {
+              postsMap.set(p.id, p.content);
+            }
+          });
+        }
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const formatted: Notification[] = (data || []).map((n: any) => ({
         id: n.id,
@@ -76,6 +125,7 @@ export default function NotificationsScreen() {
           display_name: n.actor?.display_name || 'Unknown',
           avatar_url: n.actor?.avatar_url || null,
         },
+        post_content: n.post_id ? postsMap.get(n.post_id) || null : null,
       }));
 
       setNotifications(formatted);
@@ -101,6 +151,9 @@ export default function NotificationsScreen() {
     setNotifications((prev) =>
       prev.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n))
     );
+
+    // バッジを更新
+    refetchBadge();
   };
 
   const handlePress = (notification: Notification) => {
@@ -111,7 +164,7 @@ export default function NotificationsScreen() {
     if (notification.type === 'follow') {
       router.push(`/(tabs)/(home)/user/${notification.actor.user_id}`);
     } else if (notification.post_id) {
-      router.push(`/(tabs)/(home)/post/${notification.post_id}`);
+      router.push(`/(tabs)/(notifications)/post/${notification.post_id}`);
     }
   };
 
@@ -159,7 +212,7 @@ export default function NotificationsScreen() {
   const renderNotification = ({ item }: { item: Notification }) => (
     <Pressable onPress={() => handlePress(item)}>
       <HStack
-        className={`p-4 border-b border-outline-200 ${!item.is_read ? 'bg-primary-0' : ''}`}
+        className={`p-4 border-b border-outline-200 ${!item.is_read ? 'bg-primary-50' : ''}`}
         space="md"
       >
         <Avatar size="sm">
@@ -174,6 +227,14 @@ export default function NotificationsScreen() {
               {getNotificationMessage(item.type)}
             </Text>
           </HStack>
+          {(item.type === 'like' || item.type === 'reply') && item.post_content && (
+            <Text
+              className="text-sm text-typography-500 mt-1"
+              numberOfLines={2}
+            >
+              {item.post_content}
+            </Text>
+          )}
           <Text className="text-xs text-typography-400">{formatDate(item.created_at)}</Text>
         </VStack>
       </HStack>

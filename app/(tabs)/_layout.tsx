@@ -20,7 +20,7 @@ export default function TabLayout() {
 
   // 通知タブにフォーカスした時に再フェッチ
   useEffect(() => {
-    if (pathname === '/notifications') {
+    if (pathname === '/notifications' || pathname.startsWith('/(notifications)')) {
       refetch();
     }
   }, [pathname, refetch]);
@@ -66,9 +66,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="notifications"
+        name="(notifications)"
         options={{
           title: '通知',
+          headerShown: false,
           tabBarIcon: ({ color }) => <Bell color={color} size={24} />,
           tabBarBadge: unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : undefined,
         }}
