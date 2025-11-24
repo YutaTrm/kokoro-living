@@ -1,7 +1,8 @@
-import { Tabs } from 'expo-router';
+import { Tabs, usePathname } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
+import { useUnreadNotifications } from '@/src/hooks/useUnreadNotifications';
 import { supabase } from '@/src/lib/supabase';
 
 import {
@@ -13,16 +14,28 @@ import {
 
 export default function TabLayout() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  const { unreadCount, refetch } = useUnreadNotifications(userId);
+  const pathname = usePathname();
+
+  // 通知タブにフォーカスした時に再フェッチ
+  useEffect(() => {
+    if (pathname === '/notifications') {
+      refetch();
+    }
+  }, [pathname, refetch]);
 
   useEffect(() => {
     // ログイン状態を確認
     supabase.auth.getSession().then(({ data: { session } }) => {
       setIsLoggedIn(!!session);
+      setUserId(session?.user?.id ?? null);
     });
 
     // ログイン状態の変更を監視
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsLoggedIn(!!session);
+      setUserId(session?.user?.id ?? null);
     });
 
     return () => subscription.unsubscribe();
@@ -57,7 +70,7 @@ export default function TabLayout() {
         options={{
           title: '通知',
           tabBarIcon: ({ color }) => <Bell color={color} size={24} />,
-          href: null, // タブを非表示
+          tabBarBadge: unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : undefined,
         }}
       />
       <Tabs.Screen

@@ -1,12 +1,210 @@
+import { useRouter } from 'expo-router';
+import { Heart, MessageCircle, UserPlus } from 'lucide-react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { FlatList, Pressable, RefreshControl } from 'react-native';
+
 import LoginPrompt from '@/components/LoginPrompt';
+import { Text } from '@/components/Themed';
+import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
-import { Heading } from '@/components/ui/heading';
+import { HStack } from '@/components/ui/hstack';
+import { Spinner } from '@/components/ui/spinner';
+import { VStack } from '@/components/ui/vstack';
+import { supabase } from '@/src/lib/supabase';
+
+interface Notification {
+  id: string;
+  type: 'like' | 'reply' | 'follow';
+  post_id: string | null;
+  is_read: boolean;
+  created_at: string;
+  actor: {
+    user_id: string;
+    display_name: string;
+    avatar_url: string | null;
+  };
+}
 
 export default function NotificationsScreen() {
+  const router = useRouter();
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserId(session?.user?.id ?? null);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (userId) {
+      loadNotifications();
+    }
+  }, [userId]);
+
+  const loadNotifications = async () => {
+    if (!userId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select(`
+          id,
+          type,
+          post_id,
+          is_read,
+          created_at,
+          actor:actor_id(user_id, display_name, avatar_url)
+        `)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const formatted: Notification[] = (data || []).map((n: any) => ({
+        id: n.id,
+        type: n.type,
+        post_id: n.post_id,
+        is_read: n.is_read,
+        created_at: n.created_at,
+        actor: {
+          user_id: n.actor?.user_id || '',
+          display_name: n.actor?.display_name || 'Unknown',
+          avatar_url: n.actor?.avatar_url || null,
+        },
+      }));
+
+      setNotifications(formatted);
+    } catch (error) {
+      console.error('通知取得エラー:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadNotifications();
+    setRefreshing(false);
+  }, [userId]);
+
+  const markAsRead = async (notificationId: string) => {
+    await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', notificationId);
+
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n))
+    );
+  };
+
+  const handlePress = (notification: Notification) => {
+    if (!notification.is_read) {
+      markAsRead(notification.id);
+    }
+
+    if (notification.type === 'follow') {
+      router.push(`/(tabs)/(home)/user/${notification.actor.user_id}`);
+    } else if (notification.post_id) {
+      router.push(`/(tabs)/(home)/post/${notification.post_id}`);
+    }
+  };
+
+  const getNotificationMessage = (type: string) => {
+    switch (type) {
+      case 'like':
+        return 'があなたの投稿にいいねしました';
+      case 'reply':
+        return 'があなたの投稿に返信しました';
+      case 'follow':
+        return 'があなたをフォローしました';
+      default:
+        return '';
+    }
+  };
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'like':
+        return <Heart size={16} color="#ef4444" fill="#ef4444" />;
+      case 'reply':
+        return <MessageCircle size={16} color="#3b82f6" />;
+      case 'follow':
+        return <UserPlus size={16} color="#22c55e" />;
+      default:
+        return null;
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return 'たった今';
+    if (minutes < 60) return `${minutes}分前`;
+    if (hours < 24) return `${hours}時間前`;
+    if (days < 7) return `${days}日前`;
+    return date.toLocaleDateString('ja-JP');
+  };
+
+  const renderNotification = ({ item }: { item: Notification }) => (
+    <Pressable onPress={() => handlePress(item)}>
+      <HStack
+        className={`p-4 border-b border-outline-200 ${!item.is_read ? 'bg-primary-0' : ''}`}
+        space="md"
+      >
+        <Avatar size="sm">
+          <AvatarFallbackText>{item.actor.display_name}</AvatarFallbackText>
+          {item.actor.avatar_url && <AvatarImage source={{ uri: item.actor.avatar_url }} />}
+        </Avatar>
+        <VStack className="flex-1" space="xs">
+          <HStack className="items-center" space="xs">
+            {getNotificationIcon(item.type)}
+            <Text className="flex-1 text-sm">
+              <Text className="font-semibold">{item.actor.display_name}</Text>
+              {getNotificationMessage(item.type)}
+            </Text>
+          </HStack>
+          <Text className="text-xs text-typography-400">{formatDate(item.created_at)}</Text>
+        </VStack>
+      </HStack>
+    </Pressable>
+  );
+
+  const renderEmpty = () => {
+    if (loading) {
+      return (
+        <Box className="flex-1 items-center justify-center py-8">
+          <Spinner size="large" />
+        </Box>
+      );
+    }
+    return (
+      <Box className="flex-1 items-center justify-center py-8">
+        <Text className="text-base text-typography-400">通知はありません</Text>
+      </Box>
+    );
+  };
+
   return (
     <LoginPrompt>
-      <Box className="flex-1 items-center justify-center">
-        <Heading size="xl">通知</Heading>
+      <Box className="flex-1 bg-background-0">
+        <FlatList
+          data={notifications}
+          keyExtractor={(item) => item.id}
+          renderItem={renderNotification}
+          ListEmptyComponent={renderEmpty}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        />
       </Box>
     </LoginPrompt>
   );
