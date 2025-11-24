@@ -1,7 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, FlatList } from 'react-native';
+import { Alert, FlatList, TouchableOpacity } from 'react-native';
+
+import { Pencil } from 'lucide-react-native';
 
 import ConfirmModal from '@/components/ConfirmModal';
 import LoginPrompt from '@/components/LoginPrompt';
@@ -9,20 +11,22 @@ import PostItem from '@/components/PostItem';
 import DatePickerModal from '@/components/profile/DatePickerModal';
 import MedicalSection from '@/components/profile/MedicalSection';
 import ProfileHeader from '@/components/profile/ProfileHeader';
+import TextEditModal from '@/components/profile/TextEditModal';
 import MultiSelectModal from '@/components/search/MultiSelectModal';
 import { Text } from '@/components/Themed';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonText } from '@/components/ui/button';
+import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
+import { Icon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
-import { Textarea, TextareaInput } from '@/components/ui/textarea';
-import { VStack } from '@/components/ui/vstack';
 import { usePostsData } from '@/src/hooks/usePostsData';
 import { supabase } from '@/src/lib/supabase';
 
 interface UserProfile {
   avatarUrl: string | null;
   userName: string | null;
+  xUserName: string | null;
   accountName: string | null;
   createdAt: string | null;
   bio: string | null;
@@ -120,6 +124,10 @@ export default function ProfileScreen() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // テキスト編集モーダル用のstate
+  const [showNameEditModal, setShowNameEditModal] = useState(false);
+  const [showBioEditModal, setShowBioEditModal] = useState(false);
 
   // キャッシュキー
   const CACHE_KEYS = {
@@ -798,9 +806,11 @@ export default function ProfileScreen() {
         console.error('ユーザー情報取得エラー:', userError);
       }
 
+      const xName = user.user_metadata?.name || null;
       const userProfile: UserProfile = {
         avatarUrl: user.user_metadata?.avatar_url || null,
-        userName: user.user_metadata?.name || userData?.display_name || null,
+        userName: userData?.display_name || xName,
+        xUserName: xName,
         accountName: user.user_metadata?.user_name || null,
         createdAt: userData?.created_at || user.created_at || null,
         bio: userData?.bio || null,
@@ -863,14 +873,38 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleSaveBio = async () => {
+  const handleSaveDisplayName = async (newName: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // 空文字列の場合はXアカウントの名前を使用
+      const nameToSave = newName.trim() || profile?.xUserName || 'ユーザー';
+
+      const { error } = await supabase
+        .from('users')
+        .update({ display_name: nameToSave })
+        .eq('user_id', user.id);
+
+      if (error) {
+        Alert.alert('エラー', '名前の保存に失敗しました');
+        return;
+      }
+
+      loadUserProfile();
+    } catch (error) {
+      Alert.alert('エラー', '予期しないエラーが発生しました');
+    }
+  };
+
+  const handleSaveBio = async (newBio: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const { error } = await supabase
         .from('users')
-        .update({ bio })
+        .update({ bio: newBio })
         .eq('user_id', user.id);
 
       if (error) {
@@ -878,7 +912,7 @@ export default function ProfileScreen() {
         return;
       }
 
-      Alert.alert('成功', '自由記述を保存しました');
+      setBio(newBio);
       loadUserProfile();
     } catch (error) {
       Alert.alert('エラー', '予期しないエラーが発生しました');
@@ -888,7 +922,12 @@ export default function ProfileScreen() {
 
   const renderHeader = () => (
     <>
-      <ProfileHeader profile={profile!} onLogout={handleLogoutPress} onDeleteAccount={handleDeleteAccountPress} />
+      <ProfileHeader
+        profile={profile!}
+        onLogout={handleLogoutPress}
+        onDeleteAccount={handleDeleteAccountPress}
+        onEditName={() => setShowNameEditModal(true)}
+      />
 
       {/* タブバー */}
       <HStack className="border-b border-outline-200">
@@ -966,22 +1005,19 @@ export default function ProfileScreen() {
             loading={loadingStatuses}
           />
 
-          {/* Bio編集 */}
-          <Box className="p-4">
-            <VStack space="sm">
-              <Text className="text-base font-semibold">自由記述</Text>
-              <Textarea size="md" className="min-h-32">
-                <TextareaInput
-                  placeholder="自己紹介など"
-                  value={bio}
-                  onChangeText={setBio}
-                  maxLength={500}
-                />
-              </Textarea>
-              <Button onPress={handleSaveBio} size="sm" className="self-end">
-                <ButtonText>保存</ButtonText>
-              </Button>
-            </VStack>
+          {/* Bio表示・編集 */}
+          <Box className="p-4 border-t border-outline-200">
+            <HStack className="justify-between items-center mb-2">
+              <Heading size="lg">自由記述</Heading>
+              <TouchableOpacity onPress={() => setShowBioEditModal(true)} className="p-1">
+                <Icon as={Pencil} size="sm" className="text-typography-500" />
+              </TouchableOpacity>
+            </HStack>
+            {bio ? (
+              <Text className="text-base">{bio}</Text>
+            ) : (
+              <Text className="text-sm opacity-50">まだ登録がありません</Text>
+            )}
           </Box>
 
           {/* 自分のプロフィールを表示 */}
@@ -1129,6 +1165,30 @@ export default function ProfileScreen() {
         message="退会すると、投稿やいいねなど全てのデータが削除されます。この操作は取り消せません。本当に退会しますか？"
         confirmText="退会"
         isLoading={isDeleting}
+      />
+
+      {/* 名前編集モーダル */}
+      <TextEditModal
+        isOpen={showNameEditModal}
+        onClose={() => setShowNameEditModal(false)}
+        onSave={handleSaveDisplayName}
+        title="名前を編集"
+        placeholder="表示名を入力"
+        initialValue={profile?.userName || ''}
+        maxLength={50}
+        multiline={false}
+      />
+
+      {/* 自由記述編集モーダル */}
+      <TextEditModal
+        isOpen={showBioEditModal}
+        onClose={() => setShowBioEditModal(false)}
+        onSave={handleSaveBio}
+        title="自由記述を編集"
+        placeholder="自己紹介など"
+        initialValue={bio}
+        maxLength={500}
+        multiline
       />
     </LoginPrompt>
   );

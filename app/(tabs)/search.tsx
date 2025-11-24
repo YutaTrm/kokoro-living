@@ -1,23 +1,29 @@
+import { ChevronDownIcon, PlusIcon, XIcon } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, TextInput, View } from 'react-native';
+import { FlatList, RefreshControl, TextInput, View } from 'react-native';
 
 import PostItem from '@/components/PostItem';
-import MultiSelectModal from '@/components/search/MultiSelectModal';
+import TagFilterModal from '@/components/search/TagFilterModal';
 import Tag from '@/components/Tag';
 import { Text } from '@/components/Themed';
 import { Box } from '@/components/ui/box';
-import { Button, ButtonIcon } from '@/components/ui/button';
+import { Button, ButtonIcon, ButtonText } from '@/components/ui/button';
 import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
-import { Radio, RadioGroup, RadioIcon, RadioIndicator, RadioLabel } from '@/components/ui/radio';
-import { Spinner } from '@/components/ui/spinner';
-import { VStack } from '@/components/ui/vstack';
-import { supabase } from '@/src/lib/supabase';
 import {
-  CircleIcon,
-  PlusIcon,
-  XIcon
-} from 'lucide-react-native';
+  Select,
+  SelectBackdrop,
+  SelectContent,
+  SelectDragIndicator,
+  SelectDragIndicatorWrapper,
+  SelectIcon,
+  SelectInput,
+  SelectItem,
+  SelectPortal,
+  SelectTrigger,
+} from '@/components/ui/select';
+import { Spinner } from '@/components/ui/spinner';
+import { supabase } from '@/src/lib/supabase';
 
 interface Post {
   id: string;
@@ -40,17 +46,18 @@ interface TagOption {
   type: 'diagnosis' | 'ingredient' | 'treatment' | 'status';
 }
 
-type SortOption = 'created_at' | 'updated_at' | 'experienced_at';
 type TagFilterMode = 'and' | 'or';
+type SortOption = 'created_at' | 'updated_at' | 'experienced_at';
 
 export default function SearchScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [posts, setPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
+  const [hasSearched, setHasSearched] = useState(false);
 
   const [sortBy, setSortBy] = useState<SortOption>('created_at');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -59,21 +66,12 @@ export default function SearchScreen() {
   const [tagFilterMode, setTagFilterMode] = useState<TagFilterMode>('and');
 
   const [showTagModal, setShowTagModal] = useState(false);
-  const [currentTagType, setCurrentTagType] = useState<'diagnosis' | 'ingredient' | 'treatment' | 'status'>('diagnosis');
 
   const LIMIT = 20;
 
   useEffect(() => {
     loadAllTags();
   }, []);
-
-  useEffect(() => {
-    // 検索条件が変わったら最初から検索し直す
-    setOffset(0);
-    setPosts([]);
-    setHasMore(true);
-    searchPosts(true);
-  }, [searchQuery, selectedTags, sortBy, tagFilterMode]);
 
   const loadAllTags = async () => {
     try {
@@ -96,8 +94,7 @@ export default function SearchScreen() {
         });
       }
 
-      // 服薬（成分名リストを先に表示し、その下に製品名(成分名)リストを表示）
-      // まず成分名を取得（display_flag = true のみ、display_order順）
+      // 服薬（成分名のみ）
       const { data: ingredients } = await supabase
         .from('ingredients')
         .select('id, name')
@@ -111,24 +108,6 @@ export default function SearchScreen() {
             name: ingredient.name,
             type: 'ingredient',
           });
-        });
-      }
-
-      // 次に製品名(成分名)を取得
-      const { data: products } = await supabase
-        .from('products')
-        .select('id, name, ingredient_id, ingredients(id, name)')
-        .order('name');
-
-      if (products) {
-        products.forEach((product: { id: string; name: string; ingredient_id: string; ingredients: { id: string; name: string } | null }) => {
-          if (product.ingredients) {
-            tags.push({
-              id: `ingredient-${product.ingredients.id}`,
-              name: `${product.name}(${product.ingredients.name})`,
-              type: 'ingredient',
-            });
-          }
         });
       }
 
@@ -174,6 +153,14 @@ export default function SearchScreen() {
     }
   };
 
+  const handleSearch = () => {
+    setHasSearched(true);
+    setOffset(0);
+    setPosts([]);
+    setHasMore(true);
+    searchPosts(true);
+  };
+
   const searchPosts = async (reset = false) => {
     if (!reset && (!hasMore || loadingMore)) return;
 
@@ -186,14 +173,7 @@ export default function SearchScreen() {
         setLoadingMore(true);
       }
 
-      // ソート条件を設定
-      let orderColumn = sortBy;
-      let ascending = false;
-
-      // experienced_atがnullの場合は最後に表示
-      const nullsLast = sortBy === 'experienced_at';
-
-      // 基本クエリ（返信も含む）
+      // 基本クエリ
       let query = supabase
         .from('posts')
         .select('id, content, created_at, updated_at, experienced_at, user_id, parent_post_id');
@@ -203,32 +183,12 @@ export default function SearchScreen() {
         query = query.ilike('content', `%${searchQuery.trim()}%`);
       }
 
-      // タグフィルター（AND条件）
-      if (selectedTags.length > 0) {
-        // 各タグタイプごとにフィルター
-        const diagnosisIds = selectedTags
-          .filter(t => t.startsWith('diagnosis-'))
-          .map(t => t.replace('diagnosis-', ''));
-        const ingredientIds = selectedTags
-          .filter(t => t.startsWith('ingredient-'))
-          .map(t => t.replace('ingredient-', ''));
-        const treatmentIds = selectedTags
-          .filter(t => t.startsWith('treatment-'))
-          .map(t => t.replace('treatment-', ''));
-        const statusIds = selectedTags
-          .filter(t => t.startsWith('status-'))
-          .map(t => t.replace('status-', ''));
-
-        // Supabaseのクエリでは複雑なAND条件が難しいため、
-        // いったん全件取得してJavaScript側でフィルターする方式を採用
-        // （本番環境ではPostgreSQLのRPC関数を使うことを推奨）
-      }
-
       // ソート
+      const nullsLast = sortBy === 'experienced_at';
       if (nullsLast) {
-        query = query.order(orderColumn, { ascending, nullsFirst: false });
+        query = query.order(sortBy, { ascending: false, nullsFirst: false });
       } else {
-        query = query.order(orderColumn, { ascending });
+        query = query.order(sortBy, { ascending: false });
       }
 
       // ページネーション
@@ -251,14 +211,14 @@ export default function SearchScreen() {
       }
 
       // ユーザー情報を取得
-      const userIds = [...new Set(filteredPosts.map(p => p.user_id))];
+      const userIds = [...new Set(filteredPosts.map((p) => p.user_id))];
       const { data: usersData } = await supabase
         .from('users')
         .select('user_id, display_name, avatar_url')
         .in('user_id', userIds);
 
       const usersMap = new Map(
-        (usersData || []).map(u => [u.user_id, { display_name: u.display_name, avatar_url: u.avatar_url }])
+        (usersData || []).map((u) => [u.user_id, { display_name: u.display_name, avatar_url: u.avatar_url }])
       );
 
       // 各投稿のタグを取得
@@ -279,12 +239,14 @@ export default function SearchScreen() {
               .eq('post_id', post.id),
           ]);
 
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const diagnoses = diagnosesData.data?.map((d: any) => d.user_diagnoses?.diagnoses?.name).filter(Boolean) || [];
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const treatments = treatmentsData.data?.map((t: any) => t.user_treatments?.treatments?.name).filter(Boolean) || [];
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const medicationsWithDuplicates = medicationsData.data?.map((m: any) =>
             m.user_medications?.ingredients?.name
           ).filter(Boolean) || [];
-          // 重複を除去
           const medications = [...new Set(medicationsWithDuplicates)];
 
           return {
@@ -307,7 +269,12 @@ export default function SearchScreen() {
       if (reset) {
         setPosts(postsWithData);
       } else {
-        setPosts(prev => [...prev, ...postsWithData]);
+        // 重複を除去して追加
+        setPosts((prev) => {
+          const existingIds = new Set(prev.map((p) => p.id));
+          const newPosts = postsWithData.filter((p) => !existingIds.has(p.id));
+          return [...prev, ...newPosts];
+        });
       }
 
       setOffset(currentOffset + LIMIT);
@@ -321,22 +288,23 @@ export default function SearchScreen() {
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const filterPostsByTags = async (postsData: any[], tags: string[], mode: TagFilterMode) => {
-    // AND: 全てのタグ条件を満たす / OR: どれか1つでも満たす
     const diagnosisIds = tags
-      .filter(t => t.startsWith('diagnosis-'))
-      .map(t => t.replace('diagnosis-', ''));
+      .filter((t) => t.startsWith('diagnosis-'))
+      .map((t) => t.replace('diagnosis-', ''));
     const ingredientIds = tags
-      .filter(t => t.startsWith('ingredient-'))
-      .map(t => t.replace('ingredient-', ''));
+      .filter((t) => t.startsWith('ingredient-'))
+      .map((t) => t.replace('ingredient-', ''));
     const treatmentIds = tags
-      .filter(t => t.startsWith('treatment-'))
-      .map(t => t.replace('treatment-', ''));
+      .filter((t) => t.startsWith('treatment-'))
+      .map((t) => t.replace('treatment-', ''));
     const statusIds = tags
-      .filter(t => t.startsWith('status-'))
-      .map(t => t.replace('status-', ''));
+      .filter((t) => t.startsWith('status-'))
+      .map((t) => t.replace('status-', ''));
 
-    const filteredPosts = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const filteredPosts: any[] = [];
 
     for (const post of postsData) {
       const matchResults: boolean[] = [];
@@ -348,11 +316,12 @@ export default function SearchScreen() {
           .select('user_diagnoses(diagnosis_id)')
           .eq('post_id', post.id);
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const postDiagnosisIds = data?.map((d: any) => d.user_diagnoses?.diagnosis_id) || [];
         if (mode === 'and') {
-          matchResults.push(diagnosisIds.every(id => postDiagnosisIds.includes(id)));
+          matchResults.push(diagnosisIds.every((id) => postDiagnosisIds.includes(id)));
         } else {
-          matchResults.push(diagnosisIds.some(id => postDiagnosisIds.includes(id)));
+          matchResults.push(diagnosisIds.some((id) => postDiagnosisIds.includes(id)));
         }
       }
 
@@ -363,11 +332,12 @@ export default function SearchScreen() {
           .select('user_medications(ingredient_id)')
           .eq('post_id', post.id);
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const postIngredientIds = data?.map((m: any) => m.user_medications?.ingredient_id).filter(Boolean) || [];
         if (mode === 'and') {
-          matchResults.push(ingredientIds.every(id => postIngredientIds.includes(id)));
+          matchResults.push(ingredientIds.every((id) => postIngredientIds.includes(id)));
         } else {
-          matchResults.push(ingredientIds.some(id => postIngredientIds.includes(id)));
+          matchResults.push(ingredientIds.some((id) => postIngredientIds.includes(id)));
         }
       }
 
@@ -378,11 +348,12 @@ export default function SearchScreen() {
           .select('user_treatments(treatment_id)')
           .eq('post_id', post.id);
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const postTreatmentIds = data?.map((t: any) => t.user_treatments?.treatment_id) || [];
         if (mode === 'and') {
-          matchResults.push(treatmentIds.every(id => postTreatmentIds.includes(id)));
+          matchResults.push(treatmentIds.every((id) => postTreatmentIds.includes(id)));
         } else {
-          matchResults.push(treatmentIds.some(id => postTreatmentIds.includes(id)));
+          matchResults.push(treatmentIds.some((id) => postTreatmentIds.includes(id)));
         }
       }
 
@@ -393,18 +364,18 @@ export default function SearchScreen() {
           .select('user_statuses(status_id)')
           .eq('post_id', post.id);
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const postStatusIds = data?.map((s: any) => s.user_statuses?.status_id) || [];
         if (mode === 'and') {
-          matchResults.push(statusIds.every(id => postStatusIds.includes(id)));
+          matchResults.push(statusIds.every((id) => postStatusIds.includes(id)));
         } else {
-          matchResults.push(statusIds.some(id => postStatusIds.includes(id)));
+          matchResults.push(statusIds.some((id) => postStatusIds.includes(id)));
         }
       }
 
-      // AND: 全てtrue / OR: どれか1つでもtrue
       const matches = mode === 'and'
-        ? matchResults.every(r => r)
-        : matchResults.some(r => r);
+        ? matchResults.every((r) => r)
+        : matchResults.some((r) => r);
 
       if (matches) {
         filteredPosts.push(post);
@@ -415,6 +386,7 @@ export default function SearchScreen() {
   };
 
   const handleRefresh = () => {
+    if (!hasSearched) return;
     setRefreshing(true);
     setOffset(0);
     setPosts([]);
@@ -423,50 +395,51 @@ export default function SearchScreen() {
   };
 
   const handleLoadMore = () => {
-    if (!loadingMore && hasMore) {
+    if (!loadingMore && hasMore && hasSearched) {
       searchPosts(false);
     }
   };
 
-  const openTagModal = (type: 'diagnosis' | 'ingredient' | 'treatment' | 'status') => {
-    setCurrentTagType(type);
-    setShowTagModal(true);
+  const handleClear = () => {
+    setSearchQuery('');
+    setSelectedTags([]);
+    setSortBy('created_at');
+    setTagFilterMode('and');
+    setPosts([]);
+    setHasSearched(false);
+    setOffset(0);
+    setHasMore(true);
   };
 
-  const handleTagsUpdate = (type: 'diagnosis' | 'ingredient' | 'treatment' | 'status', selectedIds: string[]) => {
-    // 現在のタイプ以外のタグは保持
-    const otherTags = selectedTags.filter(tag => {
-      if (type === 'diagnosis') return !tag.startsWith('diagnosis-');
-      if (type === 'ingredient') return !tag.startsWith('ingredient-');
-      if (type === 'treatment') return !tag.startsWith('treatment-');
-      if (type === 'status') return !tag.startsWith('status-');
-      return true;
-    });
-
-    // 新しく選択されたタグと結合（重複を除去）
-    const uniqueSelectedIds = [...new Set(selectedIds)];
-    setSelectedTags([...otherTags, ...uniqueSelectedIds]);
+  const handleTagFilterSave = (newSelectedIds: string[], newFilterMode: TagFilterMode) => {
+    setSelectedTags(newSelectedIds);
+    setTagFilterMode(newFilterMode);
   };
 
   const removeTag = (tagId: string) => {
     setSelectedTags((prev) => prev.filter((id) => id !== tagId));
   };
 
-  const getSelectedTagsByType = (type: 'diagnosis' | 'ingredient' | 'treatment' | 'status') => {
-    const prefix = `${type}-`;
-    return selectedTags.filter(tag => tag.startsWith(prefix));
-  };
+  const getTagInfo = (tagId: string) => {
+    const tag = availableTags.find((t) => t.id === tagId);
+    if (!tag) return { name: '', color: 'gray-400' };
 
-  const getTagName = (tagId: string) => {
-    // ingredientの場合、成分名のみを表示（製品名(成分名)ではなく成分名を優先）
-    if (tagId.startsWith('ingredient-')) {
-      // 同じIDで成分名のみのタグを探す（括弧がないもの）
-      const ingredientTags = availableTags.filter(t => t.id === tagId);
-      const ingredientOnly = ingredientTags.find(t => !t.name.includes('('));
-      if (ingredientOnly) return ingredientOnly.name;
+    let color = 'gray-400';
+    switch (tag.type) {
+      case 'diagnosis':
+        color = 'fuchsia-400';
+        break;
+      case 'ingredient':
+        color = 'cyan-400';
+        break;
+      case 'treatment':
+        color = 'green-400';
+        break;
+      case 'status':
+        color = 'amber-400';
+        break;
     }
-    const tag = availableTags.find(t => t.id === tagId);
-    return tag?.name || '';
+    return { name: tag.name, color };
   };
 
   const renderFooter = () => {
@@ -479,7 +452,6 @@ export default function SearchScreen() {
   };
 
   const renderEmpty = () => {
-    // ローディング中はスピナーを表示
     if (loading) {
       return (
         <Box className="py-8 items-center">
@@ -488,7 +460,14 @@ export default function SearchScreen() {
       );
     }
 
-    // ローディング完了後、データがない場合はメッセージを表示
+    if (!hasSearched) {
+      return (
+        <Box className="py-8 items-center">
+          <Text className="text-typography-500">キーワードかタグで検索してください</Text>
+        </Box>
+      );
+    }
+
     return (
       <Box className="py-8 items-center">
         <Text className="text-typography-500">検索結果がありません</Text>
@@ -499,198 +478,102 @@ export default function SearchScreen() {
   return (
     <Box className="flex-1 bg-background-0">
       {/* 検索フォーム */}
-      <VStack className="px-4 py-3 border-b border-outline-200" space="md">
-        {/* フリーワード検索 */}
-        <Box>
-          <Text className="text-sm font-semibold mb-2 text-typography-700">キーワード</Text>
-          <TextInput
-            className="border border-outline-200 rounded-lg px-3 py-2 text-base text-typography-900"
-            placeholder="投稿内容を検索..."
-            placeholderTextColor="#999"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </Box>
-
-        {/* ソート選択 */}
-        <Box>
-          <Text className="text-sm font-semibold mb-2 text-typography-700">並び順</Text>
-          <HStack space="sm">
-            {[
-              { value: 'created_at', label: '投稿日' },
-              { value: 'updated_at', label: '更新日' },
-              { value: 'experienced_at', label: '体験日' },
-            ].map((option) => (
-              <Pressable
-                key={option.value}
-                onPress={() => setSortBy(option.value as SortOption)}
-                className={`flex-1 px-3 py-2 rounded-lg border ${
-                  sortBy === option.value
-                    ? 'bg-primary-50 border-primary-50'
-                    : 'bg-background-0 border-outline-200'
-                }`}
-              >
-                <Text
-                  className={`text-center text-sm ${
-                    sortBy === option.value ? 'text-white font-semibold' : 'text-typography-700'
-                  }`}
-                >
-                  {option.label}
-                </Text>
-              </Pressable>
-            ))}
-          </HStack>
-        </Box>
-
-        {/* タグフィルター */}
+      <Box className="px-4 py-3 border-b border-outline-200">
+        {/* タグで絞り込み */}
         <Box>
           <Text className="text-sm font-semibold mb-2 text-typography-700">タグで絞り込み</Text>
-
-          {/* AND/OR切り替え */}
-          <RadioGroup value={tagFilterMode} onChange={(value) => setTagFilterMode(value as TagFilterMode)} className="mb-3">
-            <HStack space="lg">
-              <Radio value="and" size="sm">
-                <RadioIndicator>
-                  <RadioIcon as={CircleIcon} />
-                </RadioIndicator>
-                <RadioLabel className="text-sm">全て含む</RadioLabel>
-              </Radio>
-              <Radio value="or" size="sm">
-                <RadioIndicator>
-                  <RadioIcon as={CircleIcon} />
-                </RadioIndicator>
-                <RadioLabel className="text-sm">どれか含む</RadioLabel>
-              </Radio>
-            </HStack>
-          </RadioGroup>
-
           {loadingTags ? (
             <Spinner size="small" />
           ) : (
-            <VStack space="md">
-              {/* 診断名 */}
-              <Box>
-                <HStack className="items-center justify-between mb-2">
-                  <Text className="text-xs font-semibold text-typography-600">診断名</Text>
-                  <Button
-                    size="xs"
-                    variant="outline"
-                    onPress={() => openTagModal('diagnosis')}
-                    className="h-6 px-2"
-                  >
-                    <ButtonIcon as={PlusIcon} size="sm" />
-                  </Button>
-                </HStack>
-                {getSelectedTagsByType('diagnosis').length > 0 && (
-                  <View className="flex flex-row flex-wrap gap-2">
-                    {getSelectedTagsByType('diagnosis').map((tagId) => (
-                      <Tag
-                        key={tagId}
-                        name={getTagName(tagId)}
-                        color="fuchsia-400"
-                        size="xs"
-                        onPress={() => removeTag(tagId)}
-                      >
-                        <Icon as={XIcon} size="xs" />
-                      </Tag>
-                    ))}
-                  </View>
-                )}
-              </Box>
+            <View className="flex-row flex-wrap gap-2">
+              {selectedTags.map((tagId) => {
+                const { name, color } = getTagInfo(tagId);
+                return (
+                  <HStack key={tagId} className="items-center">
+                    <Tag
+                      key={tagId}
+                      name={name}
+                      color={color}
+                      size="xs"
+                      onPress={() => removeTag(tagId)}
+                    >
+                      <Icon as={XIcon} size="xs" />
+                    </Tag>
 
-              {/* 服薬 */}
-              <Box>
-                <HStack className="items-center justify-between mb-2">
-                  <Text className="text-xs font-semibold text-typography-600">服薬</Text>
-                  <Button
-                    size="xs"
-                    variant="outline"
-                    onPress={() => openTagModal('ingredient')}
-                    className="h-6 px-2"
-                  >
-                    <ButtonIcon as={PlusIcon} size="sm" />
-                  </Button>
-                </HStack>
-                {getSelectedTagsByType('ingredient').length > 0 && (
-                  <View className="flex flex-row flex-wrap gap-2">
-                    {getSelectedTagsByType('ingredient').map((tagId) => (
-                      <Tag
-                        key={tagId}
-                        name={getTagName(tagId)}
-                        color="cyan-400"
-                        size="xs"
-                        onPress={() => removeTag(tagId)}
-                      >
-                        <Icon as={XIcon} size="xs" />
-                      </Tag>
-                    ))}
-                  </View>
-                )}
-              </Box>
-
-              {/* 治療法 */}
-              <Box>
-                <HStack className="items-center justify-between mb-2">
-                  <Text className="text-xs font-semibold text-typography-600">治療法</Text>
-                  <Button
-                    size="xs"
-                    variant="outline"
-                    onPress={() => openTagModal('treatment')}
-                    className="h-6 px-2"
-                  >
-                    <ButtonIcon as={PlusIcon} size="sm" />
-                  </Button>
-                </HStack>
-                {getSelectedTagsByType('treatment').length > 0 && (
-                  <View className="flex flex-row flex-wrap gap-2">
-                    {getSelectedTagsByType('treatment').map((tagId) => (
-                      <Tag
-                        key={tagId}
-                        name={getTagName(tagId)}
-                        color="green-400"
-                        size="xs"
-                        onPress={() => removeTag(tagId)}
-                      >
-                        <Icon as={XIcon} size="xs" />
-                      </Tag>
-                    ))}
-                  </View>
-                )}
-              </Box>
-
-              {/* ステータス */}
-              <Box>
-                <HStack className="items-center justify-between mb-2">
-                  <Text className="text-xs font-semibold text-typography-600">ステータス</Text>
-                  <Button
-                    size="xs"
-                    variant="outline"
-                    onPress={() => openTagModal('status')}
-                    className="h-6 px-2"
-                  >
-                    <ButtonIcon as={PlusIcon} size="sm" />
-                  </Button>
-                </HStack>
-                {getSelectedTagsByType('status').length > 0 && (
-                  <View className="flex flex-row flex-wrap gap-2">
-                    {getSelectedTagsByType('status').map((tagId) => (
-                      <Tag
-                        key={tagId}
-                        name={getTagName(tagId)}
-                        color="amber-400"
-                        size="xs"
-                        onPress={() => removeTag(tagId)}
-                      >
-                        <Icon as={XIcon} size="xs" />
-                      </Tag>
-                    ))}
-                  </View>
-                )}
-              </Box>
-            </VStack>
+                  </HStack>
+                );
+              })}
+              <Button
+                size="xs"
+                variant="outline"
+                onPress={() => setShowTagModal(true)}
+                className="h-6 px-2"
+              >
+                <ButtonIcon as={PlusIcon} size="sm" />
+              </Button>
+            </View>
           )}
         </Box>
-      </VStack>
+
+        {/* キーワード検索 + 検索ボタン */}
+        <Text className="text-sm font-semibold my-2 text-typography-700">キーワード検索</Text>
+        <HStack space="sm" className="mb-3">
+          <TextInput
+            className="flex-1 border border-outline-200 rounded-lg px-3 py-2 text-base text-typography-900"
+            placeholder="キーワードで検索..."
+            placeholderTextColor="#999"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            onSubmitEditing={handleSearch}
+            returnKeyType="search"
+          />
+        </HStack>
+
+        <HStack className="flex justify-between" space="sm">
+          {/* ソート選択 */}
+          <Box>
+            <HStack className="justify-end items-center">
+              <Text className="text-sm text-typography-600 mr-2">並び順:</Text>
+              <Select
+                selectedValue={sortBy}
+                onValueChange={(value) => setSortBy(value as SortOption)}
+              >
+                <SelectTrigger size="sm" className="w-28">
+                  <SelectInput
+                    placeholder="選択"
+                    value={
+                      sortBy === 'created_at' ? '投稿日' :
+                      sortBy === 'updated_at' ? '更新日' : '体験日'
+                    }
+                  />
+                  <SelectIcon as={ChevronDownIcon} className="mr-2" />
+                </SelectTrigger>
+                <SelectPortal>
+                  <SelectBackdrop />
+                  <SelectContent>
+                    <SelectDragIndicatorWrapper>
+                      <SelectDragIndicator />
+                    </SelectDragIndicatorWrapper>
+                    <SelectItem label="投稿日" value="created_at" />
+                    <SelectItem label="更新日" value="updated_at" />
+                    <SelectItem label="体験日" value="experienced_at" />
+                  </SelectContent>
+                </SelectPortal>
+              </Select>
+            </HStack>
+          </Box>
+
+          <HStack className="flex grow justify-end gap-2">
+            {/* 検索クリアボタン */}
+            <Button onPress={handleClear} className="" variant="outline">
+              <ButtonText>クリア</ButtonText>
+            </Button>
+            <Button onPress={handleSearch} className="">
+              <ButtonText>検索</ButtonText>
+            </Button>
+          </HStack>
+        </HStack>
+      </Box>
 
       {/* 検索結果 */}
       <FlatList
@@ -707,20 +590,13 @@ export default function SearchScreen() {
       />
 
       {/* タグ選択モーダル */}
-      <MultiSelectModal
+      <TagFilterModal
         isOpen={showTagModal}
         onClose={() => setShowTagModal(false)}
-        title={
-          currentTagType === 'diagnosis' ? '診断名を選択' :
-          currentTagType === 'ingredient' ? '服薬を選択' :
-          currentTagType === 'treatment' ? '治療法を選択' :
-          'ステータスを選択'
-        }
-        options={availableTags
-          .filter(t => t.type === currentTagType)
-          .map(t => ({ id: t.id, name: t.name }))}
-        selectedIds={getSelectedTagsByType(currentTagType)}
-        onSave={(selectedIds) => handleTagsUpdate(currentTagType, selectedIds)}
+        onSave={handleTagFilterSave}
+        tags={availableTags}
+        selectedIds={selectedTags}
+        filterMode={tagFilterMode}
       />
     </Box>
   );
