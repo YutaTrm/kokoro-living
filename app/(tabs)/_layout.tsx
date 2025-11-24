@@ -2,7 +2,7 @@ import { Tabs, usePathname } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
-import { useUnreadNotifications } from '@/src/hooks/useUnreadNotifications';
+import { NotificationProvider, useNotificationContext } from '@/src/contexts/NotificationContext';
 import { supabase } from '@/src/lib/supabase';
 
 import {
@@ -12,10 +12,8 @@ import {
   User,
 } from 'lucide-react-native';
 
-export default function TabLayout() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
-  const { unreadCount, refetch } = useUnreadNotifications(userId);
+function TabsContent() {
+  const { unreadCount, refetch } = useNotificationContext();
   const pathname = usePathname();
 
   // 通知タブにフォーカスした時に再フェッチ
@@ -24,22 +22,6 @@ export default function TabLayout() {
       refetch();
     }
   }, [pathname, refetch]);
-
-  useEffect(() => {
-    // ログイン状態を確認
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setIsLoggedIn(!!session);
-      setUserId(session?.user?.id ?? null);
-    });
-
-    // ログイン状態の変更を監視
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsLoggedIn(!!session);
-      setUserId(session?.user?.id ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
 
   return (
     <Tabs
@@ -82,5 +64,27 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+  );
+}
+
+export default function TabLayout() {
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserId(session?.user?.id ?? null);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserId(session?.user?.id ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  return (
+    <NotificationProvider userId={userId}>
+      <TabsContent />
+    </NotificationProvider>
   );
 }

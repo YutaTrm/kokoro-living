@@ -11,7 +11,7 @@ import { Box } from '@/components/ui/box';
 import { HStack } from '@/components/ui/hstack';
 import { Spinner } from '@/components/ui/spinner';
 import { VStack } from '@/components/ui/vstack';
-import { useUnreadNotifications } from '@/src/hooks/useUnreadNotifications';
+import { useNotificationContext } from '@/src/contexts/NotificationContext';
 import { supabase } from '@/src/lib/supabase';
 
 interface Notification {
@@ -34,7 +34,7 @@ export default function NotificationsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
-  const { refetch: refetchBadge } = useUnreadNotifications(userId);
+  const { refetch: refetchBadge } = useNotificationContext();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
