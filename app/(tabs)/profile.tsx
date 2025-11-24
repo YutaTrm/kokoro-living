@@ -24,6 +24,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { useFollow } from '@/src/hooks/useFollow';
 import { usePostsData } from '@/src/hooks/usePostsData';
 import { supabase } from '@/src/lib/supabase';
+import { sortByStartDate } from '@/src/utils/sortByStartDate';
 
 interface UserProfile {
   avatarUrl: string | null;
@@ -643,8 +644,9 @@ export default function ProfileScreen() {
           startDate: d.start_date,
           endDate: d.end_date,
         }));
-        setDiagnoses(formatted);
-        await AsyncStorage.setItem(CACHE_KEYS.diagnoses, JSON.stringify(formatted));
+        const sorted = sortByStartDate(formatted);
+        setDiagnoses(sorted);
+        await AsyncStorage.setItem(CACHE_KEYS.diagnoses, JSON.stringify(sorted));
       }
     } catch (error) {
       console.error('診断名読み込みエラー:', error);
@@ -718,8 +720,9 @@ export default function ProfileScreen() {
           };
         });
 
-        setMedications(formatted);
-        await AsyncStorage.setItem(CACHE_KEYS.medications, JSON.stringify(formatted));
+        const sorted = sortByStartDate(formatted);
+        setMedications(sorted);
+        await AsyncStorage.setItem(CACHE_KEYS.medications, JSON.stringify(sorted));
       }
     } catch (error) {
       console.error('服薬読み込みエラー:', error);
@@ -748,8 +751,9 @@ export default function ProfileScreen() {
           startDate: t.start_date,
           endDate: t.end_date,
         }));
-        setTreatments(formatted);
-        await AsyncStorage.setItem(CACHE_KEYS.treatments, JSON.stringify(formatted));
+        const sorted = sortByStartDate(formatted);
+        setTreatments(sorted);
+        await AsyncStorage.setItem(CACHE_KEYS.treatments, JSON.stringify(sorted));
       }
     } catch (error) {
       console.error('治療読み込みエラー:', error);
@@ -778,8 +782,9 @@ export default function ProfileScreen() {
           startDate: s.start_date,
           endDate: s.end_date,
         }));
-        setStatuses(formatted);
-        await AsyncStorage.setItem(CACHE_KEYS.statuses, JSON.stringify(formatted));
+        const sorted = sortByStartDate(formatted);
+        setStatuses(sorted);
+        await AsyncStorage.setItem(CACHE_KEYS.statuses, JSON.stringify(sorted));
       }
     } catch (error) {
       console.error('ステータス読み込みエラー:', error);

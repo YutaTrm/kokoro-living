@@ -15,6 +15,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { VStack } from '@/components/ui/vstack';
 import { useFollow } from '@/src/hooks/useFollow';
 import { supabase } from '@/src/lib/supabase';
+import { sortByStartDate } from '@/src/utils/sortByStartDate';
 
 interface UserProfile {
   user_id: string;
@@ -107,16 +108,14 @@ export default function UserDetailScreen() {
       if (diagnosesData) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const filtered = diagnosesData
-          .filter((d: any) => d.diagnoses?.display_flag !== false)
-          .sort((a: any, b: any) => (a.diagnoses?.display_order || 0) - (b.diagnoses?.display_order || 0));
-        setDiagnoses(
-          filtered.map((d: any) => ({
-            id: d.id,
-            name: d.diagnoses?.name || '',
-            startDate: d.start_date,
-            endDate: d.end_date,
-          }))
-        );
+          .filter((d: any) => d.diagnoses?.display_flag !== false);
+        const formatted = filtered.map((d: any) => ({
+          id: d.id,
+          name: d.diagnoses?.name || '',
+          startDate: d.start_date,
+          endDate: d.end_date,
+        }));
+        setDiagnoses(sortByStartDate(formatted));
       }
 
       // 治療を取得（display_flag=trueのみ、display_order順）
@@ -128,16 +127,14 @@ export default function UserDetailScreen() {
       if (treatmentsData) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const filtered = treatmentsData
-          .filter((t: any) => t.treatments?.display_flag !== false)
-          .sort((a: any, b: any) => (a.treatments?.display_order || 0) - (b.treatments?.display_order || 0));
-        setTreatments(
-          filtered.map((t: any) => ({
-            id: t.id,
-            name: t.treatments?.name || '',
-            startDate: t.start_date,
-            endDate: t.end_date,
-          }))
-        );
+          .filter((t: any) => t.treatments?.display_flag !== false);
+        const formatted = filtered.map((t: any) => ({
+          id: t.id,
+          name: t.treatments?.name || '',
+          startDate: t.start_date,
+          endDate: t.end_date,
+        }));
+        setTreatments(sortByStartDate(formatted));
       }
 
       // 服薬を取得（display_flag=trueのみ、display_order順）
@@ -196,12 +193,7 @@ export default function UserDetailScreen() {
           }
         });
 
-        // display_order順にソート
-        const sortedItems = Array.from(ingredientMap.values()).sort(
-          (a, b) => a.displayOrder - b.displayOrder
-        );
-
-        const formatted: MedicalRecord[] = sortedItems.map((item) => {
+        const formatted: MedicalRecord[] = Array.from(ingredientMap.values()).map((item) => {
           const productNames = productsByIngredient.get(item.ingredientId) || [];
           return {
             id: item.id,
@@ -214,7 +206,7 @@ export default function UserDetailScreen() {
           };
         });
 
-        setMedications(formatted);
+        setMedications(sortByStartDate(formatted));
       }
 
       // ステータスを取得（display_flag=trueのみ、display_order順）
@@ -226,16 +218,14 @@ export default function UserDetailScreen() {
       if (statusesData) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const filtered = statusesData
-          .filter((s: any) => s.statuses?.display_flag !== false)
-          .sort((a: any, b: any) => (a.statuses?.display_order || 0) - (b.statuses?.display_order || 0));
-        setStatuses(
-          filtered.map((s: any) => ({
-            id: s.id,
-            name: s.statuses?.name || '',
-            startDate: s.start_date,
-            endDate: s.end_date,
-          }))
-        );
+          .filter((s: any) => s.statuses?.display_flag !== false);
+        const formatted = filtered.map((s: any) => ({
+          id: s.id,
+          name: s.statuses?.name || '',
+          startDate: s.start_date,
+          endDate: s.end_date,
+        }));
+        setStatuses(sortByStartDate(formatted));
       }
     } catch (error) {
       console.error('医療情報取得エラー:', error);
