@@ -79,12 +79,12 @@ export default function SearchScreen() {
     try {
       const tags: TagOption[] = [];
 
-      // 診断名を取得（display_flag = true のみ）
+      // 診断名を取得（display_flag = true のみ、display_order順）
       const { data: diagnoses } = await supabase
         .from('diagnoses')
         .select('id, name')
         .eq('display_flag', true)
-        .order('name');
+        .order('display_order', { ascending: true });
 
       if (diagnoses) {
         diagnoses.forEach((d) => {
@@ -97,12 +97,12 @@ export default function SearchScreen() {
       }
 
       // 服薬（成分名リストを先に表示し、その下に製品名(成分名)リストを表示）
-      // まず成分名を取得
+      // まず成分名を取得（display_flag = true のみ、display_order順）
       const { data: ingredients } = await supabase
         .from('ingredients')
         .select('id, name')
         .eq('display_flag', true)
-        .order('name');
+        .order('display_order', { ascending: true });
 
       if (ingredients) {
         ingredients.forEach((ingredient) => {
@@ -132,12 +132,12 @@ export default function SearchScreen() {
         });
       }
 
-      // 治療法を取得（display_flag = true のみ）
+      // 治療法を取得（display_flag = true のみ、display_order順）
       const { data: treatments } = await supabase
         .from('treatments')
         .select('id, name')
         .eq('display_flag', true)
-        .order('name');
+        .order('display_order', { ascending: true });
 
       if (treatments) {
         treatments.forEach((t) => {
@@ -149,12 +149,12 @@ export default function SearchScreen() {
         });
       }
 
-      // ステータスを取得（display_flag = true のみ）
+      // ステータスを取得（display_flag = true のみ、display_order順）
       const { data: statuses } = await supabase
         .from('statuses')
         .select('id, name')
         .eq('display_flag', true)
-        .order('name');
+        .order('display_order', { ascending: true });
 
       if (statuses) {
         statuses.forEach((s) => {

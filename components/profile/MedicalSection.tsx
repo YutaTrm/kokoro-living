@@ -67,7 +67,7 @@ export default function MedicalSection({
 
     // データがある場合は一覧を表示
     return records.map((record) => (
-      <Box key={record.id} className="py-2 px-3 bg-background-50 rounded-lg mb-2">
+      <Box key={record.id} className="p-2 bg-background-50 rounded-lg mb-2">
         <HStack className="justify-between items-center">
           <VStack className="flex-1">
             <Text className="text-base font-semibold">{record.name}</Text>
@@ -104,7 +104,7 @@ export default function MedicalSection({
   };
 
   return (
-    <Box className="px-5 py-4 border-t border-outline-200">
+    <Box className="p-4 border-t border-outline-200">
       <HStack className="justify-between items-center mb-3">
         <Heading size="lg">{title}</Heading>
         {!readonly && onAdd && (

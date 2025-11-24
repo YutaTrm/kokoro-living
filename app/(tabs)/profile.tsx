@@ -184,19 +184,23 @@ export default function ProfileScreen() {
 
   const loadMasterData = async () => {
     try {
-      // 診断名マスター
-      const { data: diagData } = await supabase.from('diagnoses').select('id, name');
+      // 診断名マスター（display_flag=trueのみ、display_order順）
+      const { data: diagData } = await supabase
+        .from('diagnoses')
+        .select('id, name')
+        .eq('display_flag', true)
+        .order('display_order', { ascending: true });
       if (diagData) setDiagnosisMasters(diagData);
 
       // 服薬マスター（成分名リストを先に表示し、その下に製品名(成分名)リストを表示）
       const medicationList: MasterData[] = [];
 
-      // まず成分名を取得
+      // まず成分名を取得（display_flag=trueのみ、display_order順）
       const { data: ingredientData } = await supabase
         .from('ingredients')
         .select('id, name')
         .eq('display_flag', true)
-        .order('name');
+        .order('display_order', { ascending: true });
 
       if (ingredientData) {
         ingredientData.forEach((i: { id: string; name: string }) => {
@@ -229,8 +233,12 @@ export default function ProfileScreen() {
 
       setMedicationMasters(medicationList);
 
-      // 治療法マスター
-      const { data: treatData } = await supabase.from('treatments').select('id, name');
+      // 治療法マスター（display_flag=trueのみ、display_order順）
+      const { data: treatData } = await supabase
+        .from('treatments')
+        .select('id, name')
+        .eq('display_flag', true)
+        .order('display_order', { ascending: true });
       if (treatData) setTreatmentMasters(treatData);
 
       // ステータスマスター（display_order > 0のみ、display_order順）
@@ -959,7 +967,7 @@ export default function ProfileScreen() {
           />
 
           {/* Bio編集 */}
-          <Box className="px-5 py-4">
+          <Box className="p-4">
             <VStack space="sm">
               <Text className="text-base font-semibold">自由記述</Text>
               <Textarea size="md" className="min-h-32">
@@ -977,7 +985,7 @@ export default function ProfileScreen() {
           </Box>
 
           {/* 自分のプロフィールを表示 */}
-          <Box className="px-5 py-4 border-t border-outline-200">
+          <Box className="p-4 border-t border-outline-200">
             <Button
               onPress={async () => {
                 const { data: { user } } = await supabase.auth.getUser();
@@ -988,7 +996,7 @@ export default function ProfileScreen() {
               variant="outline"
               className="w-full"
             >
-              <ButtonText>自分のプロフィール</ButtonText>
+              <ButtonText>自分のプロフィール画面</ButtonText>
             </Button>
           </Box>
         </>

@@ -81,16 +81,19 @@ export default function UserDetailScreen() {
   const loadMedicalRecords = async () => {
     setLoadingMedical(true);
     try {
-      // 診断名を取得
+      // 診断名を取得（display_flag=trueのみ、display_order順）
       const { data: diagnosesData } = await supabase
         .from('user_diagnoses')
-        .select('id, diagnoses(name), start_date, end_date')
+        .select('id, diagnoses(name, display_flag, display_order), start_date, end_date')
         .eq('user_id', id);
 
       if (diagnosesData) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const filtered = diagnosesData
+          .filter((d: any) => d.diagnoses?.display_flag !== false)
+          .sort((a: any, b: any) => (a.diagnoses?.display_order || 0) - (b.diagnoses?.display_order || 0));
         setDiagnoses(
-          diagnosesData.map((d: any) => ({
+          filtered.map((d: any) => ({
             id: d.id,
             name: d.diagnoses?.name || '',
             startDate: d.start_date,
@@ -99,16 +102,19 @@ export default function UserDetailScreen() {
         );
       }
 
-      // 治療を取得
+      // 治療を取得（display_flag=trueのみ、display_order順）
       const { data: treatmentsData } = await supabase
         .from('user_treatments')
-        .select('id, treatments(name), start_date, end_date')
+        .select('id, treatments(name, display_flag, display_order), start_date, end_date')
         .eq('user_id', id);
 
       if (treatmentsData) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const filtered = treatmentsData
+          .filter((t: any) => t.treatments?.display_flag !== false)
+          .sort((a: any, b: any) => (a.treatments?.display_order || 0) - (b.treatments?.display_order || 0));
         setTreatments(
-          treatmentsData.map((t: any) => ({
+          filtered.map((t: any) => ({
             id: t.id,
             name: t.treatments?.name || '',
             startDate: t.start_date,
@@ -117,10 +123,10 @@ export default function UserDetailScreen() {
         );
       }
 
-      // 服薬を取得
+      // 服薬を取得（display_flag=trueのみ、display_order順）
       const { data: medicationsData } = await supabase
         .from('user_medications')
-        .select('id, ingredient_id, ingredients(id, name), products(name), start_date, end_date')
+        .select('id, ingredient_id, ingredients(id, name, display_flag, display_order), products(name), start_date, end_date')
         .eq('user_id', id);
 
       const { data: allProducts } = await supabase.from('products').select('ingredient_id, name');
@@ -145,6 +151,7 @@ export default function UserDetailScreen() {
             id: string;
             ingredientName: string;
             ingredientId: string;
+            displayOrder: number;
             startDate: string | null;
             endDate: string | null;
           }
@@ -154,19 +161,30 @@ export default function UserDetailScreen() {
         medicationsData.forEach((m: any) => {
           const ingredientId = m.ingredient_id;
           const ingredientName = m.ingredients?.name || '';
+          const displayFlag = m.ingredients?.display_flag;
+          const displayOrder = m.ingredients?.display_order || 0;
+
+          // display_flag=falseのものは除外
+          if (displayFlag === false) return;
 
           if (ingredientName && ingredientId && !ingredientMap.has(ingredientId)) {
             ingredientMap.set(ingredientId, {
               id: m.id,
               ingredientName,
               ingredientId,
+              displayOrder,
               startDate: m.start_date,
               endDate: m.end_date,
             });
           }
         });
 
-        const formatted: MedicalRecord[] = Array.from(ingredientMap.values()).map((item) => {
+        // display_order順にソート
+        const sortedItems = Array.from(ingredientMap.values()).sort(
+          (a, b) => a.displayOrder - b.displayOrder
+        );
+
+        const formatted: MedicalRecord[] = sortedItems.map((item) => {
           const productNames = productsByIngredient.get(item.ingredientId) || [];
           return {
             id: item.id,
@@ -182,16 +200,19 @@ export default function UserDetailScreen() {
         setMedications(formatted);
       }
 
-      // ステータスを取得
+      // ステータスを取得（display_flag=trueのみ、display_order順）
       const { data: statusesData } = await supabase
         .from('user_statuses')
-        .select('id, statuses(name), start_date, end_date')
+        .select('id, statuses(name, display_flag, display_order), start_date, end_date')
         .eq('user_id', id);
 
       if (statusesData) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const filtered = statusesData
+          .filter((s: any) => s.statuses?.display_flag !== false)
+          .sort((a: any, b: any) => (a.statuses?.display_order || 0) - (b.statuses?.display_order || 0));
         setStatuses(
-          statusesData.map((s: any) => ({
+          filtered.map((s: any) => ({
             id: s.id,
             name: s.statuses?.name || '',
             startDate: s.start_date,
@@ -315,9 +336,6 @@ export default function UserDetailScreen() {
       <>
         {/* プロフィールヘッダー */}
         <Box className="p-4">
-          <Heading size="md" className="text-primary-500">
-            ユーザープロフィール
-          </Heading>
           <HStack className="mt-2" space="md">
             <Avatar size="lg">
               <AvatarFallbackText>{profile.display_name}</AvatarFallbackText>
@@ -348,7 +366,7 @@ export default function UserDetailScreen() {
         <MedicalSection title="ステータス" records={statuses} loading={loadingMedical} readonly />
 
         {/* 投稿セクションヘッダー */}
-        <Box className="px-5 py-4 border-t border-outline-200">
+        <Box className="p-4 border-t border-outline-200">
           <Heading size="lg">投稿</Heading>
         </Box>
       </>

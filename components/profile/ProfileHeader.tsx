@@ -21,10 +21,7 @@ interface ProfileHeaderProps {
 
 export default function ProfileHeader({ profile, onLogout, onDeleteAccount }: ProfileHeaderProps) {
   return (
-    <Box className="p-4 bg-">
-      <Heading size="md" className="text-primary-500">
-        ログイン中のアカウント
-      </Heading>
+    <Box className="p-4">
       <HStack className="mt-2" space="md">
         {profile.avatarUrl && (
           <Avatar size="lg">
@@ -33,19 +30,21 @@ export default function ProfileHeader({ profile, onLogout, onDeleteAccount }: Pr
           </Avatar>
         )}
         <VStack className="flex-1 justify-center" space="xs">
-          {profile.userName && <Heading size="xl" className="text-primary-300">{profile.userName}</Heading>}
-          {profile.accountName && (
-            <Text className="text-sm text-primary-300">@{profile.accountName}</Text>
-          )}
+          {profile.userName && <Heading size="lg" className="text-primary-500">{profile.userName}</Heading>}
           {profile.createdAt && (
             <Text className="text-sm text-primary-300">
               アプリ登録日時: {new Date(profile.createdAt).toLocaleDateString('ja-JP')}
             </Text>
           )}
+          {profile.accountName && (
+            <Text className="text-sm text-primary-300">
+             ログイン中のXアカウント: @{profile.accountName}
+            </Text>
+          )}
         </VStack>
       </HStack>
 
-      <HStack className="my-4" space="sm">
+      <HStack className="mt-4" space="sm">
         <Button onPress={onLogout} variant="outline" action="negative" className="flex-1">
           <ButtonText>ログアウト</ButtonText>
         </Button>
