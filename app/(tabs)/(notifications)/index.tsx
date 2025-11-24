@@ -162,7 +162,7 @@ export default function NotificationsScreen() {
     }
 
     if (notification.type === 'follow') {
-      router.push(`/(tabs)/(home)/user/${notification.actor.user_id}`);
+      router.push(`/(tabs)/(notifications)/user/${notification.actor.user_id}`);
     } else if (notification.post_id) {
       router.push(`/(tabs)/(notifications)/post/${notification.post_id}`);
     }

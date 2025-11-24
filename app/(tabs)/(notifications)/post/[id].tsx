@@ -1,8 +1,8 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
-import { ChevronDown, ChevronLeft, Clock, CornerDownRight, Edit } from 'lucide-react-native';
+import { ChevronDown, Clock, CornerDownRight, Edit } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView as RNScrollView, useColorScheme } from 'react-native';
+import { Alert, Pressable, ScrollView as RNScrollView } from 'react-native';
 
 import PostActionButtons from '@/components/PostActionButtons';
 import ReplyItem from '@/components/ReplyItem';
@@ -48,8 +48,6 @@ interface Reply {
 export default function NotificationPostDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const colorScheme = useColorScheme();
-  const iconColor = colorScheme === 'dark' ? '#fff' : '#333';
   const [loading, setLoading] = useState(true);
   const [post, setPost] = useState<Post | null>(null);
   const [parentPost, setParentPost] = useState<Post | null>(null);
@@ -349,17 +347,7 @@ export default function NotificationPostDetailScreen() {
 
   return (
     <>
-      <Stack.Screen
-        options={{
-          title: 'ポスト',
-          headerBackVisible: false,
-          headerLeft: () => (
-            <Pressable onPress={() => router.back()} className="p-2 -ml-2">
-              <ChevronLeft size={24} color={iconColor} />
-            </Pressable>
-          ),
-        }}
-      />
+      <Stack.Screen options={{ title: 'ポスト' }} />
       <RNScrollView className="flex-1 bg-background-0">
         <Box className="px-4 py-4 border-b border-outline-200">
           {isReply && parentPost && (
