@@ -673,6 +673,7 @@ export default function PostDetailScreen() {
             onReply={handleReply}
             onLike={handleLike}
             onBookmark={handleBookmark}
+            onLikesCountPress={() => router.push(`/(tabs)/(home)/post/${id}/likes`)}
             size="md"
           />
         </Box>

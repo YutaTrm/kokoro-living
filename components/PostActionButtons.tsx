@@ -12,6 +12,7 @@ interface PostActionButtonsProps {
   onReply: () => void;
   onLike: () => void;
   onBookmark: () => void;
+  onLikesCountPress?: () => void;
   size?: 'sm' | 'md';
   showReplyButton?: boolean;
 }
@@ -24,6 +25,7 @@ export default function PostActionButtons({
   onReply,
   onLike,
   onBookmark,
+  onLikesCountPress,
   size = 'md',
   showReplyButton = true,
 }: PostActionButtonsProps) {
@@ -31,7 +33,7 @@ export default function PostActionButtons({
   const textClass = size === 'sm' ? 'text-xs' : 'text-sm font-semibold';
 
   return (
-    <HStack space="lg" className="items-center">
+    <HStack space="4xl" className="items-center">
       {/* 返信ボタン */}
       {showReplyButton && (
         <Pressable onPress={onReply} className="flex-row items-center">
@@ -45,20 +47,22 @@ export default function PostActionButtons({
       )}
 
       {/* いいねボタン */}
-      <Pressable onPress={onLike} className="flex-row items-center">
-        <HStack space="xs" className="items-center">
+      <HStack space="xs" className="items-center">
+        <Pressable onPress={onLike}>
           <Heart
             size={iconSize}
             color={isLiked ? 'red' : 'gray'}
             fill={isLiked ? 'red' : 'none'}
           />
-          {likesCount > 0 && (
-            <Text className={`${textClass} ${isLiked ? 'text-red-500' : 'text-typography-500'}`}>
+        </Pressable>
+        {likesCount > 0 && (
+          <Pressable onPress={onLikesCountPress}>
+            <Text className={`${textClass} ${isLiked ? 'text-red-500' : 'text-typography-500'} pl-1`}>
               {likesCount}
             </Text>
-          )}
-        </HStack>
-      </Pressable>
+          </Pressable>
+        )}
+      </HStack>
 
       {/* ブックマークボタン */}
       <Pressable onPress={onBookmark} className="flex-row items-center">
