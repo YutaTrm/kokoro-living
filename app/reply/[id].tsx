@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, ScrollView, TextInput } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/Themed';
 import { Box } from '@/components/ui/box';
@@ -114,7 +115,7 @@ export default function ReplyScreen() {
   };
 
   return (
-    <Box className="flex-1 bg-background-0">
+    <SafeAreaView className="flex-1 bg-background-0" edges={['top']}>
       {/* ヘッダー */}
       <HStack className="justify-between items-center px-4 py-3 border-b border-outline-200">
         <Button variant="link" onPress={() => router.back()}>
@@ -165,6 +166,6 @@ export default function ReplyScreen() {
           </Box>
         </VStack>
       </ScrollView>
-    </Box>
+    </SafeAreaView>
   );
 }
