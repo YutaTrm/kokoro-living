@@ -215,7 +215,7 @@ export default function TabOneScreen() {
     // ローディング完了後、データがない場合はメッセージを表示
     return (
       <Box className="flex-1 items-center justify-center pt-24">
-        <Text className="text-base opacity-50">まだ投稿がありません</Text>
+        <Text className="text-base opacity-50">あなたとあなたがフォローしているユーザーの投稿が表示されます。ユーザー検索して仲間を探しましょう！</Text>
       </Box>
     );
   };

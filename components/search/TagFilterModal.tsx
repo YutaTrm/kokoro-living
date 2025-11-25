@@ -118,16 +118,16 @@ export default function TagFilterModal({
             >
               <HStack space="lg">
                 <Radio value="and" size="md">
-                  <RadioIndicator>
-                    <RadioIcon as={CircleIcon} />
-                  </RadioIndicator>
-                  <RadioLabel className="text-sm">全て含む</RadioLabel>
-                </Radio>
-                <Radio value="or" size="md">
+                  <Radio value="or" size="md">
                   <RadioIndicator>
                     <RadioIcon as={CircleIcon} />
                   </RadioIndicator>
                   <RadioLabel className="text-sm">どれか含む</RadioLabel>
+                </Radio>
+                  <RadioIndicator>
+                    <RadioIcon as={CircleIcon} />
+                  </RadioIndicator>
+                  <RadioLabel className="text-sm">全て含む</RadioLabel>
                 </Radio>
               </HStack>
             </RadioGroup>
