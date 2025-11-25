@@ -241,7 +241,7 @@ export default function TabOneScreen() {
 
         const result = await WebBrowser.openAuthSessionAsync(
           data.url,
-          'kokoroliving://'
+          'kokoroliving://auth/callback'
         );
 
         console.log('[Login] WebBrowser結果:', JSON.stringify(result));

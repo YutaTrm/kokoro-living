@@ -54,7 +54,7 @@ export default function LoginPrompt({ children }: LoginPromptProps) {
       if (data?.url) {
         const result = await WebBrowser.openAuthSessionAsync(
           data.url,
-          'kokoroliving://'
+          'kokoroliving://auth/callback'
         );
 
         console.log('[LoginPrompt] WebBrowser結果:', JSON.stringify(result));
