@@ -1,9 +1,10 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
-import { ChevronDown, Clock, CornerDownRight, Edit, Flag, MoreVertical } from 'lucide-react-native';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { ChevronDown, Clock, CornerDownRight, Edit, Flag, MoreVertical, Trash2 } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView as RNScrollView } from 'react-native';
 
+import ConfirmModal from '@/components/ConfirmModal';
 import PostActionButtons from '@/components/PostActionButtons';
 import ReplyItem from '@/components/ReplyItem';
 import Tag from '@/components/Tag';
@@ -13,8 +14,8 @@ import { Box } from '@/components/ui/box';
 import { Button, ButtonText } from '@/components/ui/button';
 import { HStack } from '@/components/ui/hstack';
 import { Menu, MenuItem, MenuItemLabel } from '@/components/ui/menu';
-import { Modal, ModalBackdrop, ModalContent, ModalBody, ModalHeader, ModalFooter } from '@/components/ui/modal';
-import { Radio, RadioGroup, RadioIndicator, RadioLabel, RadioIcon } from '@/components/ui/radio';
+import { Modal, ModalBackdrop, ModalBody, ModalContent, ModalFooter, ModalHeader } from '@/components/ui/modal';
+import { Radio, RadioGroup, RadioIcon, RadioIndicator, RadioLabel } from '@/components/ui/radio';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea, TextareaInput } from '@/components/ui/textarea';
 import { VStack } from '@/components/ui/vstack';
@@ -75,6 +76,8 @@ export default function PostDetailScreen() {
   const [reportReason, setReportReason] = useState<string>('harassment');
   const [reportDescription, setReportDescription] = useState('');
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // 認証状態の監視
   useEffect(() => {
@@ -532,6 +535,32 @@ export default function PostDetailScreen() {
     setShowReportModal(true);
   };
 
+  const handleDeletePress = () => {
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('posts')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setShowDeleteModal(false);
+      Alert.alert('削除完了', '投稿を削除しました', [
+        { text: 'OK', onPress: () => router.back() }
+      ]);
+    } catch (error) {
+      console.error('削除エラー:', error);
+      Alert.alert('エラー', '投稿の削除に失敗しました');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleSubmitReport = async () => {
     if (!reportReason) {
       Alert.alert('エラー', '通報理由を選択してください');
@@ -721,10 +750,16 @@ export default function PostDetailScreen() {
                 }}
               >
                 {isOwnPost ? (
-                  <MenuItem key="edit" textValue="編集" onPress={handleEdit}>
-                    <Edit size={16} color="#666" />
-                    <MenuItemLabel className="ml-2">投稿を編集</MenuItemLabel>
-                  </MenuItem>
+                  <>
+                    <MenuItem key="edit" textValue="編集" onPress={handleEdit}>
+                      <Edit size={16} color="#666" />
+                      <MenuItemLabel className="ml-2">投稿を編集</MenuItemLabel>
+                    </MenuItem>
+                    <MenuItem key="delete" textValue="削除" onPress={handleDeletePress}>
+                      <Trash2 size={16} color="#DC2626" />
+                      <MenuItemLabel className="ml-2 text-error-500">投稿を削除</MenuItemLabel>
+                    </MenuItem>
+                  </>
                 ) : (
                   <MenuItem key="report" textValue="通報" onPress={handleReport}>
                     <Flag size={16} color="#666" />
@@ -740,7 +775,7 @@ export default function PostDetailScreen() {
             <Box className="bg-error-50 border border-error-200 rounded-md p-3 mb-3">
               <HStack space="sm" className="items-center">
                 <Flag size={16} color="#DC2626" />
-                <Text className="text-sm text-error-700 flex-1">
+                <Text className="text-sm text-error-500 flex-1">
                   この投稿は通報により非表示になりました（あなた以外には表示されません）
                 </Text>
               </HStack>
@@ -887,6 +922,17 @@ export default function PostDetailScreen() {
           </ModalFooter>
         </ModalContent>
       </Modal>
+
+      {/* 削除確認モーダル */}
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDeleteConfirm}
+        title="投稿を削除"
+        message="この投稿を削除しますか？この操作は取り消せません。"
+        confirmText="削除"
+        isLoading={isDeleting}
+      />
     </>
   );
 }

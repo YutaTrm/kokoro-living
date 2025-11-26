@@ -4,12 +4,12 @@ import { useEffect, useState } from 'react';
 import { Pressable, ScrollView } from 'react-native';
 
 import Tag from '@/components/Tag';
-import { supabase } from '@/src/lib/supabase';
 import { Text } from '@/components/Themed';
 import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
 import { HStack } from '@/components/ui/hstack';
 import { VStack } from '@/components/ui/vstack';
+import { supabase } from '@/src/lib/supabase';
 
 interface PostItemProps {
   post: {
@@ -146,7 +146,7 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
               <Box className="bg-error-50 border border-error-200 rounded-md p-2 mt-2">
                 <HStack space="xs" className="items-center">
                   <Flag size={12} color="#DC2626" />
-                  <Text className="text-xs text-error-700 flex-1">
+                  <Text className="text-xs text-error-500 flex-1">
                     通報により非表示（あなたのみ表示）
                   </Text>
                 </HStack>
