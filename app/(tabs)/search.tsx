@@ -1,4 +1,4 @@
-import { ChevronDownIcon, PlusIcon, XIcon } from 'lucide-react-native';
+import { ChevronDownIcon, CircleIcon, PlusIcon, XIcon } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, TextInput, View } from 'react-native';
 
@@ -10,6 +10,7 @@ import { Box } from '@/components/ui/box';
 import { Button, ButtonIcon, ButtonText } from '@/components/ui/button';
 import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
+import { Radio, RadioGroup, RadioIcon, RadioIndicator, RadioLabel } from '@/components/ui/radio';
 import {
   Select,
   SelectBackdrop,
@@ -76,7 +77,7 @@ export default function SearchScreen() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<TagOption[]>([]);
   const [loadingTags, setLoadingTags] = useState(true);
-  const [tagFilterMode, setTagFilterMode] = useState<TagFilterMode>('and');
+  const [tagFilterMode, setTagFilterMode] = useState<TagFilterMode>('or');
 
   const [showTagModal, setShowTagModal] = useState(false);
 
@@ -373,9 +374,13 @@ export default function SearchScreen() {
       }
 
       // ソート
-      const nullsLast = sortBy === 'experienced_at';
-      if (nullsLast) {
-        query = query.order(sortBy, { ascending: false, nullsFirst: false });
+      if (sortBy === 'experienced_at') {
+        // 体験日でソートする場合は、experienced_atがnullの投稿を除外
+        // 同じ体験年月の場合は投稿日時で降順
+        query = query
+          .not('experienced_at', 'is', null)
+          .order(sortBy, { ascending: false })
+          .order('created_at', { ascending: false });
       } else {
         query = query.order(sortBy, { ascending: false });
       }
@@ -610,7 +615,7 @@ export default function SearchScreen() {
     setSearchQuery('');
     setSelectedTags([]);
     setSortBy('created_at');
-    setTagFilterMode('and');
+    setTagFilterMode('or');
     setPosts([]);
     setUsers([]);
     setHasSearched(false);
@@ -628,9 +633,8 @@ export default function SearchScreen() {
     setHasMore(true);
   };
 
-  const handleTagFilterSave = (newSelectedIds: string[], newFilterMode: TagFilterMode) => {
+  const handleTagFilterSave = (newSelectedIds: string[]) => {
     setSelectedTags(newSelectedIds);
-    setTagFilterMode(newFilterMode);
   };
 
   const removeTag = (tagId: string) => {
@@ -718,7 +722,28 @@ export default function SearchScreen() {
       <Box className="px-4 py-3 border-b border-outline-200">
         {/* タグで絞り込み */}
         <Box>
-          <Text className="text-sm font-semibold mb-2 text-typography-700">タグで絞り込み</Text>
+          <HStack className="justify-between items-center mb-2">
+            <Text className="text-sm font-semibold text-typography-700">タグで絞り込み</Text>
+            <RadioGroup
+              value={tagFilterMode}
+              onChange={(value) => setTagFilterMode(value as TagFilterMode)}
+            >
+              <HStack space="md">
+                <Radio value="or" size="sm">
+                  <RadioIndicator>
+                    <RadioIcon as={CircleIcon} />
+                  </RadioIndicator>
+                  <RadioLabel className="text-md">どれか</RadioLabel>
+                </Radio>
+                <Radio value="and" size="sm">
+                  <RadioIndicator>
+                    <RadioIcon as={CircleIcon} />
+                  </RadioIndicator>
+                  <RadioLabel className="text-md">全て</RadioLabel>
+                </Radio>
+              </HStack>
+            </RadioGroup>
+          </HStack>
           {loadingTags ? (
             <Spinner size="small" />
           ) : (
@@ -861,7 +886,6 @@ export default function SearchScreen() {
         onSave={handleTagFilterSave}
         tags={availableTags}
         selectedIds={selectedTags}
-        filterMode={tagFilterMode}
       />
     </Box>
   );

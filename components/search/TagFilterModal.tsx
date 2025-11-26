@@ -1,4 +1,3 @@
-import { CircleIcon } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { ScrollView } from 'react-native';
 
@@ -7,7 +6,6 @@ import { Box } from '@/components/ui/box';
 import { Button, ButtonText } from '@/components/ui/button';
 import { Checkbox, CheckboxIcon, CheckboxIndicator, CheckboxLabel } from '@/components/ui/checkbox';
 import { Heading } from '@/components/ui/heading';
-import { HStack } from '@/components/ui/hstack';
 import { CheckIcon } from '@/components/ui/icon';
 import {
   Modal,
@@ -17,7 +15,6 @@ import {
   ModalFooter,
   ModalHeader,
 } from '@/components/ui/modal';
-import { Radio, RadioGroup, RadioIcon, RadioIndicator, RadioLabel } from '@/components/ui/radio';
 import { VStack } from '@/components/ui/vstack';
 
 interface TagOption {
@@ -26,15 +23,12 @@ interface TagOption {
   type: 'diagnosis' | 'ingredient' | 'treatment' | 'status';
 }
 
-type TagFilterMode = 'and' | 'or';
-
 interface TagFilterModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (selectedIds: string[], filterMode: TagFilterMode) => void;
+  onSave: (selectedIds: string[]) => void;
   tags: TagOption[];
   selectedIds: string[];
-  filterMode: TagFilterMode;
 }
 
 export default function TagFilterModal({
@@ -43,18 +37,15 @@ export default function TagFilterModal({
   onSave,
   tags,
   selectedIds,
-  filterMode,
 }: TagFilterModalProps) {
   const [localSelectedIds, setLocalSelectedIds] = useState<string[]>(selectedIds);
-  const [localFilterMode, setLocalFilterMode] = useState<TagFilterMode>(filterMode);
 
   // モーダルが開くたびに状態をリセット
   useEffect(() => {
     if (isOpen) {
       setLocalSelectedIds(selectedIds);
-      setLocalFilterMode(filterMode);
     }
-  }, [isOpen, selectedIds, filterMode]);
+  }, [isOpen, selectedIds]);
 
   const handleToggle = (id: string) => {
     setLocalSelectedIds((prev) =>
@@ -63,7 +54,7 @@ export default function TagFilterModal({
   };
 
   const handleSave = () => {
-    onSave(localSelectedIds, localFilterMode);
+    onSave(localSelectedIds);
     onClose();
   };
 
@@ -110,29 +101,6 @@ export default function TagFilterModal({
           <Heading size="lg">タグで絞り込み</Heading>
         </ModalHeader>
         <ModalBody>
-          {/* AND/OR切り替え */}
-          <Box className="mb-4">
-            <RadioGroup
-              value={localFilterMode}
-              onChange={(value) => setLocalFilterMode(value as TagFilterMode)}
-            >
-              <HStack space="lg">
-                <Radio value="and" size="md">
-                  <Radio value="or" size="md">
-                  <RadioIndicator>
-                    <RadioIcon as={CircleIcon} />
-                  </RadioIndicator>
-                  <RadioLabel className="text-sm">どれか含む</RadioLabel>
-                </Radio>
-                  <RadioIndicator>
-                    <RadioIcon as={CircleIcon} />
-                  </RadioIndicator>
-                  <RadioLabel className="text-sm">全て含む</RadioLabel>
-                </Radio>
-              </HStack>
-            </RadioGroup>
-          </Box>
-
           <ScrollView className="flex-1">
             {renderSection('診断名', 'diagnosis')}
             {renderSection('服薬', 'ingredient')}
