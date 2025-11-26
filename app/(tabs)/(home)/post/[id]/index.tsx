@@ -1,6 +1,6 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
-import { ChevronDown, Clock, CornerDownRight, Edit } from 'lucide-react-native';
+import { ChevronDown, Clock, CornerDownRight, Edit, Flag, MoreVertical } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView as RNScrollView } from 'react-native';
 
@@ -12,7 +12,11 @@ import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar'
 import { Box } from '@/components/ui/box';
 import { Button, ButtonText } from '@/components/ui/button';
 import { HStack } from '@/components/ui/hstack';
+import { Menu, MenuItem, MenuItemLabel } from '@/components/ui/menu';
+import { Modal, ModalBackdrop, ModalContent, ModalBody, ModalHeader, ModalFooter } from '@/components/ui/modal';
+import { Radio, RadioGroup, RadioIndicator, RadioLabel, RadioIcon } from '@/components/ui/radio';
 import { Spinner } from '@/components/ui/spinner';
+import { Textarea, TextareaInput } from '@/components/ui/textarea';
 import { VStack } from '@/components/ui/vstack';
 import { supabase } from '@/src/lib/supabase';
 
@@ -23,6 +27,8 @@ interface Post {
   user_id: string;
   parent_post_id?: string | null;
   experienced_at?: string | null;
+  is_hidden?: boolean;
+  hidden_reason?: string | null;
   user: {
     display_name: string;
     user_id: string;
@@ -65,6 +71,10 @@ export default function PostDetailScreen() {
   });
   const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set());
   const [loadingDeeperReplies, setLoadingDeeperReplies] = useState<Set<string>>(new Set());
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportReason, setReportReason] = useState<string>('harassment');
+  const [reportDescription, setReportDescription] = useState('');
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
 
   // 認証状態の監視
   useEffect(() => {
@@ -102,7 +112,7 @@ export default function PostDetailScreen() {
     try {
       const { data: postData, error: postError } = await supabase
         .from('posts')
-        .select('id, content, created_at, user_id, experienced_at, parent_post_id')
+        .select('id, content, created_at, user_id, experienced_at, parent_post_id, is_hidden, hidden_reason')
         .eq('id', id)
         .single();
 
@@ -518,6 +528,50 @@ export default function PostDetailScreen() {
     router.push(`/create-post?postId=${id}`);
   };
 
+  const handleReport = () => {
+    setShowReportModal(true);
+  };
+
+  const handleSubmitReport = async () => {
+    if (!reportReason) {
+      Alert.alert('エラー', '通報理由を選択してください');
+      return;
+    }
+
+    setIsSubmittingReport(true);
+
+    try {
+      const { data, error } = await supabase.rpc('report_post', {
+        p_post_id: id,
+        p_reason: reportReason,
+        p_description: reportDescription || null,
+      });
+
+      if (error) throw error;
+
+      const result = data as { success: boolean; report_count: number; threshold: number; hidden: boolean };
+
+      setShowReportModal(false);
+      setReportReason('harassment');
+      setReportDescription('');
+
+      if (result.hidden) {
+        Alert.alert(
+          '通報完了',
+          '通報を受け付けました。この投稿は非表示になりました。',
+          [{ text: 'OK', onPress: () => router.back() }]
+        );
+      } else {
+        Alert.alert('通報完了', '通報を受け付けました。ご協力ありがとうございます。');
+      }
+    } catch (error) {
+      console.error('通報エラー:', error);
+      Alert.alert('エラー', '通報の送信に失敗しました');
+    } finally {
+      setIsSubmittingReport(false);
+    }
+  };
+
   const handleUserPress = (userId: string) => {
     // 自分のアバターならマイページへ、他ユーザーならプロフィールページへ
     if (userId === currentUserId) {
@@ -552,6 +606,26 @@ export default function PostDetailScreen() {
           <ButtonText>戻る</ButtonText>
         </Button>
       </Box>
+    );
+  }
+
+  // 非表示投稿の場合（他人の投稿のみブロック、自分の投稿は警告バナー付きで表示）
+  if (post.is_hidden && !isOwnPost) {
+    return (
+      <>
+        <Stack.Screen options={{ title: 'ポスト' }} />
+        <Box className="flex-1 items-center justify-center p-5">
+          <VStack space="md" className="items-center">
+            <Flag size={48} color="#999" />
+            <Text className="text-base text-center text-typography-500">
+              この投稿は通報により非表示になりました
+            </Text>
+            <Button onPress={() => router.back()} className="mt-4">
+              <ButtonText>戻る</ButtonText>
+            </Button>
+          </VStack>
+        </Box>
+      </>
     );
   }
 
@@ -617,7 +691,7 @@ export default function PostDetailScreen() {
             </Pressable>
           )}
 
-          {/* ヘッダー：ユーザー情報と編集ボタン */}
+          {/* ヘッダー：ユーザー情報とメニューボタン */}
           <HStack className="justify-between items-start mb-3">
             <Pressable onPress={() => handleUserPress(post.user_id)} className="flex-1">
               <HStack space="sm">
@@ -634,12 +708,44 @@ export default function PostDetailScreen() {
                 </VStack>
               </HStack>
             </Pressable>
-            {isOwnPost && (
-              <Pressable onPress={handleEdit} className="p-2">
-                <Edit size={20} color="#666" />
-              </Pressable>
+            {isLoggedIn && (
+              <Menu
+                placement="bottom right"
+                offset={5}
+                trigger={({ ...triggerProps }) => {
+                  return (
+                    <Pressable {...triggerProps} className="p-2">
+                      <MoreVertical size={20} color="#666" />
+                    </Pressable>
+                  );
+                }}
+              >
+                {isOwnPost ? (
+                  <MenuItem key="edit" textValue="編集" onPress={handleEdit}>
+                    <Edit size={16} color="#666" />
+                    <MenuItemLabel className="ml-2">投稿を編集</MenuItemLabel>
+                  </MenuItem>
+                ) : (
+                  <MenuItem key="report" textValue="通報" onPress={handleReport}>
+                    <Flag size={16} color="#666" />
+                    <MenuItemLabel className="ml-2">投稿を通報</MenuItemLabel>
+                  </MenuItem>
+                )}
+              </Menu>
             )}
           </HStack>
+
+          {/* 非表示警告バナー（自分の投稿のみ） */}
+          {post.is_hidden && isOwnPost && (
+            <Box className="bg-error-50 border border-error-200 rounded-md p-3 mb-3">
+              <HStack space="sm" className="items-center">
+                <Flag size={16} color="#DC2626" />
+                <Text className="text-sm text-error-700 flex-1">
+                  この投稿は通報により非表示になりました（あなた以外には表示されません）
+                </Text>
+              </HStack>
+            </Box>
+          )}
 
           <Text className="text-lg leading-6 mb-2">{post.content}</Text>
 
@@ -694,6 +800,93 @@ export default function PostDetailScreen() {
           </Box>
         )}
       </RNScrollView>
+
+      {/* 通報モーダル */}
+      <Modal isOpen={showReportModal} onClose={() => setShowReportModal(false)} size="md">
+        <ModalBackdrop />
+        <ModalContent>
+          <ModalHeader>
+            <Text className="text-lg font-semibold">投稿を通報</Text>
+          </ModalHeader>
+          <ModalBody>
+            <VStack space="md">
+              <Text className="text-sm text-typography-500">
+                通報理由を選択してください
+              </Text>
+              <RadioGroup value={reportReason} onChange={setReportReason}>
+                <VStack space="md">
+                  <Radio value="self_harm">
+                    <RadioIndicator>
+                      <RadioIcon as={ChevronDown} />
+                    </RadioIndicator>
+                    <RadioLabel>自傷・自殺の誘発</RadioLabel>
+                  </Radio>
+                  <Radio value="harassment">
+                    <RadioIndicator>
+                      <RadioIcon as={ChevronDown} />
+                    </RadioIndicator>
+                    <RadioLabel>ハラスメント・攻撃的な内容</RadioLabel>
+                  </Radio>
+                  <Radio value="spam">
+                    <RadioIndicator>
+                      <RadioIcon as={ChevronDown} />
+                    </RadioIndicator>
+                    <RadioLabel>スパム・宣伝</RadioLabel>
+                  </Radio>
+                  <Radio value="privacy">
+                    <RadioIndicator>
+                      <RadioIcon as={ChevronDown} />
+                    </RadioIndicator>
+                    <RadioLabel>個人情報の漏洩</RadioLabel>
+                  </Radio>
+                  <Radio value="other">
+                    <RadioIndicator>
+                      <RadioIcon as={ChevronDown} />
+                    </RadioIndicator>
+                    <RadioLabel>その他</RadioLabel>
+                  </Radio>
+                </VStack>
+              </RadioGroup>
+              <VStack space="xs">
+                <Text className="text-sm text-typography-500">
+                  詳細説明（任意）
+                </Text>
+                <Textarea>
+                  <TextareaInput
+                    placeholder="詳しい説明があれば記入してください"
+                    value={reportDescription}
+                    onChangeText={setReportDescription}
+                    className="min-h-[80px]"
+                  />
+                </Textarea>
+              </VStack>
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <HStack space="sm" className="flex-1">
+              <Button
+                variant="outline"
+                onPress={() => setShowReportModal(false)}
+                className="flex-1"
+                disabled={isSubmittingReport}
+              >
+                <ButtonText>キャンセル</ButtonText>
+              </Button>
+              <Button
+                onPress={handleSubmitReport}
+                className="flex-1"
+                disabled={isSubmittingReport}
+              >
+                {isSubmittingReport ? (
+                  <Spinner size="small" color="white" />
+                ) : (
+                  <ButtonText>送信</ButtonText>
+                )}
+              </Button>
+            </HStack>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </>
   );
 }

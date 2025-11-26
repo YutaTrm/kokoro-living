@@ -14,6 +14,7 @@ interface Post {
   id: string;
   content: string;
   created_at: string;
+  is_hidden?: boolean;
   user: {
     display_name: string;
     user_id: string;
@@ -68,25 +69,39 @@ export default function TabOneScreen() {
           .eq('follower_id', user.id);
 
         const followingIds = followingData?.map(f => f.following_id) || [];
-        const userIds = [user.id, ...followingIds]; // 自分のIDも追加
 
-        // 自分とフォローしている人の投稿を取得
-        const result = await supabase
+        // 自分の投稿（非表示を含む）
+        const { data: myPosts } = await supabase
           .from('posts')
-          .select('id, content, created_at, user_id')
-          .in('user_id', userIds)
+          .select('id, content, created_at, user_id, is_hidden')
+          .eq('user_id', user.id)
           .is('parent_post_id', null)
           .order('created_at', { ascending: false })
           .limit(50);
 
-        postsData = result.data;
-        postsError = result.error;
+        // フォローしている人の投稿（非表示を除外）
+        const { data: followingPosts, error: followingError } = await supabase
+          .from('posts')
+          .select('id, content, created_at, user_id, is_hidden')
+          .in('user_id', followingIds)
+          .is('parent_post_id', null)
+          .eq('is_hidden', false)
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        // マージして時系列順にソート
+        const allPosts = [...(myPosts || []), ...(followingPosts || [])];
+        postsData = allPosts.sort((a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        ).slice(0, 50);
+        postsError = followingError;
       } else {
-        // 未ログイン: すべての投稿を取得
+        // 未ログイン: すべての投稿を取得（非表示を除外）
         const result = await supabase
           .from('posts')
-          .select('id, content, created_at, user_id')
+          .select('id, content, created_at, user_id, is_hidden')
           .is('parent_post_id', null)
+          .eq('is_hidden', false)
           .order('created_at', { ascending: false })
           .limit(50);
 
@@ -178,6 +193,7 @@ export default function TabOneScreen() {
         id: post.id,
         content: post.content,
         created_at: post.created_at,
+        is_hidden: post.is_hidden || false,
         user: {
           display_name: usersMap.get(post.user_id)?.display_name || 'Unknown',
           user_id: post.user_id,

@@ -36,6 +36,7 @@ interface Post {
   id: string;
   content: string;
   created_at: string;
+  is_hidden?: boolean;
   user: {
     display_name: string;
     user_id: string;
@@ -242,6 +243,7 @@ export default function UserDetailScreen() {
         .select('id, content, created_at, user_id')
         .eq('user_id', id)
         .is('parent_post_id', null)
+        .eq('is_hidden', false)
         .order('created_at', { ascending: false })
         .limit(20);
 
@@ -321,6 +323,7 @@ export default function UserDetailScreen() {
         id: post.id,
         content: post.content,
         created_at: post.created_at,
+        is_hidden: false, // ユーザープロフィールでは非表示投稿は除外されている
         user: {
           display_name: userData?.display_name || 'Unknown',
           user_id: post.user_id,
@@ -358,12 +361,13 @@ export default function UserDetailScreen() {
 
       const postIds = likesData.map((l) => l.post_id);
 
-      // 投稿データを取得
+      // 投稿データを取得（非表示を除外）
       const { data: postsData, error: postsError } = await supabase
         .from('posts')
         .select('id, content, created_at, user_id')
         .in('id', postIds)
-        .is('parent_post_id', null);
+        .is('parent_post_id', null)
+        .eq('is_hidden', false);
 
       if (postsError) throw postsError;
 
@@ -449,6 +453,7 @@ export default function UserDetailScreen() {
             id: post.id,
             content: post.content,
             created_at: post.created_at,
+            is_hidden: false, // いいね一覧では非表示投稿は除外されている
             user: {
               display_name: user?.display_name || 'Unknown',
               user_id: post.user_id,

@@ -6,6 +6,7 @@ export interface Post {
   id: string;
   content: string;
   created_at: string;
+  is_hidden?: boolean;
   user: {
     display_name: string;
     user_id: string;
@@ -95,7 +96,7 @@ export const usePostsData = () => {
 
       const { data: postsData, error: postsError } = await supabase
         .from('posts')
-        .select('id, content, created_at, user_id')
+        .select('id, content, created_at, user_id, is_hidden')
         .eq('user_id', user.id)
         .is('parent_post_id', null)
         .order('created_at', { ascending: false });
@@ -127,6 +128,7 @@ export const usePostsData = () => {
           id: post.id,
           content: post.content,
           created_at: post.created_at,
+          is_hidden: post.is_hidden || false,
           user: {
             display_name: userData?.display_name || 'Unknown',
             user_id: post.user_id,
@@ -158,6 +160,7 @@ export const usePostsData = () => {
         .from('likes')
         .select('post_id, posts!inner(id, content, created_at, user_id)')
         .eq('user_id', user.id)
+        .eq('posts.is_hidden', false)
         .order('created_at', { ascending: false });
 
       if (likesError) throw likesError;
@@ -196,6 +199,7 @@ export const usePostsData = () => {
           id: like.posts.id,
           content: like.posts.content,
           created_at: like.posts.created_at,
+          is_hidden: false, // いいね一覧では非表示投稿は除外されている
           user: {
             display_name: usersMap.get(like.posts.user_id)?.display_name || 'Unknown',
             user_id: like.posts.user_id,
@@ -227,6 +231,7 @@ export const usePostsData = () => {
         .from('bookmarks')
         .select('post_id, posts!inner(id, content, created_at, user_id)')
         .eq('user_id', user.id)
+        .eq('posts.is_hidden', false)
         .order('created_at', { ascending: false });
 
       if (bookmarksError) throw bookmarksError;
@@ -267,6 +272,7 @@ export const usePostsData = () => {
           id: bookmark.posts.id,
           content: bookmark.posts.content,
           created_at: bookmark.posts.created_at,
+          is_hidden: false, // ブックマーク一覧では非表示投稿は除外されている
           user: {
             display_name: usersMap.get(bookmark.posts.user_id)?.display_name || 'Unknown',
             user_id: bookmark.posts.user_id,

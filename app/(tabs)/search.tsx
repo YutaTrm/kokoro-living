@@ -32,6 +32,7 @@ interface Post {
   content: string;
   created_at: string;
   parent_post_id: string | null;
+  is_hidden?: boolean;
   user: {
     display_name: string;
     user_id: string;
@@ -360,10 +361,11 @@ export default function SearchScreen() {
         setLoadingMore(true);
       }
 
-      // 基本クエリ
+      // 基本クエリ（非表示投稿を除外）
       let query = supabase
         .from('posts')
-        .select('id, content, created_at, updated_at, experienced_at, user_id, parent_post_id');
+        .select('id, content, created_at, updated_at, experienced_at, user_id, parent_post_id')
+        .eq('is_hidden', false);
 
       // フリーワード検索
       if (searchQuery.trim()) {
@@ -441,6 +443,7 @@ export default function SearchScreen() {
             content: post.content,
             created_at: post.created_at,
             parent_post_id: post.parent_post_id,
+            is_hidden: false, // 検索画面では非表示投稿は除外されている
             user: {
               display_name: usersMap.get(post.user_id)?.display_name || 'Unknown',
               user_id: post.user_id,

@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { CornerDownRight } from 'lucide-react-native';
+import { CornerDownRight, Flag } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView } from 'react-native';
 
@@ -17,6 +17,7 @@ interface PostItemProps {
     content: string;
     created_at: string;
     parent_post_id?: string | null;
+    is_hidden?: boolean;
     user: {
       display_name: string;
       user_id: string;
@@ -139,6 +140,18 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
             <Text className="text-base leading-5" numberOfLines={3} ellipsizeMode="tail">
               {post.content}
             </Text>
+
+            {/* 非表示警告バナー（自分の投稿のみ） */}
+            {post.is_hidden && currentUserId === post.user.user_id && (
+              <Box className="bg-error-50 border border-error-200 rounded-md p-2 mt-2">
+                <HStack space="xs" className="items-center">
+                  <Flag size={12} color="#DC2626" />
+                  <Text className="text-xs text-error-700 flex-1">
+                    通報により非表示（あなたのみ表示）
+                  </Text>
+                </HStack>
+              </Box>
+            )}
           </VStack>
         </HStack>
       </Box>
