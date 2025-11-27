@@ -814,7 +814,10 @@ export default function PostDetailScreen() {
             onReply={handleReply}
             onLike={handleLike}
             onBookmark={handleBookmark}
-            onLikesCountPress={() => router.push(`/(tabs)/(home)/post/${id}/likes`)}
+            onLikesCountPress={() => {
+              const currentTab = getCurrentTab(segments);
+              router.push(`/(tabs)/${currentTab}/post/${id}/likes`);
+            }}
             size="md"
           />
         </Box>
