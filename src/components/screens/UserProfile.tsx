@@ -1,7 +1,8 @@
 import { Stack, useLocalSearchParams, useRouter, useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { FlatList, Pressable } from 'react-native';
+import { Alert, FlatList, Pressable } from 'react-native';
 
+import ConfirmModal from '@/components/ConfirmModal';
 import FollowButton from '@/components/FollowButton';
 import PostItem from '@/components/PostItem';
 import MedicalSection from '@/components/profile/MedicalSection';
@@ -9,13 +10,18 @@ import ProfileTabBar, { TabType } from '@/components/profile/ProfileTabBar';
 import { Text } from '@/components/Themed';
 import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
+import { Button } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
+import { Icon } from '@/components/ui/icon';
+import { Menu, MenuItem, MenuItemLabel } from '@/components/ui/menu';
 import { Spinner } from '@/components/ui/spinner';
 import { VStack } from '@/components/ui/vstack';
+import { useBlock } from '@/src/hooks/useBlock';
 import { useFollow } from '@/src/hooks/useFollow';
 import { supabase } from '@/src/lib/supabase';
 import { sortByStartDate } from '@/src/utils/sortByStartDate';
+import { MoreVertical } from 'lucide-react-native';
 
 interface UserProfile {
   user_id: string;
@@ -52,9 +58,12 @@ export default function UserDetailScreen() {
   const router = useRouter();
   const segments = useSegments();
   const { isFollowing, isLoading: followLoading, toggleFollow, counts, isOwnProfile, currentUserId } = useFollow(id ?? null);
+  const { isBlocked, isLoading: blockLoading, toggleBlock } = useBlock(id ?? null);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('profile');
+  const [showBlockModal, setShowBlockModal] = useState(false);
+  const [isBlockProcessing, setIsBlockProcessing] = useState(false);
   const [diagnoses, setDiagnoses] = useState<MedicalRecord[]>([]);
   const [treatments, setTreatments] = useState<MedicalRecord[]>([]);
   const [medications, setMedications] = useState<MedicalRecord[]>([]);
@@ -510,6 +519,25 @@ export default function UserDetailScreen() {
                     登録日: {new Date(profile.created_at).toLocaleDateString('ja-JP')}
                   </Text>
                 </VStack>
+                {!isOwnProfile && currentUserId && (
+                  <Menu
+                    placement="bottom right"
+                    offset={5}
+                    trigger={({ ...triggerProps }) => {
+                      return (
+                        <Pressable {...triggerProps} className="p-2">
+                          <MoreVertical size={20} color="#666" />
+                        </Pressable>
+                      );
+                    }}
+                  >
+                    <MenuItem key="block" textValue={isBlocked ? 'ブロック解除' : 'ブロック'} onPress={handleBlockPress}>
+                      <MenuItemLabel className={isBlocked ? '' : 'text-error-500'}>
+                        {isBlocked ? 'ブロック解除' : 'ブロック'}
+                      </MenuItemLabel>
+                    </MenuItem>
+                  </Menu>
+                )}
               </HStack>
               {/* フォロー数 */}
               <HStack space="md" className="items-center mt-2">
@@ -596,6 +624,23 @@ export default function UserDetailScreen() {
     );
   }
 
+  const handleBlockPress = () => {
+    setShowBlockModal(true);
+  };
+
+  const handleBlockConfirm = async () => {
+    setIsBlockProcessing(true);
+    try {
+      await toggleBlock();
+      setShowBlockModal(false);
+      Alert.alert('成功', isBlocked ? 'ブロックを解除しました' : 'ブロックしました');
+    } catch (error) {
+      Alert.alert('エラー', '操作に失敗しました');
+    } finally {
+      setIsBlockProcessing(false);
+    }
+  };
+
   if (!profile) {
     return (
       <Box className="flex-1 items-center justify-center p-5">
@@ -616,6 +661,21 @@ export default function UserDetailScreen() {
           ListEmptyComponent={renderEmptyContent}
         />
       </Box>
+
+      {/* ブロック確認モーダル */}
+      <ConfirmModal
+        isOpen={showBlockModal}
+        onClose={() => setShowBlockModal(false)}
+        onConfirm={handleBlockConfirm}
+        title={isBlocked ? 'ブロック解除' : 'ブロック'}
+        message={
+          isBlocked
+            ? 'このユーザーのブロックを解除しますか？'
+            : 'このユーザーをブロックしますか？ブロックすると、相互フォローが解除され、お互いの投稿が見えなくなります。'
+        }
+        confirmText={isBlocked ? 'ブロック解除' : 'ブロック'}
+        isLoading={isBlockProcessing}
+      />
     </>
   );
 }
