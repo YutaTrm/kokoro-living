@@ -55,7 +55,25 @@ export default function NotificationsScreen() {
     if (!userId) return;
 
     try {
-      const { data, error } = await supabase
+      // ブロックしているユーザーとブロックされているユーザーを取得
+      const { data: blocksData } = await supabase
+        .from('blocks')
+        .select('blocked_id')
+        .eq('blocker_id', userId);
+
+      const blockedIds = blocksData?.map((b) => b.blocked_id) || [];
+
+      const { data: blockedByData } = await supabase
+        .from('blocks')
+        .select('blocker_id')
+        .eq('blocked_id', userId);
+
+      const blockedByIds = blockedByData?.map((b) => b.blocker_id) || [];
+
+      const allBlockedIds = [...blockedIds, ...blockedByIds];
+
+      // 通知を取得（ブロックユーザーを除外）
+      let query = supabase
         .from('notifications')
         .select(`
           id,
@@ -68,6 +86,13 @@ export default function NotificationsScreen() {
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(50);
+
+      // ブロックリストがある場合のみ除外
+      if (allBlockedIds.length > 0) {
+        query = query.not('actor_id', 'in', `(${allBlockedIds.join(',')})`);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 

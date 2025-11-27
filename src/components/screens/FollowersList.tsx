@@ -19,13 +19,39 @@ export default function FollowersListScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (id) loadFollowers();
-  }, [id]);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setCurrentUserId(session?.user?.id ?? null);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (id && currentUserId) loadFollowers();
+  }, [id, currentUserId]);
 
   const loadFollowers = async () => {
+    if (!currentUserId) return;
+
     try {
+      // ブロックしているユーザーとブロックされているユーザーを取得
+      const { data: blocksData } = await supabase
+        .from('blocks')
+        .select('blocked_id')
+        .eq('blocker_id', currentUserId);
+
+      const blockedIds = blocksData?.map((b) => b.blocked_id) || [];
+
+      const { data: blockedByData } = await supabase
+        .from('blocks')
+        .select('blocker_id')
+        .eq('blocked_id', currentUserId);
+
+      const blockedByIds = blockedByData?.map((b) => b.blocker_id) || [];
+
+      const allBlockedIds = [...blockedIds, ...blockedByIds];
+
       // フォロワーのユーザーIDを取得
       const { data: followsData, error: followsError } = await supabase
         .from('follows')
@@ -39,7 +65,15 @@ export default function FollowersListScreen() {
         return;
       }
 
-      const userIds = followsData.map((f) => f.follower_id);
+      // ブロックユーザーを除外
+      const userIds = followsData
+        .map((f) => f.follower_id)
+        .filter((userId) => !allBlockedIds.includes(userId));
+
+      if (userIds.length === 0) {
+        setUsers([]);
+        return;
+      }
 
       // ユーザー情報を取得
       const { data: usersData, error: usersError } = await supabase

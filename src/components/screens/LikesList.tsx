@@ -19,13 +19,39 @@ export default function PostLikesScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (id) loadLikedUsers();
-  }, [id]);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setCurrentUserId(session?.user?.id ?? null);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (id && currentUserId) loadLikedUsers();
+  }, [id, currentUserId]);
 
   const loadLikedUsers = async () => {
+    if (!currentUserId) return;
+
     try {
+      // ブロックしているユーザーとブロックされているユーザーを取得
+      const { data: blocksData } = await supabase
+        .from('blocks')
+        .select('blocked_id')
+        .eq('blocker_id', currentUserId);
+
+      const blockedIds = blocksData?.map((b) => b.blocked_id) || [];
+
+      const { data: blockedByData } = await supabase
+        .from('blocks')
+        .select('blocker_id')
+        .eq('blocked_id', currentUserId);
+
+      const blockedByIds = blockedByData?.map((b) => b.blocker_id) || [];
+
+      const allBlockedIds = [...blockedIds, ...blockedByIds];
+
       const { data: likesData, error: likesError } = await supabase
         .from('likes')
         .select('user_id')
@@ -38,7 +64,15 @@ export default function PostLikesScreen() {
         return;
       }
 
-      const userIds = likesData.map((l) => l.user_id);
+      // ブロックユーザーを除外
+      const userIds = likesData
+        .map((l) => l.user_id)
+        .filter((userId) => !allBlockedIds.includes(userId));
+
+      if (userIds.length === 0) {
+        setUsers([]);
+        return;
+      }
 
       const { data: usersData, error: usersError } = await supabase
         .from('users')
