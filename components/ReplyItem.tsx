@@ -10,6 +10,7 @@ import { Box } from '@/components/ui/box';
 import { HStack } from '@/components/ui/hstack';
 import { VStack } from '@/components/ui/vstack';
 import { supabase } from '@/src/lib/supabase';
+import { getCurrentTab } from '@/src/utils/getCurrentTab';
 
 interface ReplyItemProps {
   reply: {
@@ -50,15 +51,6 @@ export default function ReplyItem({
     loadCounts();
     checkInteractionStatus();
   }, [reply.id]);
-
-  // 現在のタブを判定
-  const getCurrentTab = () => {
-    if (segments.includes('(notifications)')) return '(notifications)';
-    if (segments.includes('(search)')) return '(search)';
-    if (segments.includes('(profile)')) return '(profile)';
-    if (segments.includes('(home)')) return '(home)';
-    return '(home)'; // デフォルトはホーム
-  };
 
   const checkLoginStatus = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -135,19 +127,19 @@ export default function ReplyItem({
   };
 
   const handlePress = () => {
-    const currentTab = getCurrentTab();
+    const currentTab = getCurrentTab(segments);
     router.push(`/(tabs)/${currentTab}/post/${reply.id}`);
   };
 
   const handleAvatarPress = () => {
     // 現在のタブ内のユーザー詳細に遷移（自分でも他人でも同じ）
-    const currentTab = getCurrentTab();
+    const currentTab = getCurrentTab(segments);
     router.push(`/(tabs)/${currentTab}/user/${reply.user.user_id}`);
   };
 
   const handleParentPress = () => {
     if (reply.parent_post_id) {
-      const currentTab = getCurrentTab();
+      const currentTab = getCurrentTab(segments);
       router.push(`/(tabs)/${currentTab}/post/${reply.parent_post_id}`);
     }
   };

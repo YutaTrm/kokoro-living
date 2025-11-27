@@ -10,6 +10,7 @@ import { Box } from '@/components/ui/box';
 import { HStack } from '@/components/ui/hstack';
 import { VStack } from '@/components/ui/vstack';
 import { supabase } from '@/src/lib/supabase';
+import { getCurrentTab } from '@/src/utils/getCurrentTab';
 
 interface PostItemProps {
   post: {
@@ -43,16 +44,6 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
     getCurrentUser();
   }, []);
 
-  // 現在のタブを判定
-  const getCurrentTab = () => {
-    console.log('PostItem segments:', segments);
-    if (segments.includes('(notifications)')) return '(notifications)';
-    if (segments.includes('(search)')) return '(search)';
-    if (segments.includes('(profile)')) return '(profile)';
-    if (segments.includes('(home)')) return '(home)';
-    return '(home)'; // デフォルトはホーム
-  };
-
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -69,7 +60,7 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
   };
 
   const handlePress = () => {
-    const currentTab = getCurrentTab();
+    const currentTab = getCurrentTab(segments);
     router.push(`/(tabs)/${currentTab}/post/${post.id}`);
   };
 
@@ -77,7 +68,7 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
     if (disableAvatarTap) return;
     e.stopPropagation();
     // 現在のタブ内のユーザー詳細に遷移（自分でも他人でも同じ）
-    const currentTab = getCurrentTab();
+    const currentTab = getCurrentTab(segments);
     router.push(`/(tabs)/${currentTab}/user/${post.user.user_id}`);
   };
 

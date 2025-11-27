@@ -5,6 +5,7 @@ import { Text } from '@/components/Themed';
 import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
 import { HStack } from '@/components/ui/hstack';
 import { VStack } from '@/components/ui/vstack';
+import { getCurrentTab } from '@/src/utils/getCurrentTab';
 
 interface UserListItemProps {
   userId: string;
@@ -17,17 +18,8 @@ export default function UserListItem({ userId, displayName, avatarUrl, bio }: Us
   const router = useRouter();
   const segments = useSegments();
 
-  // 現在のタブを判定
-  const getCurrentTab = () => {
-    if (segments.includes('(notifications)')) return '(notifications)';
-    if (segments.includes('(search)')) return '(search)';
-    if (segments.includes('(profile)')) return '(profile)';
-    if (segments.includes('(home)')) return '(home)';
-    return '(home)'; // デフォルトはホーム
-  };
-
   const handlePress = () => {
-    const currentTab = getCurrentTab();
+    const currentTab = getCurrentTab(segments);
     router.push(`/(tabs)/${currentTab}/user/${userId}`);
   };
 

@@ -20,6 +20,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Textarea, TextareaInput } from '@/components/ui/textarea';
 import { VStack } from '@/components/ui/vstack';
 import { supabase } from '@/src/lib/supabase';
+import { getCurrentTab } from '@/src/utils/getCurrentTab';
 
 interface Post {
   id: string;
@@ -110,15 +111,6 @@ export default function PostDetailScreen() {
     const { data: { session } } = await supabase.auth.getSession();
     setIsLoggedIn(!!session);
     setCurrentUserId(session?.user?.id || null);
-  };
-
-  // 現在のタブを判定
-  const getCurrentTab = () => {
-    if (segments.includes('(notifications)')) return '(notifications)';
-    if (segments.includes('(search)')) return '(search)';
-    if (segments.includes('(profile)')) return '(profile)';
-    if (segments.includes('(home)')) return '(home)';
-    return '(home)'; // デフォルトはホーム
   };
 
   const loadPostDetail = async () => {
@@ -613,13 +605,13 @@ export default function PostDetailScreen() {
 
   const handleUserPress = (userId: string) => {
     // 現在のタブ内のユーザー詳細に遷移（自分でも他人でも同じ）
-    const currentTab = getCurrentTab();
+    const currentTab = getCurrentTab(segments);
     router.push(`/(tabs)/${currentTab}/user/${userId}`);
   };
 
   const handleParentPress = () => {
     if (post?.parent_post_id) {
-      const currentTab = getCurrentTab();
+      const currentTab = getCurrentTab(segments);
       router.push(`/(tabs)/${currentTab}/post/${post.parent_post_id}`);
     }
   };
