@@ -174,12 +174,31 @@ export default function PostDetailScreen() {
 
   const loadReplies = async () => {
     try {
+      // ブロックしているユーザーのIDを取得
+      const { data: { user } } = await supabase.auth.getUser();
+      let blockedUserIds: string[] = [];
+
+      if (user) {
+        const { data: blocksData } = await supabase
+          .from('blocks')
+          .select('blocked_id')
+          .eq('blocker_id', user.id);
+
+        blockedUserIds = blocksData?.map(b => b.blocked_id) || [];
+      }
+
       // 直接の返信（1階層目）を取得
-      const { data: repliesData, error: repliesError } = await supabase
+      let repliesQuery = supabase
         .from('posts')
         .select('id, content, created_at, user_id, parent_post_id')
-        .eq('parent_post_id', id)
-        .order('created_at', { ascending: true });
+        .eq('parent_post_id', id);
+
+      // ブロックしているユーザーの返信を除外
+      if (blockedUserIds.length > 0) {
+        repliesQuery = repliesQuery.not('user_id', 'in', `(${blockedUserIds.join(',')})`);
+      }
+
+      const { data: repliesData, error: repliesError } = await repliesQuery.order('created_at', { ascending: true });
 
       if (repliesError) throw repliesError;
 
@@ -191,11 +210,17 @@ export default function PostDetailScreen() {
 
       // 返信への返信（2階層目）を取得
       const replyIds = repliesData.map(r => r.id);
-      const { data: childRepliesData } = await supabase
+      let childRepliesQuery = supabase
         .from('posts')
         .select('id, content, created_at, user_id, parent_post_id')
-        .in('parent_post_id', replyIds)
-        .order('created_at', { ascending: true });
+        .in('parent_post_id', replyIds);
+
+      // ブロックしているユーザーの返信を除外
+      if (blockedUserIds.length > 0) {
+        childRepliesQuery = childRepliesQuery.not('user_id', 'in', `(${blockedUserIds.join(',')})`);
+      }
+
+      const { data: childRepliesData } = await childRepliesQuery.order('created_at', { ascending: true });
 
       // 2階層目の返信IDを収集して、3階層目の存在確認
       const childReplyIds = (childRepliesData || []).map(r => r.id);
@@ -278,11 +303,30 @@ export default function PostDetailScreen() {
     setLoadingDeeperReplies(prev => new Set(prev).add(parentReplyId));
 
     try {
-      const { data: deeperRepliesData } = await supabase
+      // ブロックしているユーザーのIDを取得
+      const { data: { user } } = await supabase.auth.getUser();
+      let blockedUserIds: string[] = [];
+
+      if (user) {
+        const { data: blocksData } = await supabase
+          .from('blocks')
+          .select('blocked_id')
+          .eq('blocker_id', user.id);
+
+        blockedUserIds = blocksData?.map(b => b.blocked_id) || [];
+      }
+
+      let deeperRepliesQuery = supabase
         .from('posts')
         .select('id, content, created_at, user_id, parent_post_id')
-        .eq('parent_post_id', parentReplyId)
-        .order('created_at', { ascending: true });
+        .eq('parent_post_id', parentReplyId);
+
+      // ブロックしているユーザーの返信を除外
+      if (blockedUserIds.length > 0) {
+        deeperRepliesQuery = deeperRepliesQuery.not('user_id', 'in', `(${blockedUserIds.join(',')})`);
+      }
+
+      const { data: deeperRepliesData } = await deeperRepliesQuery.order('created_at', { ascending: true });
 
       if (!deeperRepliesData || deeperRepliesData.length === 0) return;
 
