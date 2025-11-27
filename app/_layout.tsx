@@ -1,16 +1,19 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import * as WebBrowser from 'expo-web-browser';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 
 import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
 import { useColorScheme } from '@/components/useColorScheme';
 import '@/global.css';
+
+const TERMS_AGREEMENT_KEY = 'terms_agreement_accepted';
 
 // OAuth認証のリダイレクトを処理
 WebBrowser.maybeCompleteAuthSession();
@@ -56,6 +59,36 @@ export default function RootLayout() {
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
+  const segments = useSegments();
+  const router = useRouter();
+  const [termsAccepted, setTermsAccepted] = useState<boolean | null>(null);
+
+  // 利用規約同意状態をチェック
+  useEffect(() => {
+    const checkTermsAgreement = async () => {
+      try {
+        const accepted = await AsyncStorage.getItem(TERMS_AGREEMENT_KEY);
+        setTermsAccepted(accepted === 'true');
+      } catch (error) {
+        console.error('同意状態の確認エラー:', error);
+        setTermsAccepted(false);
+      }
+    };
+    checkTermsAgreement();
+  }, []);
+
+  // 同意状態に基づいてリダイレクト
+  useEffect(() => {
+    if (termsAccepted === null) return; // まだチェック中
+
+    const inTermsAgreement = segments[0] === 'terms-agreement';
+    const inAuthCallback = segments[0] === 'auth';
+
+    // 未同意で、同意画面や認証コールバックにいない場合は同意画面へ
+    if (!termsAccepted && !inTermsAgreement && !inAuthCallback) {
+      router.replace('/terms-agreement');
+    }
+  }, [termsAccepted, segments]);
 
   return (
     <GluestackUIProvider mode={colorScheme === 'dark' ? 'dark' : 'light'}>
@@ -63,6 +96,7 @@ function RootLayoutNav() {
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="terms-agreement" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
           <Stack.Screen name="create-post" options={{ presentation: 'modal', headerShown: false, gestureEnabled: false }} />
           <Stack.Screen name="reply/[id]" options={{ presentation: 'modal', headerShown: false, gestureEnabled: false }} />

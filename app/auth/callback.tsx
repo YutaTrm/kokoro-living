@@ -10,7 +10,7 @@ export default function AuthCallbackScreen() {
   useEffect(() => {
     // 認証完了後、ホーム画面にリダイレクト
     const timer = setTimeout(() => {
-      router.replace('/(tabs)');
+      router.replace('/(tabs)/(home)');
     }, 100);
 
     return () => clearTimeout(timer);

@@ -361,7 +361,7 @@ export default function CreatePostScreen() {
         router.back();
       } else {
         // 新規作成: タイムラインにリダイレクト
-        router.replace('/(tabs)');
+        router.replace('/(tabs)/(home)');
       }
     } catch (error) {
       console.error('投稿エラー:', error);
