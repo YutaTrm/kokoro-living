@@ -1,4 +1,4 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter, useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { FlatList, Pressable } from 'react-native';
 
@@ -50,6 +50,7 @@ interface Post {
 export default function UserDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const segments = useSegments();
   const { isFollowing, isLoading: followLoading, toggleFollow, counts, isOwnProfile, currentUserId } = useFollow(id ?? null);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -475,7 +476,11 @@ export default function UserDetailScreen() {
 
   const handleFollowCountPress = (type: 'following' | 'followers') => {
     if (!id) return;
-    router.push(`/(tabs)/(home)/user/${id}/${type}`);
+
+    // 現在のタブを判定（segments[1]が (home), (notifications), (search), (profile) のいずれか）
+    const currentTab = segments[1] || '(home)';
+    const path = `/(tabs)/${currentTab}/user/${id}/${type}`;
+    router.push(path as `/(tabs)/(home)/user/${string}/following`);
   };
 
   const renderHeader = () => {

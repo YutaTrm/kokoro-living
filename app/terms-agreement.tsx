@@ -1,7 +1,6 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Linking, ScrollView } from 'react-native';
+import { Alert, Linking, ScrollView } from 'react-native';
 
 import { Text } from '@/components/Themed';
 import { Box } from '@/components/ui/box';
@@ -10,24 +9,55 @@ import { Checkbox, CheckboxIcon, CheckboxIndicator, CheckboxLabel } from '@/comp
 import { Heading } from '@/components/ui/heading';
 import { VStack } from '@/components/ui/vstack';
 import { CheckIcon } from 'lucide-react-native';
-
-const TERMS_AGREEMENT_KEY = 'terms_agreement_accepted';
+import { supabase } from '@/src/lib/supabase';
 
 export default function TermsAgreementScreen() {
   const router = useRouter();
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleAccept = async () => {
-    if (!termsAccepted || !privacyAccepted) {
+    if (!termsAccepted || !privacyAccepted || isSubmitting) {
       return;
     }
 
+    setIsSubmitting(true);
+
     try {
-      await AsyncStorage.setItem(TERMS_AGREEMENT_KEY, 'true');
+      // 現在のユーザーを取得
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        Alert.alert('エラー', 'ログインセッションが見つかりません');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // terms_accepted_at を更新
+      console.log('[terms-agreement] 同意状態を保存中...');
+      const { error, data } = await supabase
+        .from('users')
+        .update({ terms_accepted_at: new Date().toISOString() })
+        .eq('user_id', session.user.id)
+        .select();
+
+      console.log('[terms-agreement] 更新結果:', { error, data });
+
+      if (error) {
+        console.error('同意状態の保存エラー:', error);
+        Alert.alert('エラー', '同意状態の保存に失敗しました');
+        setIsSubmitting(false);
+        return;
+      }
+
+      console.log('[terms-agreement] 保存成功、ホーム画面へリダイレクト');
+      // ホーム画面にリダイレクト
       router.replace('/(tabs)/(home)');
     } catch (error) {
       console.error('同意状態の保存エラー:', error);
+      Alert.alert('エラー', '同意状態の保存に失敗しました');
+      setIsSubmitting(false);
     }
   };
 
@@ -132,11 +162,11 @@ export default function TermsAgreementScreen() {
 
           <Button
             onPress={handleAccept}
-            isDisabled={!termsAccepted || !privacyAccepted}
+            isDisabled={!termsAccepted || !privacyAccepted || isSubmitting}
             className="mt-6"
             size="lg"
           >
-            <ButtonText>同意して始める</ButtonText>
+            <ButtonText>{isSubmitting ? '保存中...' : '同意して始める'}</ButtonText>
           </Button>
 
           <Text className="text-center text-sm text-typography-400 mt-4">

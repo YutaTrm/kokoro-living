@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -11,9 +10,8 @@ import 'react-native-reanimated';
 
 import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
 import { useColorScheme } from '@/components/useColorScheme';
+import { supabase } from '@/src/lib/supabase';
 import '@/global.css';
-
-const TERMS_AGREEMENT_KEY = 'terms_agreement_accepted';
 
 // OAuth認証のリダイレクトを処理
 WebBrowser.maybeCompleteAuthSession();
@@ -61,34 +59,133 @@ function RootLayoutNav() {
   const colorScheme = useColorScheme();
   const segments = useSegments();
   const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
   const [termsAccepted, setTermsAccepted] = useState<boolean | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
   // 利用規約同意状態をチェック
   useEffect(() => {
     const checkTermsAgreement = async () => {
       try {
-        const accepted = await AsyncStorage.getItem(TERMS_AGREEMENT_KEY);
-        setTermsAccepted(accepted === 'true');
+        // セッション取得
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (!session) {
+          // ログインしていない場合
+          setIsAuthenticated(false);
+          setTermsAccepted(null);
+          setIsLoading(false);
+          return;
+        }
+
+        setIsAuthenticated(true);
+
+        // ユーザー情報取得
+        const { data: user, error } = await supabase
+          .from('users')
+          .select('terms_accepted_at')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+
+        console.log('[_layout] ユーザー情報:', user);
+        console.log('[_layout] terms_accepted_at:', user?.terms_accepted_at);
+
+        if (error) {
+          console.error('ユーザー情報取得エラー:', error);
+          setTermsAccepted(false);
+        } else if (!user) {
+          console.log('[_layout] レコードが存在しないため作成');
+          // レコードが存在しない場合は作成
+          const { error: insertError } = await supabase
+            .from('users')
+            .insert({
+              user_id: session.user.id,
+              display_name: session.user.user_metadata?.name ||
+                           session.user.user_metadata?.user_name ||
+                           session.user.user_metadata?.full_name ||
+                           session.user.email ||
+                           'User',
+              avatar_url: session.user.user_metadata?.avatar_url || null,
+              is_admin: false,
+            });
+
+          if (insertError) {
+            console.error('ユーザーレコード作成エラー:', insertError);
+          }
+
+          // 新規作成なので未同意
+          console.log('[_layout] 新規作成 → termsAccepted = false');
+          setTermsAccepted(false);
+        } else {
+          const accepted = user.terms_accepted_at !== null;
+          console.log('[_layout] termsAccepted =', accepted);
+          setTermsAccepted(accepted);
+        }
       } catch (error) {
         console.error('同意状態の確認エラー:', error);
         setTermsAccepted(false);
+      } finally {
+        setIsLoading(false);
       }
     };
+
     checkTermsAgreement();
+
+    // セッション変更を監視
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        checkTermsAgreement();
+      } else {
+        setIsAuthenticated(false);
+        setTermsAccepted(null);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   // 同意状態に基づいてリダイレクト
   useEffect(() => {
-    if (termsAccepted === null) return; // まだチェック中
+    console.log('[_layout リダイレクト判定]', {
+      isLoading,
+      isAuthenticated,
+      termsAccepted,
+      segment0: segments[0],
+    });
+
+    if (isLoading) return; // まだチェック中
 
     const inTermsAgreement = segments[0] === 'terms-agreement';
     const inAuthCallback = segments[0] === 'auth';
 
-    // 未同意で、同意画面や認証コールバックにいない場合は同意画面へ
-    if (!termsAccepted && !inTermsAgreement && !inAuthCallback) {
-      router.replace('/terms-agreement');
+    // 同意画面から他の画面に遷移した場合、状態を再チェック
+    if (isAuthenticated && !inTermsAgreement && !inAuthCallback) {
+      const recheckTerms = async () => {
+        console.log('[_layout] ホーム画面に遷移、同意状態を再チェック');
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const { data: user } = await supabase
+            .from('users')
+            .select('terms_accepted_at')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+
+          console.log('[_layout] 再チェック結果:', user?.terms_accepted_at);
+          const accepted = user?.terms_accepted_at !== null;
+          setTermsAccepted(accepted);
+
+          // まだ未同意なら同意画面へ
+          if (!accepted) {
+            console.log('[_layout] 未同意のため同意画面へリダイレクト');
+            router.replace('/terms-agreement');
+          }
+        }
+      };
+      recheckTerms();
     }
-  }, [termsAccepted, segments]);
+  }, [isLoading, isAuthenticated, segments]);
 
   return (
     <GluestackUIProvider mode={colorScheme === 'dark' ? 'dark' : 'light'}>
