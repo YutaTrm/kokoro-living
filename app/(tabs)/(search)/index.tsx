@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ChevronDownIcon, CircleIcon, PlusIcon, XIcon } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, TextInput, View } from 'react-native';
@@ -61,6 +62,8 @@ type SearchTab = 'users' | 'posts';
 type TagFilterMode = 'and' | 'or';
 type SortOption = 'created_at' | 'updated_at' | 'experienced_at';
 
+const SEARCH_TAGS_KEY = 'search_selected_tags';
+
 export default function SearchScreen() {
   const [searchTab, setSearchTab] = useState<SearchTab>('users');
   const [searchQuery, setSearchQuery] = useState('');
@@ -86,10 +89,33 @@ export default function SearchScreen() {
   const LIMIT = 20;
 
   useEffect(() => {
-    if (!loadingMedications) {
-      loadAllTags();
-    }
+    const initializeData = async () => {
+      if (!loadingMedications) {
+        await loadAllTags();
+
+        // 前回選択したタグを読み込む
+        try {
+          const savedTags = await AsyncStorage.getItem(SEARCH_TAGS_KEY);
+          if (savedTags) {
+            setSelectedTags(JSON.parse(savedTags));
+          }
+        } catch (error) {
+          console.error('検索タグ読み込みエラー:', error);
+        }
+      }
+    };
+
+    initializeData();
   }, [loadingMedications]);
+
+  // selectedTagsが変更されたらAsyncStorageに保存
+  useEffect(() => {
+    if (selectedTags.length > 0) {
+      AsyncStorage.setItem(SEARCH_TAGS_KEY, JSON.stringify(selectedTags)).catch((error) => {
+        console.error('検索タグ保存エラー:', error);
+      });
+    }
+  }, [selectedTags]);
 
   const loadAllTags = async () => {
     try {
@@ -195,10 +221,28 @@ export default function SearchScreen() {
         setLoadingMore(true);
       }
 
+      // ブロックしているユーザーのIDを取得
+      const { data: { user } } = await supabase.auth.getUser();
+      let blockedUserIds: string[] = [];
+
+      if (user) {
+        const { data: blocksData } = await supabase
+          .from('blocks')
+          .select('blocked_id')
+          .eq('blocker_id', user.id);
+
+        blockedUserIds = blocksData?.map(b => b.blocked_id) || [];
+      }
+
       // 基本クエリ
       let query = supabase
         .from('users')
         .select('user_id, display_name, avatar_url, bio');
+
+      // ブロックしているユーザーを除外
+      if (blockedUserIds.length > 0) {
+        query = query.not('user_id', 'in', `(${blockedUserIds.join(',')})`);
+      }
 
       // キーワード検索（bio）
       if (searchQuery.trim()) {
@@ -362,11 +406,29 @@ export default function SearchScreen() {
         setLoadingMore(true);
       }
 
+      // ブロックしているユーザーのIDを取得
+      const { data: { user } } = await supabase.auth.getUser();
+      let blockedUserIds: string[] = [];
+
+      if (user) {
+        const { data: blocksData } = await supabase
+          .from('blocks')
+          .select('blocked_id')
+          .eq('blocker_id', user.id);
+
+        blockedUserIds = blocksData?.map(b => b.blocked_id) || [];
+      }
+
       // 基本クエリ（非表示投稿を除外）
       let query = supabase
         .from('posts')
         .select('id, content, created_at, updated_at, experienced_at, user_id, parent_post_id')
         .eq('is_hidden', false);
+
+      // ブロックしているユーザーの投稿を除外
+      if (blockedUserIds.length > 0) {
+        query = query.not('user_id', 'in', `(${blockedUserIds.join(',')})`);
+      }
 
       // フリーワード検索
       if (searchQuery.trim()) {

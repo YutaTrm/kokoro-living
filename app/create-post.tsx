@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, TextInput } from 'react-native';
@@ -22,6 +23,8 @@ interface MedicalTag {
   relatedIds?: string[]; // 服薬用: 同じ成分の全てのuser_medication ID
 }
 
+const SELECTED_TAGS_KEY = 'last_selected_tags';
+
 export default function CreatePostScreen() {
   const router = useRouter();
   const { postId } = useLocalSearchParams<{ postId?: string }>();
@@ -45,11 +48,36 @@ export default function CreatePostScreen() {
   const isEditMode = !!postId;
 
   useEffect(() => {
-    loadUserMedicalData();
-    if (postId) {
-      loadExistingPost();
-    }
+    const initializeData = async () => {
+      await loadUserMedicalData();
+
+      if (postId) {
+        // 編集モードの場合は既存の投稿を読み込む
+        loadExistingPost();
+      } else {
+        // 新規投稿の場合は前回選択したタグを読み込む
+        try {
+          const savedTags = await AsyncStorage.getItem(SELECTED_TAGS_KEY);
+          if (savedTags) {
+            setSelectedTags(JSON.parse(savedTags));
+          }
+        } catch (error) {
+          console.error('タグ読み込みエラー:', error);
+        }
+      }
+    };
+
+    initializeData();
   }, [postId]);
+
+  // selectedTagsが変更されたらAsyncStorageに保存（編集モード以外）
+  useEffect(() => {
+    if (!postId && selectedTags.length > 0) {
+      AsyncStorage.setItem(SELECTED_TAGS_KEY, JSON.stringify(selectedTags)).catch((error) => {
+        console.error('タグ保存エラー:', error);
+      });
+    }
+  }, [selectedTags, postId]);
 
   const loadUserMedicalData = async () => {
     try {
