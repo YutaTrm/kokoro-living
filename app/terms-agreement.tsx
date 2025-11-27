@@ -57,7 +57,7 @@ export default function TermsAgreementScreen() {
               コミュニティガイドライン
             </Heading>
             <Text className="mb-3">
-              こころリビングは、すべてのユーザーが安全で快適に利用できる環境を目指しています。
+              こころのリビングは、すべてのユーザーが安全で快適に利用できる環境を目指しています。
             </Text>
             <Text className="font-semibold mb-2">以下のような行為は禁止されています：</Text>
             <VStack space="xs" className="ml-4">
