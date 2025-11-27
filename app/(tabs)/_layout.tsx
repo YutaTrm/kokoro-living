@@ -41,9 +41,10 @@ function TabsContent() {
         }}
       />
       <Tabs.Screen
-        name="search"
+        name="(search)"
         options={{
           title: '検索',
+          headerShown: false,
           tabBarIcon: ({ color }) => <Search color={color} size={24} />,
         }}
       />
@@ -57,9 +58,10 @@ function TabsContent() {
         }}
       />
       <Tabs.Screen
-        name="profile"
+        name="(profile)"
         options={{
           title: 'マイページ',
+          headerShown: false,
           tabBarIcon: ({ color }) => <User color={color} size={24} />,
         }}
       />

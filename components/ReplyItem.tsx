@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter, useSegments } from 'expo-router';
 import { CornerDownRight } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
@@ -37,6 +37,7 @@ export default function ReplyItem({
   onReplyCreated,
 }: ReplyItemProps) {
   const router = useRouter();
+  const segments = useSegments();
   const [likesCount, setLikesCount] = useState(0);
   const [repliesCount, setRepliesCount] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
@@ -49,6 +50,15 @@ export default function ReplyItem({
     loadCounts();
     checkInteractionStatus();
   }, [reply.id]);
+
+  // 現在のタブを判定
+  const getCurrentTab = () => {
+    if (segments.includes('(notifications)')) return '(notifications)';
+    if (segments.includes('(search)')) return '(search)';
+    if (segments.includes('(profile)')) return '(profile)';
+    if (segments.includes('(home)')) return '(home)';
+    return '(home)'; // デフォルトはホーム
+  };
 
   const checkLoginStatus = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -125,21 +135,20 @@ export default function ReplyItem({
   };
 
   const handlePress = () => {
-    router.push(`/post/${reply.id}`);
+    const currentTab = getCurrentTab();
+    router.push(`/(tabs)/${currentTab}/post/${reply.id}`);
   };
 
   const handleAvatarPress = () => {
-    // 自分のアバターならマイページへ遷移
-    if (currentUserId === reply.user.user_id) {
-      router.push('/(tabs)/profile');
-    } else {
-      router.push(`/user/${reply.user.user_id}`);
-    }
+    // 現在のタブ内のユーザー詳細に遷移（自分でも他人でも同じ）
+    const currentTab = getCurrentTab();
+    router.push(`/(tabs)/${currentTab}/user/${reply.user.user_id}`);
   };
 
   const handleParentPress = () => {
     if (reply.parent_post_id) {
-      router.push(`/post/${reply.parent_post_id}`);
+      const currentTab = getCurrentTab();
+      router.push(`/(tabs)/${currentTab}/post/${reply.parent_post_id}`);
     }
   };
 

@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter, useSegments } from 'expo-router';
 import { Pressable } from 'react-native';
 
 import { Text } from '@/components/Themed';
@@ -15,9 +15,20 @@ interface UserListItemProps {
 
 export default function UserListItem({ userId, displayName, avatarUrl, bio }: UserListItemProps) {
   const router = useRouter();
+  const segments = useSegments();
+
+  // 現在のタブを判定
+  const getCurrentTab = () => {
+    if (segments.includes('(notifications)')) return '(notifications)';
+    if (segments.includes('(search)')) return '(search)';
+    if (segments.includes('(profile)')) return '(profile)';
+    if (segments.includes('(home)')) return '(home)';
+    return '(home)'; // デフォルトはホーム
+  };
 
   const handlePress = () => {
-    router.push(`/(tabs)/(home)/user/${userId}`);
+    const currentTab = getCurrentTab();
+    router.push(`/(tabs)/${currentTab}/user/${userId}`);
   };
 
   return (

@@ -976,7 +976,7 @@ export default function ProfileScreen() {
               onPress={async () => {
                 const { data: { user } } = await supabase.auth.getUser();
                 if (user) {
-                  router.push(`/user/${user.id}`);
+                  router.push(`/(tabs)/(profile)/user/${user.id}`);
                 }
               }}
               variant="outline"

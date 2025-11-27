@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter, useSegments } from 'expo-router';
 import { CornerDownRight, Flag } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView } from 'react-native';
@@ -32,6 +32,7 @@ interface PostItemProps {
 
 export default function PostItem({ post, disableAvatarTap = false }: PostItemProps) {
   const router = useRouter();
+  const segments = useSegments();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -41,6 +42,16 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
     };
     getCurrentUser();
   }, []);
+
+  // 現在のタブを判定
+  const getCurrentTab = () => {
+    console.log('PostItem segments:', segments);
+    if (segments.includes('(notifications)')) return '(notifications)';
+    if (segments.includes('(search)')) return '(search)';
+    if (segments.includes('(profile)')) return '(profile)';
+    if (segments.includes('(home)')) return '(home)';
+    return '(home)'; // デフォルトはホーム
+  };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -58,18 +69,16 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
   };
 
   const handlePress = () => {
-    router.push(`/post/${post.id}`);
+    const currentTab = getCurrentTab();
+    router.push(`/(tabs)/${currentTab}/post/${post.id}`);
   };
 
   const handleAvatarPress = (e: { stopPropagation: () => void }) => {
     if (disableAvatarTap) return;
     e.stopPropagation();
-    // 自分のアバターならマイページへ遷移
-    if (currentUserId === post.user.user_id) {
-      router.push('/(tabs)/profile');
-    } else {
-      router.push(`/user/${post.user.user_id}`);
-    }
+    // 現在のタブ内のユーザー詳細に遷移（自分でも他人でも同じ）
+    const currentTab = getCurrentTab();
+    router.push(`/(tabs)/${currentTab}/user/${post.user.user_id}`);
   };
 
   const AvatarComponent = disableAvatarTap ? (
