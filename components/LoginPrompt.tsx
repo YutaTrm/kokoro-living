@@ -1,12 +1,13 @@
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
-import { Alert } from 'react-native';
+import { Alert, Image } from 'react-native';
 
 import AppleLogo from '@/components/icons/AppleLogo';
-import GoogleLogo from '@/components/icons/GoogleLogo';
 import XLogo from '@/components/icons/XLogo';
+import { Text } from '@/components/Themed';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonText } from '@/components/ui/button';
+import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
 import { Spinner } from '@/components/ui/spinner';
 import { VStack } from '@/components/ui/vstack';
@@ -129,46 +130,67 @@ export default function LoginPrompt({ children }: LoginPromptProps) {
 
   if (!isLoggedIn) {
     return (
-      <Box className="flex-1 items-center justify-center px-6">
-        <VStack space="md" className="w-full max-w-sm">
-          {/* Sign in with Apple */}
-          <Button
-            onPress={handleAppleLogin}
-            className="bg-typography-black rounded px-6 w-full"
-          >
-            <HStack space="sm" className="items-center">
-              <AppleLogo width={20} height={20} />
-              <ButtonText className="text-typography-white text-base font-semibold">
-                Appleでサインイン
-              </ButtonText>
-            </HStack>
-          </Button>
+      <Box className="flex-1 items-center justify-center">
+        <VStack space="2xl" className="w-full max-w-sm items-center">
+          {/* アプリアイコンとタイトル */}
+          <VStack space="md" className="items-center">
+            <Image
+              source={require('@/assets/images/paddinless-icon.png')}
+              className="w-auto h-36"
+              resizeMode="contain"
+            />
+            <Heading size="xl" className="text-primary-500">
+              こころのリビング
+            </Heading>
+            <Text className="text-center text-base leading-6">
+              メンタルヘルスケアに特化したSNS。同じ経験を持つ人と安心してつながり、支え合えるコミュニティ。
+            </Text>
+          </VStack>
 
-          {/* Sign in with Google */}
-          <Button
-            onPress={handleGoogleLogin}
-            className="bg-white rounded px-6 w-full border border-outline-300"
-          >
-            <HStack space="sm" className="items-center">
-              <GoogleLogo width={20} height={20} />
-              <ButtonText className="text-typography-black text-base font-semibold">
-                Googleでサインイン
-              </ButtonText>
-            </HStack>
-          </Button>
+          {/* サインインボタン */}
+          <VStack space="md" className="w-full p-6">
+            <Text className="text-center text-sm text-typography-500">
+              ご利用にはソーシャルサインインが必要です
+            </Text>
+            {/* Sign in with Apple */}
+            <Button
+              onPress={handleAppleLogin}
+              className="bg-typography-black rounded px-6 w-full"
+            >
+              <HStack space="sm" className="items-center">
+                <AppleLogo width={20} height={20} />
+                <ButtonText className="text-typography-white font-semibold">
+                  Appleでサインイン
+                </ButtonText>
+              </HStack>
+            </Button>
 
-          {/* Sign in with X */}
-          <Button
-            onPress={handleXLogin}
-            className="bg-typography-black rounded px-6 w-full"
-          >
-            <HStack space="sm" className="items-center">
-              <XLogo width={20} height={20} />
-              <ButtonText className="text-typography-white text-base font-semibold">
-                Xアカウントで登録
-              </ButtonText>
-            </HStack>
-          </Button>
+            {/* Sign in with Google */}
+            {/* <Button
+              onPress={handleGoogleLogin}
+              className="bg-white rounded px-6 w-full border border-outline-300"
+            >
+              <HStack space="sm" className="items-center">
+                <GoogleLogo width={20} height={20} />
+                <ButtonText className="text-typography-black text-base font-semibold">
+                  Googleでサインイン
+                </ButtonText>
+              </HStack>
+            </Button> */}
+
+            {/* Sign in with X */}
+            <Button
+              onPress={handleXLogin}
+              className="bg-typography-black rounded px-6 w-full"
+            >
+              <HStack space="sm" className="items-center">
+                <XLogo width={20} height={20} />
+                <ButtonText className="text-typography-white font-semibold">
+                  Xでサインイン
+                </ButtonText>
+              </HStack>
+            </Button>
+          </VStack>
         </VStack>
       </Box>
     );
