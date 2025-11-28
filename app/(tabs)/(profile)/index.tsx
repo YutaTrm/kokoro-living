@@ -25,6 +25,7 @@ import { useFollow } from '@/src/hooks/useFollow';
 import { useMedicationMasters } from '@/src/hooks/useMedicationMasters';
 import { usePostsData } from '@/src/hooks/usePostsData';
 import { supabase } from '@/src/lib/supabase';
+import { checkNGWords } from '@/src/utils/ngWordFilter';
 import { sortByStartDate } from '@/src/utils/sortByStartDate';
 
 interface UserProfile {
@@ -800,6 +801,13 @@ export default function ProfileScreen() {
       // 空文字列の場合はXアカウントの名前を使用
       const nameToSave = newName.trim() || profile?.xUserName || 'ユーザー';
 
+      // NGワードチェック
+      const ngWordCheck = checkNGWords(nameToSave);
+      if (!ngWordCheck.isValid) {
+        Alert.alert('保存できません', ngWordCheck.message);
+        return;
+      }
+
       const { error } = await supabase
         .from('users')
         .update({ display_name: nameToSave })
@@ -820,6 +828,13 @@ export default function ProfileScreen() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+
+      // NGワードチェック
+      const ngWordCheck = checkNGWords(newBio);
+      if (!ngWordCheck.isValid) {
+        Alert.alert('保存できません', ngWordCheck.message);
+        return;
+      }
 
       const { error } = await supabase
         .from('users')

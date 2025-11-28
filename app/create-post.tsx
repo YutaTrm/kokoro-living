@@ -14,6 +14,7 @@ import { CheckIcon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
 import { VStack } from '@/components/ui/vstack';
 import { supabase } from '@/src/lib/supabase';
+import { checkNGWords } from '@/src/utils/ngWordFilter';
 
 interface MedicalTag {
   id: string;
@@ -298,6 +299,13 @@ export default function CreatePostScreen() {
 
     if (content.length > maxLength) {
       Alert.alert('エラー', `投稿は${maxLength}文字以内で入力してください`);
+      return;
+    }
+
+    // NGワードチェック
+    const ngWordCheck = checkNGWords(content);
+    if (!ngWordCheck.isValid) {
+      Alert.alert('投稿できません', ngWordCheck.message);
       return;
     }
 

@@ -10,6 +10,7 @@ import { HStack } from '@/components/ui/hstack';
 import { Spinner } from '@/components/ui/spinner';
 import { VStack } from '@/components/ui/vstack';
 import { supabase } from '@/src/lib/supabase';
+import { checkNGWords } from '@/src/utils/ngWordFilter';
 
 interface ParentPost {
   id: string;
@@ -80,6 +81,13 @@ export default function ReplyScreen() {
 
     if (content.length > maxLength) {
       Alert.alert('エラー', `返信は${maxLength}文字以内で入力してください`);
+      return;
+    }
+
+    // NGワードチェック
+    const ngWordCheck = checkNGWords(content);
+    if (!ngWordCheck.isValid) {
+      Alert.alert('返信できません', ngWordCheck.message);
       return;
     }
 
