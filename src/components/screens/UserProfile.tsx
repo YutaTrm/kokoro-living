@@ -4,11 +4,12 @@ import { Alert, FlatList, Pressable } from 'react-native';
 
 import ConfirmModal from '@/components/ConfirmModal';
 import FollowButton from '@/components/FollowButton';
+import DefaultAvatar from '@/components/icons/DefaultAvatar';
 import PostItem from '@/components/PostItem';
 import MedicalSection from '@/components/profile/MedicalSection';
 import ProfileTabBar, { TabType } from '@/components/profile/ProfileTabBar';
 import { Text } from '@/components/Themed';
-import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
 import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
@@ -504,8 +505,11 @@ export default function UserDetailScreen() {
         <Box className="p-4">
           <HStack className="mt-2 items-start" space="md">
             <Avatar size="lg">
-              <AvatarFallbackText>{profile.display_name}</AvatarFallbackText>
-              {profile.avatar_url && <AvatarImage source={{ uri: profile.avatar_url }} />}
+              {profile.avatar_url ? (
+                <AvatarImage source={{ uri: profile.avatar_url }} />
+              ) : (
+                <DefaultAvatar size={64} />
+              )}
             </Avatar>
             <VStack className="flex-1" space="xs">
               <HStack className="justify-between items-start">

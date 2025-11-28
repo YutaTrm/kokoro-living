@@ -34,6 +34,7 @@ interface UserProfile {
   xUserName: string | null;
   accountName: string | null;
   createdAt: string | null;
+  provider: string | null;
   bio: string | null;
 }
 
@@ -766,7 +767,7 @@ export default function ProfileScreen() {
       // usersテーブルからプロフィール情報を取得
       const { data: userData, error: userError } = await supabase
         .from('users')
-        .select('display_name, created_at, bio')
+        .select('display_name, created_at, bio, provider')
         .eq('user_id', user.id)
         .single();
 
@@ -781,6 +782,7 @@ export default function ProfileScreen() {
         xUserName: xName,
         accountName: user.user_metadata?.user_name || null,
         createdAt: userData?.created_at || user.created_at || null,
+        provider: userData?.provider || null,
         bio: userData?.bio || null,
       };
 

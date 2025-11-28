@@ -1,10 +1,10 @@
 import { Pencil } from 'lucide-react-native';
 import { Pressable, TouchableOpacity } from 'react-native';
 
+import DefaultAvatar from '@/components/icons/DefaultAvatar';
 import { Text } from '@/components/Themed';
 import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
-import { Button, ButtonText } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
@@ -16,6 +16,7 @@ interface UserProfile {
   xUserName: string | null;
   accountName: string | null;
   createdAt: string | null;
+  provider: string | null;
 }
 
 interface FollowCounts {
@@ -38,15 +39,32 @@ export default function ProfileHeader({
   onFollowingPress,
   onFollowersPress,
 }: ProfileHeaderProps) {
+  // プロバイダーに応じた表示名を取得
+  const getProviderLabel = () => {
+    switch (profile.provider) {
+      case 'apple':
+        return 'Apple';
+      case 'google':
+        return 'Google';
+      case 'twitter':
+        return 'X';
+      default:
+        return 'アカウント';
+    }
+  };
+
+  const providerLabel = getProviderLabel();
+
   return (
     <Box className="p-4">
       <HStack className="mt-2" space="md">
-        {profile.avatarUrl && (
-          <Avatar size="lg">
-            <AvatarFallbackText>{profile.userName || 'User'}</AvatarFallbackText>
+        <Avatar size="lg">
+          {profile.avatarUrl ? (
             <AvatarImage source={{ uri: profile.avatarUrl }} />
-          </Avatar>
-        )}
+          ) : (
+            <DefaultAvatar size={64} />
+          )}
+        </Avatar>
         <VStack className="flex-1 justify-center" space="xs">
           <HStack className="items-center" space="xs">
             <Heading size="lg" className="text-primary-500">
@@ -58,12 +76,12 @@ export default function ProfileHeader({
           </HStack>
           {profile.xUserName && profile.userName !== profile.xUserName && (
             <Text className="text-sm text-primary-300">
-              Xアカウントの名前: {profile.xUserName}
+              {providerLabel}アカウントの名前: {profile.xUserName}
             </Text>
           )}
           {profile.accountName && (
             <Text className="text-sm text-primary-300">
-              ログイン中のXアカウント: @{profile.accountName}
+              ログイン中の{providerLabel}アカウント: @{profile.accountName}
             </Text>
           )}
           {profile.createdAt && (

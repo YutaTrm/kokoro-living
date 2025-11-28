@@ -3,9 +3,10 @@ import { CornerDownRight } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
 
+import DefaultAvatar from '@/components/icons/DefaultAvatar';
 import PostActionButtons from '@/components/PostActionButtons';
 import { Text } from '@/components/Themed';
-import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
 import { HStack } from '@/components/ui/hstack';
 import { VStack } from '@/components/ui/vstack';
@@ -234,7 +235,7 @@ export default function ReplyItem({
         <Box className={`px-4 py-3 ${showBorder ? 'border-b border-outline-200' : ''}`}>
           <HStack space="sm" className="items-center">
             <Avatar size="sm">
-              <AvatarFallbackText>ミュート</AvatarFallbackText>
+              <DefaultAvatar size={32} />
             </Avatar>
             <Text className="text-sm text-typography-400">ミュートユーザーの投稿（タップして表示）</Text>
           </HStack>
@@ -254,7 +255,7 @@ export default function ReplyItem({
                 {reply.user.avatar_url ? (
                   <AvatarImage source={{ uri: reply.user.avatar_url }} />
                 ) : (
-                  <AvatarFallbackText>{reply.user.display_name}</AvatarFallbackText>
+                  <DefaultAvatar size={32} />
                 )}
               </Avatar>
             </Pressable>

@@ -3,9 +3,10 @@ import { CornerDownRight, Flag } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView } from 'react-native';
 
+import DefaultAvatar from '@/components/icons/DefaultAvatar';
 import Tag from '@/components/Tag';
 import { Text } from '@/components/Themed';
-import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
 import { HStack } from '@/components/ui/hstack';
 import { VStack } from '@/components/ui/vstack';
@@ -74,23 +75,23 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
   };
 
   const displayName = post.isMuted ? 'ミュートユーザー' : post.user.display_name;
-  const showAvatar = !post.isMuted && post.user.avatar_url;
+  const hasAvatar = !post.isMuted && post.user.avatar_url;
 
   const AvatarComponent = disableAvatarTap || post.isMuted ? (
     <Avatar size="md">
-      {showAvatar ? (
+      {hasAvatar ? (
         <AvatarImage source={{ uri: post.user.avatar_url! }} />
       ) : (
-        <AvatarFallbackText>{displayName || 'User'}</AvatarFallbackText>
+        <DefaultAvatar size={48} />
       )}
     </Avatar>
   ) : (
     <Pressable onPress={handleAvatarPress}>
       <Avatar size="md">
-        {showAvatar ? (
+        {hasAvatar ? (
           <AvatarImage source={{ uri: post.user.avatar_url! }} />
         ) : (
-          <AvatarFallbackText>{displayName || 'User'}</AvatarFallbackText>
+          <DefaultAvatar size={48} />
         )}
       </Avatar>
     </Pressable>
