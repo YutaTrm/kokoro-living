@@ -33,6 +33,11 @@ yarn-error.*
 # local env files
 .env*.local
 
+# Apple Sign In secrets
+apple-jwt.txt
+AuthKey_*.p8
+scripts/*.local.js
+
 # typescript
 *.tsbuildinfo
 
