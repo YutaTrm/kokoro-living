@@ -9,6 +9,7 @@ import { Text } from '@/components/Themed';
 import { Avatar, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
 import { HStack } from '@/components/ui/hstack';
+import { Icon } from '@/components/ui/icon';
 import { VStack } from '@/components/ui/vstack';
 import { supabase } from '@/src/lib/supabase';
 import { getCurrentTab } from '@/src/utils/getCurrentTab';
@@ -109,7 +110,7 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
             {/* 返信インジケーター */}
             {post.parent_post_id && (
               <HStack space="xs" className="items-center mb-1">
-                <CornerDownRight size={12} color="#666" />
+                <Icon as={CornerDownRight} size={12} className="text-typography-500" />
                 <Text className="text-xs text-typography-500">返信</Text>
               </HStack>
             )}
@@ -150,7 +151,7 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
             {post.is_hidden && currentUserId === post.user.user_id && (
               <Box className="bg-error-50 border border-error-200 rounded-md p-2 mt-2">
                 <HStack space="xs" className="items-center">
-                  <Flag size={12} color="#DC2626" />
+                  <Icon as={Flag} size={12} className="text-error-500" />
                   <Text className="text-xs text-error-500 flex-1">
                     通報により非表示（あなたのみ表示）
                   </Text>

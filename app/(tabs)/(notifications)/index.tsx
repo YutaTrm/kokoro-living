@@ -9,6 +9,7 @@ import { Text } from '@/components/Themed';
 import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
 import { HStack } from '@/components/ui/hstack';
+import { Icon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
 import { VStack } from '@/components/ui/vstack';
 import { useNotificationContext } from '@/src/contexts/NotificationContext';
@@ -231,11 +232,11 @@ export default function NotificationsScreen() {
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'like':
-        return <Heart size={20} color="#ef4444" fill="#ef4444" />;
+        return <Icon as={Heart} size={20} className="text-secondary-500 fill-secondary-500" />;
       case 'reply':
-        return <MessageCircle size={20} color="#3b82f6" />;
+        return <Icon as={MessageCircle} size={20} className="text-info-500" />;
       case 'follow':
-        return <UserPlus size={20} color="#22c55e" />;
+        return <Icon as={UserPlus} size={20} className="text-success-500" />;
       default:
         return null;
     }

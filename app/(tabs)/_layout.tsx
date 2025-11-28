@@ -2,6 +2,7 @@ import { Tabs, usePathname } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
+import { Icon } from '@/components/ui/icon';
 import { NotificationProvider, useNotificationContext } from '@/src/contexts/NotificationContext';
 import { supabase } from '@/src/lib/supabase';
 
@@ -26,7 +27,6 @@ function TabsContent() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#333',
         tabBarShowLabel: false,
         // Disable the static render of the header on web
         // to prevent a hydration error in React Navigation v6.
@@ -37,7 +37,13 @@ function TabsContent() {
         options={{
           title: 'ホーム',
           headerShown: false,
-          tabBarIcon: ({ color }) => <House color={color} size={24} />,
+          tabBarIcon: ({ focused }) => (
+            <Icon
+              as={House}
+              size="xl"
+              className={focused ? 'text-primary-500' : 'text-typography-500'}
+            />
+          ),
         }}
       />
       <Tabs.Screen
@@ -45,7 +51,13 @@ function TabsContent() {
         options={{
           title: '検索',
           headerShown: false,
-          tabBarIcon: ({ color }) => <Search color={color} size={24} />,
+          tabBarIcon: ({ focused }) => (
+            <Icon
+              as={Search}
+              size="xl"
+              className={focused ? 'text-primary-500' : 'text-typography-500'}
+            />
+          ),
         }}
       />
       <Tabs.Screen
@@ -53,7 +65,13 @@ function TabsContent() {
         options={{
           title: '通知',
           headerShown: false,
-          tabBarIcon: ({ color }) => <Bell color={color} size={24} />,
+          tabBarIcon: ({ focused }) => (
+            <Icon
+              as={Bell}
+              size="xl"
+              className={focused ? 'text-primary-500' : 'text-typography-500'}
+            />
+          ),
           tabBarBadge: unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : undefined,
         }}
       />
@@ -62,7 +80,13 @@ function TabsContent() {
         options={{
           title: 'マイページ',
           headerShown: false,
-          tabBarIcon: ({ color }) => <User color={color} size={24} />,
+          tabBarIcon: ({ focused }) => (
+            <Icon
+              as={User}
+              size="xl"
+              className={focused ? 'text-primary-500' : 'text-typography-500'}
+            />
+          ),
         }}
       />
     </Tabs>

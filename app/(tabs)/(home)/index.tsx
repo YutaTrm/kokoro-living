@@ -357,13 +357,12 @@ export default function TabOneScreen() {
       {/* 投稿ボタンはログイン時のみ表示 */}
       {isLoggedIn && (
         <Button
-          className="absolute right-5 bottom-5 rounded-full h-16 w-16"
+          className="absolute right-5 bottom-5 rounded-full h-16 w-16 bg-secondary-400"
           variant="solid"
           size="md"
-          action="primary"
           onPress={() => router.push('/create-post')}
         >
-          <ButtonIcon as={AddIcon} size="lg" />
+          <ButtonIcon as={AddIcon} size="lg" className="text-white" />
         </Button>
       )}
     </Box>

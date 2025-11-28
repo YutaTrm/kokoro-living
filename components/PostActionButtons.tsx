@@ -3,6 +3,7 @@ import { Pressable } from 'react-native';
 
 import { Text } from '@/components/Themed';
 import { HStack } from '@/components/ui/hstack';
+import { Icon } from '@/components/ui/icon';
 
 interface PostActionButtonsProps {
   repliesCount: number;
@@ -38,7 +39,7 @@ export default function PostActionButtons({
       {showReplyButton && (
         <Pressable onPress={onReply} className="flex-row items-center">
           <HStack space="xs" className="items-center">
-            <MessageCircle size={iconSize} color="gray" />
+            <Icon as={MessageCircle} size={iconSize} className="text-typography-500" />
             {repliesCount > 0 && (
               <Text className={`${textClass} text-typography-500`}>{repliesCount}</Text>
             )}
@@ -49,15 +50,15 @@ export default function PostActionButtons({
       {/* いいねボタン */}
       <HStack space="xs" className="items-center">
         <Pressable onPress={onLike}>
-          <Heart
+          <Icon
+            as={Heart}
             size={iconSize}
-            color={isLiked ? 'red' : 'gray'}
-            fill={isLiked ? 'red' : 'none'}
+            className={isLiked ? 'text-secondary-500 fill-secondary-500' : 'text-typography-500 fill-none'}
           />
         </Pressable>
         {likesCount > 0 && (
           <Pressable onPress={onLikesCountPress}>
-            <Text className={`${textClass} ${isLiked ? 'text-red-500' : 'text-typography-500'} pl-1`}>
+            <Text className={`${textClass} ${isLiked ? 'text-secondary-500' : 'text-typography-500'} pl-1`}>
               {likesCount}
             </Text>
           </Pressable>
@@ -66,10 +67,10 @@ export default function PostActionButtons({
 
       {/* ブックマークボタン */}
       <Pressable onPress={onBookmark} className="flex-row items-center">
-        <Bookmark
+        <Icon
+          as={Bookmark}
           size={iconSize}
-          color={isBookmarked ? '#3b82f6' : 'gray'}
-          fill={isBookmarked ? '#3b82f6' : 'none'}
+          className={isBookmarked ? 'text-primary-500 fill-primary-500' : 'text-typography-500 fill-none'}
         />
       </Pressable>
     </HStack>
