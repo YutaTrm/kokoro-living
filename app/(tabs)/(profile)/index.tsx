@@ -841,13 +841,13 @@ export default function ProfileScreen() {
 
   const handleFollowingPress = () => {
     if (currentUserId) {
-      router.push(`/(tabs)/(home)/user/${currentUserId}/following`);
+      router.push(`/(tabs)/(profile)/user/${currentUserId}/following`);
     }
   };
 
   const handleFollowersPress = () => {
     if (currentUserId) {
-      router.push(`/(tabs)/(home)/user/${currentUserId}/followers`);
+      router.push(`/(tabs)/(profile)/user/${currentUserId}/followers`);
     }
   };
 
