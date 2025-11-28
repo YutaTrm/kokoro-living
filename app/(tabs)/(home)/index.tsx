@@ -70,6 +70,14 @@ export default function TabOneScreen() {
 
         const followingIds = followingData?.map(f => f.following_id) || [];
 
+        // ミュートしているユーザーIDを取得
+        const { data: mutesData } = await supabase
+          .from('mutes')
+          .select('muted_id')
+          .eq('muter_id', user.id);
+
+        const mutedIds = mutesData?.map(m => m.muted_id) || [];
+
         // 自分の投稿（非表示を含む）
         const { data: myPosts } = await supabase
           .from('posts')
@@ -91,7 +99,11 @@ export default function TabOneScreen() {
 
         // マージして時系列順にソート
         const allPosts = [...(myPosts || []), ...(followingPosts || [])];
-        postsData = allPosts.sort((a, b) =>
+        // ミュートユーザーの投稿を除外（自分の投稿は除外しない）
+        const filteredPosts = allPosts.filter(p =>
+          p.user_id === user.id || !mutedIds.includes(p.user_id)
+        );
+        postsData = filteredPosts.sort((a, b) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         ).slice(0, 50);
         postsError = followingError;

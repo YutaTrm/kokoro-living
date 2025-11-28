@@ -70,7 +70,15 @@ export default function NotificationsScreen() {
 
       const blockedByIds = blockedByData?.map((b) => b.blocker_id) || [];
 
-      const allBlockedIds = [...blockedIds, ...blockedByIds];
+      // ミュートしているユーザーを取得
+      const { data: mutesData } = await supabase
+        .from('mutes')
+        .select('muted_id')
+        .eq('muter_id', userId);
+
+      const mutedIds = mutesData?.map((m) => m.muted_id) || [];
+
+      const allBlockedIds = [...blockedIds, ...blockedByIds, ...mutedIds];
 
       // 通知を取得（ブロックユーザーを除外）
       let query = supabase

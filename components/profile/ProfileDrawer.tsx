@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { LogOut, ShieldBan, UserX, X } from 'lucide-react-native';
+import { LogOut, ShieldBan, UserX, VolumeX, X } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, Pressable } from 'react-native';
 
@@ -37,6 +37,11 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
   const handleBlockList = () => {
     onClose();
     router.push('/(tabs)/(profile)/blocks');
+  };
+
+  const handleMuteList = () => {
+    onClose();
+    router.push('/(tabs)/(profile)/mutes');
   };
 
   const handleOpenLink = async (url: string) => {
@@ -104,6 +109,14 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
                 <HStack space="md" className="items-center">
                   <Icon as={ShieldBan} size="md" className="text-typography-700" />
                   <Text className="text-base -ml-2">ブロックリスト</Text>
+                </HStack>
+              </Pressable>
+
+              {/* ミュートリスト */}
+              <Pressable onPress={handleMuteList}>
+                <HStack space="md" className="items-center">
+                  <Icon as={VolumeX} size="md" className="text-typography-700" />
+                  <Text className="text-base -ml-2">ミュートリスト</Text>
                 </HStack>
               </Pressable>
 

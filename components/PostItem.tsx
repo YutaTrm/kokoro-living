@@ -27,6 +27,7 @@ interface PostItemProps {
     diagnoses: string[];
     treatments: string[];
     medications: string[];
+    isMuted?: boolean;
   };
   disableAvatarTap?: boolean;
 }
@@ -72,21 +73,24 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
     router.push(`/(tabs)/${currentTab}/user/${post.user.user_id}`);
   };
 
-  const AvatarComponent = disableAvatarTap ? (
+  const displayName = post.isMuted ? 'ミュートユーザー' : post.user.display_name;
+  const showAvatar = !post.isMuted && post.user.avatar_url;
+
+  const AvatarComponent = disableAvatarTap || post.isMuted ? (
     <Avatar size="md">
-      {post.user.avatar_url ? (
-        <AvatarImage source={{ uri: post.user.avatar_url }} />
+      {showAvatar ? (
+        <AvatarImage source={{ uri: post.user.avatar_url! }} />
       ) : (
-        <AvatarFallbackText>{post.user.display_name || 'User'}</AvatarFallbackText>
+        <AvatarFallbackText>{displayName || 'User'}</AvatarFallbackText>
       )}
     </Avatar>
   ) : (
     <Pressable onPress={handleAvatarPress}>
       <Avatar size="md">
-        {post.user.avatar_url ? (
-          <AvatarImage source={{ uri: post.user.avatar_url }} />
+        {showAvatar ? (
+          <AvatarImage source={{ uri: post.user.avatar_url! }} />
         ) : (
-          <AvatarFallbackText>{post.user.display_name || 'User'}</AvatarFallbackText>
+          <AvatarFallbackText>{displayName || 'User'}</AvatarFallbackText>
         )}
       </Avatar>
     </Pressable>
@@ -111,7 +115,7 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
 
             {/* ユーザー名、時間、タグ */}
             <HStack space="xs" className="items-center flex-1">
-              <Text className="font-semibold text-base">{post.user.display_name}</Text>
+              <Text className="font-semibold text-base">{displayName}</Text>
               <Text className="text-sm text-typography-500">{formatDate(post.created_at)}</Text>
 
               {/* タグ（横スクロール） */}

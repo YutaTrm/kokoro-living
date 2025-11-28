@@ -51,6 +51,7 @@ interface Reply {
   childReplies?: Reply[];
   hasMoreReplies?: boolean;
   deeperRepliesCount?: number;
+  isMuted?: boolean;
 }
 
 export default function PostDetailScreen() {
@@ -174,9 +175,10 @@ export default function PostDetailScreen() {
 
   const loadReplies = async () => {
     try {
-      // ブロックしているユーザーのIDを取得
+      // ブロックしているユーザーとミュートしているユーザーのIDを取得
       const { data: { user } } = await supabase.auth.getUser();
       let blockedUserIds: string[] = [];
+      let mutedUserIds: string[] = [];
 
       if (user) {
         const { data: blocksData } = await supabase
@@ -185,6 +187,14 @@ export default function PostDetailScreen() {
           .eq('blocker_id', user.id);
 
         blockedUserIds = blocksData?.map(b => b.blocked_id) || [];
+
+        // ミュートしているユーザーを取得
+        const { data: mutesData } = await supabase
+          .from('mutes')
+          .select('muted_id')
+          .eq('muter_id', user.id);
+
+        mutedUserIds = mutesData?.map(m => m.muted_id) || [];
       }
 
       // 直接の返信（1階層目）を取得
@@ -276,6 +286,7 @@ export default function PostDetailScreen() {
           },
           hasMoreReplies: deeperCount > 0,
           deeperRepliesCount: deeperCount,
+          isMuted: mutedUserIds.includes(reply.user_id),
         });
       });
 
@@ -290,6 +301,7 @@ export default function PostDetailScreen() {
           avatar_url: usersMap.get(reply.user_id)?.avatar_url || null,
         },
         childReplies: childRepliesMap.get(reply.id) || [],
+        isMuted: mutedUserIds.includes(reply.user_id),
       }));
 
       setReplies(formattedReplies);
@@ -303,9 +315,10 @@ export default function PostDetailScreen() {
     setLoadingDeeperReplies(prev => new Set(prev).add(parentReplyId));
 
     try {
-      // ブロックしているユーザーのIDを取得
+      // ブロックしているユーザーとミュートしているユーザーのIDを取得
       const { data: { user } } = await supabase.auth.getUser();
       let blockedUserIds: string[] = [];
+      let mutedUserIds: string[] = [];
 
       if (user) {
         const { data: blocksData } = await supabase
@@ -314,6 +327,14 @@ export default function PostDetailScreen() {
           .eq('blocker_id', user.id);
 
         blockedUserIds = blocksData?.map(b => b.blocked_id) || [];
+
+        // ミュートしているユーザーを取得
+        const { data: mutesData } = await supabase
+          .from('mutes')
+          .select('muted_id')
+          .eq('muter_id', user.id);
+
+        mutedUserIds = mutesData?.map(m => m.muted_id) || [];
       }
 
       let deeperRepliesQuery = supabase
@@ -365,6 +386,7 @@ export default function PostDetailScreen() {
         },
         hasMoreReplies: (evenDeeperCountsMap.get(reply.id) || 0) > 0,
         deeperRepliesCount: evenDeeperCountsMap.get(reply.id) || 0,
+        isMuted: mutedUserIds.includes(reply.user_id),
       }));
 
       // repliesを更新して、該当の2階層目返信にchildRepliesを追加

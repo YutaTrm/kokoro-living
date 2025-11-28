@@ -23,6 +23,7 @@ interface ReplyItemProps {
       user_id: string;
       avatar_url?: string | null;
     };
+    isMuted?: boolean;
   };
   parentPostContent?: string;
   showVerticalLine?: boolean;
@@ -45,6 +46,7 @@ export default function ReplyItem({
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     checkLoginStatus();
@@ -224,6 +226,22 @@ export default function ReplyItem({
 
   // 1階層目のみ上下の線で分ける
   const showBorder = depth === 0;
+
+  // ミュートユーザーの折りたたみ表示
+  if (reply.isMuted && !isExpanded) {
+    return (
+      <Pressable onPress={() => setIsExpanded(true)}>
+        <Box className={`px-4 py-3 ${showBorder ? 'border-b border-outline-200' : ''}`}>
+          <HStack space="sm" className="items-center">
+            <Avatar size="sm">
+              <AvatarFallbackText>ミュート</AvatarFallbackText>
+            </Avatar>
+            <Text className="text-sm text-typography-400">ミュートユーザーの投稿（タップして表示）</Text>
+          </HStack>
+        </Box>
+      </Pressable>
+    );
+  }
 
   return (
     <Pressable onPress={handlePress}>

@@ -43,6 +43,7 @@ interface Post {
   diagnoses: string[];
   treatments: string[];
   medications: string[];
+  isMuted?: boolean;
 }
 
 interface TagOption {
@@ -221,9 +222,9 @@ export default function SearchScreen() {
         setLoadingMore(true);
       }
 
-      // ブロックしているユーザーのIDを取得
+      // ブロックしているユーザーとブロックされているユーザーのIDを取得
       const { data: { user } } = await supabase.auth.getUser();
-      let blockedUserIds: string[] = [];
+      let allBlockedUserIds: string[] = [];
 
       if (user) {
         const { data: blocksData } = await supabase
@@ -231,7 +232,18 @@ export default function SearchScreen() {
           .select('blocked_id')
           .eq('blocker_id', user.id);
 
-        blockedUserIds = blocksData?.map(b => b.blocked_id) || [];
+        const blockedUserIds = blocksData?.map(b => b.blocked_id) || [];
+
+        // ブロックされているユーザーも取得
+        const { data: blockedByData } = await supabase
+          .from('blocks')
+          .select('blocker_id')
+          .eq('blocked_id', user.id);
+
+        const blockedByUserIds = blockedByData?.map(b => b.blocker_id) || [];
+
+        // 両方を結合
+        allBlockedUserIds = [...blockedUserIds, ...blockedByUserIds];
       }
 
       // 基本クエリ
@@ -239,9 +251,9 @@ export default function SearchScreen() {
         .from('users')
         .select('user_id, display_name, avatar_url, bio');
 
-      // ブロックしているユーザーを除外
-      if (blockedUserIds.length > 0) {
-        query = query.not('user_id', 'in', `(${blockedUserIds.join(',')})`);
+      // ブロック関係にあるユーザーを除外
+      if (allBlockedUserIds.length > 0) {
+        query = query.not('user_id', 'in', `(${allBlockedUserIds.join(',')})`);
       }
 
       // キーワード検索（bio）
@@ -406,9 +418,10 @@ export default function SearchScreen() {
         setLoadingMore(true);
       }
 
-      // ブロックしているユーザーのIDを取得
+      // ブロックしているユーザー、ブロックされているユーザー、ミュートしているユーザーのIDを取得
       const { data: { user } } = await supabase.auth.getUser();
-      let blockedUserIds: string[] = [];
+      let allBlockedUserIds: string[] = [];
+      let mutedUserIds: string[] = [];
 
       if (user) {
         const { data: blocksData } = await supabase
@@ -416,7 +429,26 @@ export default function SearchScreen() {
           .select('blocked_id')
           .eq('blocker_id', user.id);
 
-        blockedUserIds = blocksData?.map(b => b.blocked_id) || [];
+        const blockedUserIds = blocksData?.map(b => b.blocked_id) || [];
+
+        // ブロックされているユーザーも取得
+        const { data: blockedByData } = await supabase
+          .from('blocks')
+          .select('blocker_id')
+          .eq('blocked_id', user.id);
+
+        const blockedByUserIds = blockedByData?.map(b => b.blocker_id) || [];
+
+        // 両方を結合
+        allBlockedUserIds = [...blockedUserIds, ...blockedByUserIds];
+
+        // ミュートしているユーザーを取得
+        const { data: mutesData } = await supabase
+          .from('mutes')
+          .select('muted_id')
+          .eq('muter_id', user.id);
+
+        mutedUserIds = mutesData?.map(m => m.muted_id) || [];
       }
 
       // 基本クエリ（非表示投稿を除外）
@@ -425,9 +457,9 @@ export default function SearchScreen() {
         .select('id, content, created_at, updated_at, experienced_at, user_id, parent_post_id')
         .eq('is_hidden', false);
 
-      // ブロックしているユーザーの投稿を除外
-      if (blockedUserIds.length > 0) {
-        query = query.not('user_id', 'in', `(${blockedUserIds.join(',')})`);
+      // ブロック関係にあるユーザーの投稿を除外
+      if (allBlockedUserIds.length > 0) {
+        query = query.not('user_id', 'in', `(${allBlockedUserIds.join(',')})`);
       }
 
       // フリーワード検索
@@ -519,6 +551,7 @@ export default function SearchScreen() {
             diagnoses,
             treatments,
             medications,
+            isMuted: mutedUserIds.includes(post.user_id),
           };
         })
       );

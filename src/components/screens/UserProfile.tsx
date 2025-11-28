@@ -19,6 +19,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { VStack } from '@/components/ui/vstack';
 import { useBlock } from '@/src/hooks/useBlock';
 import { useFollow } from '@/src/hooks/useFollow';
+import { useMute } from '@/src/hooks/useMute';
 import { supabase } from '@/src/lib/supabase';
 import { sortByStartDate } from '@/src/utils/sortByStartDate';
 import { MoreVertical } from 'lucide-react-native';
@@ -59,11 +60,14 @@ export default function UserDetailScreen() {
   const segments = useSegments();
   const { isFollowing, isLoading: followLoading, toggleFollow, counts, isOwnProfile, currentUserId } = useFollow(id ?? null);
   const { isBlocked, isLoading: blockLoading, toggleBlock } = useBlock(id ?? null);
+  const { isMuted, isLoading: muteLoading, toggleMute } = useMute(id ?? null);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('profile');
   const [showBlockModal, setShowBlockModal] = useState(false);
   const [isBlockProcessing, setIsBlockProcessing] = useState(false);
+  const [showMuteModal, setShowMuteModal] = useState(false);
+  const [isMuteProcessing, setIsMuteProcessing] = useState(false);
   const [diagnoses, setDiagnoses] = useState<MedicalRecord[]>([]);
   const [treatments, setTreatments] = useState<MedicalRecord[]>([]);
   const [medications, setMedications] = useState<MedicalRecord[]>([]);
@@ -531,6 +535,11 @@ export default function UserDetailScreen() {
                       );
                     }}
                   >
+                    <MenuItem key="mute" textValue={isMuted ? 'ミュート解除' : 'ミュート'} onPress={handleMutePress}>
+                      <MenuItemLabel>
+                        {isMuted ? 'ミュート解除' : 'ミュート'}
+                      </MenuItemLabel>
+                    </MenuItem>
                     <MenuItem key="block" textValue={isBlocked ? 'ブロック解除' : 'ブロック'} onPress={handleBlockPress}>
                       <MenuItemLabel className={isBlocked ? '' : 'text-error-500'}>
                         {isBlocked ? 'ブロック解除' : 'ブロック'}
@@ -641,6 +650,23 @@ export default function UserDetailScreen() {
     }
   };
 
+  const handleMutePress = () => {
+    setShowMuteModal(true);
+  };
+
+  const handleMuteConfirm = async () => {
+    setIsMuteProcessing(true);
+    try {
+      await toggleMute();
+      setShowMuteModal(false);
+      Alert.alert('成功', isMuted ? 'ミュートを解除しました' : 'ミュートしました');
+    } catch (error) {
+      Alert.alert('エラー', '操作に失敗しました');
+    } finally {
+      setIsMuteProcessing(false);
+    }
+  };
+
   if (!profile) {
     return (
       <Box className="flex-1 items-center justify-center p-5">
@@ -675,6 +701,21 @@ export default function UserDetailScreen() {
         }
         confirmText={isBlocked ? 'ブロック解除' : 'ブロック'}
         isLoading={isBlockProcessing}
+      />
+
+      {/* ミュート確認モーダル */}
+      <ConfirmModal
+        isOpen={showMuteModal}
+        onClose={() => setShowMuteModal(false)}
+        onConfirm={handleMuteConfirm}
+        title={isMuted ? 'ミュート解除' : 'ミュート'}
+        message={
+          isMuted
+            ? 'このユーザーのミュートを解除しますか？'
+            : 'このユーザーをミュートしますか？ミュートすると、このユーザーの投稿がタイムラインに表示されなくなります。フォロー関係は維持されます。'
+        }
+        confirmText={isMuted ? 'ミュート解除' : 'ミュート'}
+        isLoading={isMuteProcessing}
       />
     </>
   );

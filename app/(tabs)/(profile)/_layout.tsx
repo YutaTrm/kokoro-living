@@ -66,6 +66,12 @@ export default function ProfileLayout() {
           title: 'ブロックリスト',
         }}
       />
+      <Stack.Screen
+        name="mutes"
+        options={{
+          title: 'ミュートリスト',
+        }}
+      />
     </Stack>
       <ProfileDrawer isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </>
