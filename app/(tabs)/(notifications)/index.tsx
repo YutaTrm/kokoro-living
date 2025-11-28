@@ -96,15 +96,16 @@ export default function NotificationsScreen() {
 
       if (error) throw error;
 
-      // 投稿内容を取得
+      // 投稿内容と作成者を取得
       const postIds = (data || []).map((n) => n.post_id).filter(Boolean) as string[];
       let postsMap = new Map<string, string>();
+      let postAuthorsMap = new Map<string, string>();
 
       if (postIds.length > 0) {
         // いいね通知の場合は元の投稿、返信通知の場合は返信自体の親投稿を取得
         const { data: postsData } = await supabase
           .from('posts')
-          .select('id, content, parent_post_id')
+          .select('id, content, parent_post_id, user_id')
           .in('id', postIds);
 
         if (postsData) {
@@ -114,44 +115,57 @@ export default function NotificationsScreen() {
             .map((p) => p.parent_post_id) as string[];
 
           let parentPostsMap = new Map<string, string>();
+          let parentAuthorsMap = new Map<string, string>();
           if (parentPostIds.length > 0) {
             const { data: parentPostsData } = await supabase
               .from('posts')
-              .select('id, content')
+              .select('id, content, user_id')
               .in('id', parentPostIds);
 
             if (parentPostsData) {
               parentPostsData.forEach((p) => {
                 parentPostsMap.set(p.id, p.content);
+                parentAuthorsMap.set(p.id, p.user_id);
               });
             }
           }
 
           postsData.forEach((p) => {
-            // 返信通知の場合は親投稿の内容を使用
+            // 返信通知の場合は親投稿の内容と作成者を使用
             if (p.parent_post_id && parentPostsMap.has(p.parent_post_id)) {
               postsMap.set(p.id, parentPostsMap.get(p.parent_post_id)!);
+              postAuthorsMap.set(p.id, parentAuthorsMap.get(p.parent_post_id)!);
             } else {
               postsMap.set(p.id, p.content);
+              postAuthorsMap.set(p.id, p.user_id);
             }
           });
         }
       }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const formatted: Notification[] = (data || []).map((n: any) => ({
-        id: n.id,
-        type: n.type,
-        post_id: n.post_id,
-        is_read: n.is_read,
-        created_at: n.created_at,
-        actor: {
-          user_id: n.actor?.user_id || '',
-          display_name: n.actor?.display_name || 'Unknown',
-          avatar_url: n.actor?.avatar_url || null,
-        },
-        post_content: n.post_id ? postsMap.get(n.post_id) || null : null,
-      }));
+      const formatted: Notification[] = (data || [])
+        .filter((n: any) => {
+          // ブロックした人の投稿に対する通知を除外
+          if (n.post_id && postAuthorsMap.has(n.post_id)) {
+            const postAuthor = postAuthorsMap.get(n.post_id);
+            return !allBlockedIds.includes(postAuthor!);
+          }
+          return true;
+        })
+        .map((n: any) => ({
+          id: n.id,
+          type: n.type,
+          post_id: n.post_id,
+          is_read: n.is_read,
+          created_at: n.created_at,
+          actor: {
+            user_id: n.actor?.user_id || '',
+            display_name: n.actor?.display_name || 'Unknown',
+            avatar_url: n.actor?.avatar_url || null,
+          },
+          post_content: n.post_id ? postsMap.get(n.post_id) || null : null,
+        }));
 
       setNotifications(formatted);
     } catch (error) {

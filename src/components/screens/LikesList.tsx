@@ -52,6 +52,19 @@ export default function PostLikesScreen() {
 
       const allBlockedIds = [...blockedIds, ...blockedByIds];
 
+      // 投稿の作成者を確認
+      const { data: postData } = await supabase
+        .from('posts')
+        .select('user_id')
+        .eq('id', id)
+        .single();
+
+      // 投稿の作成者がブロックリストに含まれている場合は空のリストを返す
+      if (postData && allBlockedIds.includes(postData.user_id)) {
+        setUsers([]);
+        return;
+      }
+
       const { data: likesData, error: likesError } = await supabase
         .from('likes')
         .select('user_id')
