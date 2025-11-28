@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { LogOut, MessageCircleOff, ShieldBan, UserX, X } from 'lucide-react-native';
+import { LogOut, MessageCircleOff, Monitor, Moon, ShieldBan, Sun, UserX, X } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, Pressable } from 'react-native';
 
@@ -22,6 +22,7 @@ import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
 import { VStack } from '@/components/ui/vstack';
+import { useTheme } from '@/src/contexts/ThemeContext';
 import { supabase } from '@/src/lib/supabase';
 
 interface ProfileDrawerProps {
@@ -31,6 +32,7 @@ interface ProfileDrawerProps {
 
 export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
   const router = useRouter();
+  const { themeMode, setThemeMode } = useTheme();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false);
 
@@ -104,11 +106,14 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
           </DrawerHeader>
           <DrawerBody>
             <VStack space="md">
+              {/*  */}
+              <Text className="text-sm text-typography-500 mb-2">プライバシー</Text>
+
               {/* ブロックリスト */}
               <Pressable onPress={handleBlockList}>
                 <HStack space="md" className="items-center">
                   <Icon as={ShieldBan} size="md" className="text-typography-700" />
-                  <Text className="text-base -ml-2">ブロックリスト</Text>
+                  <Text className="text-lg -ml-2">ブロックリスト</Text>
                 </HStack>
               </Pressable>
 
@@ -116,11 +121,61 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
               <Pressable onPress={handleMuteList}>
                 <HStack space="md" className="items-center">
                   <Icon as={MessageCircleOff} size="md" className="text-typography-700" />
-                  <Text className="text-base -ml-2">ミュートリスト</Text>
+                  <Text className="text-lg -ml-2">ミュートリスト</Text>
                 </HStack>
               </Pressable>
 
               <Divider className="my-2" />
+
+              {/* テーマ設定 */}
+              <Text className="text-sm text-typography-500 mb-2">テーマ</Text>
+
+              {/* システム設定 */}
+              <Pressable onPress={() => setThemeMode('system')}>
+                <HStack space="md" className="items-center">
+                  <Icon
+                    as={Monitor}
+                    size="md"
+                    className={themeMode === 'system' ? 'text-primary-500' : 'text-typography-700'}
+                  />
+                  <Text className={`text-lg -ml-2 ${themeMode === 'system' ? 'text-primary-500 font-semibold' : ''}`}>
+                    システム設定
+                  </Text>
+                </HStack>
+              </Pressable>
+
+              {/* ライト */}
+              <Pressable onPress={() => setThemeMode('light')} className="">
+                <HStack space="md" className="items-center">
+                  <Icon
+                    as={Sun}
+                    size="md"
+                    className={themeMode === 'light' ? 'text-primary-500' : 'text-typography-700'}
+                  />
+                  <Text className={`text-lg -ml-2 ${themeMode === 'light' ? 'text-primary-500 font-semibold' : ''}`}>
+                    ライト
+                  </Text>
+                </HStack>
+              </Pressable>
+
+              {/* ダーク */}
+              <Pressable onPress={() => setThemeMode('dark')} className="">
+                <HStack space="md" className="items-center">
+                  <Icon
+                    as={Moon}
+                    size="md"
+                    className={themeMode === 'dark' ? 'text-primary-500' : 'text-typography-700'}
+                  />
+                  <Text className={`text-lg -ml-2 ${themeMode === 'dark' ? 'text-primary-500 font-semibold' : ''}`}>
+                    ダーク
+                  </Text>
+                </HStack>
+              </Pressable>
+
+              <Divider className="my-2" />
+
+              {/* サービス情報 */}
+              {/* <Text className="text-sm text-typography-500 mb-2">サービス情報</Text> */}
 
               {/* 利用規約 */}
               <Pressable
@@ -129,7 +184,7 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
                 }
               >
                 <HStack space="md" className="items-center">
-                  <Text className="text-base -mr-2">利用規約</Text>
+                  <Text className="text-lg -mr-2">利用規約</Text>
                   {/* <Icon as={ExternalLink} size="md" className="text-typography-700" /> */}
                 </HStack>
               </Pressable>
@@ -141,7 +196,7 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
                 }
               >
                 <HStack space="md" className="items-center">
-                  <Text className="text-base -mr-2">プライバシーポリシー</Text>
+                  <Text className="text-lg -mr-2">プライバシーポリシー</Text>
                   {/* <Icon as={ExternalLink} size="md" className="text-typography-700" /> */}
                 </HStack>
               </Pressable>
@@ -153,7 +208,7 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
                 }
               >
                 <HStack space="md" className="items-center">
-                  <Text className="text-base -mr-2">サポート</Text>
+                  <Text className="text-lg -mr-2">サポート</Text>
                   {/* <Icon as={ExternalLink} size="md" className="text-typography-700" /> */}
                 </HStack>
               </Pressable>
@@ -168,7 +223,7 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
                 variant="outline"
                 className="w-full"
               >
-                <ButtonText>ログアウト</ButtonText>
+                <ButtonText className="text-error-500">ログアウト</ButtonText>
                 <ButtonIcon as={LogOut} />
               </Button>
 

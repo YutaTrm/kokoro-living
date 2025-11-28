@@ -1,5 +1,5 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 
 import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
-import { useColorScheme } from '@/components/useColorScheme';
+import { ThemeProvider, useTheme } from '@/src/contexts/ThemeContext';
 import { supabase } from '@/src/lib/supabase';
 import '@/global.css';
 
@@ -52,11 +52,15 @@ export default function RootLayout() {
     return null;
   }
 
-  return <RootLayoutNav />;
+  return (
+    <ThemeProvider>
+      <RootLayoutNav />
+    </ThemeProvider>
+  );
 }
 
 function RootLayoutNav() {
-  const colorScheme = useColorScheme();
+  const { theme } = useTheme();
   const segments = useSegments();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
@@ -188,9 +192,9 @@ function RootLayoutNav() {
   }, [isLoading, isAuthenticated, segments]);
 
   return (
-    <GluestackUIProvider mode={colorScheme === 'dark' ? 'dark' : 'light'}>
+    <GluestackUIProvider mode={theme === 'dark' ? 'dark' : 'light'}>
       <QueryClientProvider client={queryClient}>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <NavigationThemeProvider value={theme === 'dark' ? DarkTheme : DefaultTheme}>
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="terms-agreement" options={{ headerShown: false }} />
@@ -198,7 +202,7 @@ function RootLayoutNav() {
           <Stack.Screen name="create-post" options={{ presentation: 'modal', headerShown: false, gestureEnabled: false }} />
           <Stack.Screen name="reply/[id]" options={{ presentation: 'modal', headerShown: false, gestureEnabled: false }} />
         </Stack>
-      </ThemeProvider>
+      </NavigationThemeProvider>
     </QueryClientProvider>
     </GluestackUIProvider>
   );
