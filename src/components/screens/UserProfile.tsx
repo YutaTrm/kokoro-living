@@ -10,7 +10,6 @@ import ProfileTabBar, { TabType } from '@/components/profile/ProfileTabBar';
 import { Text } from '@/components/Themed';
 import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
-import { Button } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
@@ -22,7 +21,7 @@ import { useFollow } from '@/src/hooks/useFollow';
 import { useMute } from '@/src/hooks/useMute';
 import { supabase } from '@/src/lib/supabase';
 import { sortByStartDate } from '@/src/utils/sortByStartDate';
-import { MoreVertical } from 'lucide-react-native';
+import { MessageCircleOff, MoreVertical, ShieldBan } from 'lucide-react-native';
 
 interface UserProfile {
   user_id: string;
@@ -536,14 +535,12 @@ export default function UserDetailScreen() {
                     }}
                   >
                     <MenuItem key="mute" textValue={isMuted ? 'ミュート解除' : 'ミュート'} onPress={handleMutePress}>
-                      <MenuItemLabel>
-                        {isMuted ? 'ミュート解除' : 'ミュート'}
-                      </MenuItemLabel>
+                      <Icon as={MessageCircleOff} size="md" className="text-typography-700" />
+                      <MenuItemLabel className="ml-2">{isMuted ? 'ミュート解除' : 'ミュート'}</MenuItemLabel>
                     </MenuItem>
-                    <MenuItem key="block" textValue={isBlocked ? 'ブロック解除' : 'ブロック'} onPress={handleBlockPress}>
-                      <MenuItemLabel className={isBlocked ? '' : 'text-error-500'}>
-                        {isBlocked ? 'ブロック解除' : 'ブロック'}
-                      </MenuItemLabel>
+                    <MenuItem key="block" textValue={`items-center ${isBlocked ? 'ブロック解除' : 'ブロック'}`} onPress={handleBlockPress}>
+                      <Icon as={ShieldBan} size="md" className="text-error-500" />
+                      <MenuItemLabel className="ml-2 text-error-500">{isBlocked ? 'ブロック解除' : 'ブロック'}</MenuItemLabel>
                     </MenuItem>
                   </Menu>
                 )}

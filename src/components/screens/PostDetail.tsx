@@ -13,6 +13,7 @@ import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar'
 import { Box } from '@/components/ui/box';
 import { Button, ButtonText } from '@/components/ui/button';
 import { HStack } from '@/components/ui/hstack';
+import { Icon } from '@/components/ui/icon';
 import { Menu, MenuItem, MenuItemLabel } from '@/components/ui/menu';
 import { Modal, ModalBackdrop, ModalBody, ModalContent, ModalFooter, ModalHeader } from '@/components/ui/modal';
 import { Radio, RadioGroup, RadioIcon, RadioIndicator, RadioLabel } from '@/components/ui/radio';
@@ -818,11 +819,11 @@ export default function PostDetailScreen() {
                 {isOwnPost ? (
                   <>
                     <MenuItem key="edit" textValue="編集" onPress={handleEdit}>
-                      <Edit size={16} color="#666" />
+                      <Icon as={Edit} size="md" className="text-typography-700" />
                       <MenuItemLabel className="ml-2">投稿を編集</MenuItemLabel>
                     </MenuItem>
                     <MenuItem key="delete" textValue="削除" onPress={handleDeletePress}>
-                      <Trash2 size={16} color="#DC2626" />
+                      <Icon as={Trash2} size="md" className="text-error-500" />
                       <MenuItemLabel className="ml-2 text-error-500">投稿を削除</MenuItemLabel>
                     </MenuItem>
                   </>
