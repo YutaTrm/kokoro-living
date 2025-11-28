@@ -25,8 +25,6 @@ interface FollowCounts {
 
 interface ProfileHeaderProps {
   profile: UserProfile;
-  onLogout: () => void;
-  onDeleteAccount: () => void;
   onEditName: () => void;
   followCounts?: FollowCounts;
   onFollowingPress?: () => void;
@@ -35,8 +33,6 @@ interface ProfileHeaderProps {
 
 export default function ProfileHeader({
   profile,
-  onLogout,
-  onDeleteAccount,
   onEditName,
   followCounts,
   onFollowingPress,
@@ -93,15 +89,6 @@ export default function ProfileHeader({
             </HStack>
           )}
         </VStack>
-      </HStack>
-
-      <HStack className="mt-4" space="sm">
-        <Button onPress={onLogout} variant="outline" action="negative" className="flex-1">
-          <ButtonText>ログアウト</ButtonText>
-        </Button>
-        <Button onPress={onDeleteAccount} action="negative" className="flex-1">
-          <ButtonText>アプリ退会</ButtonText>
-        </Button>
       </HStack>
     </Box>
   );

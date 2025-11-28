@@ -124,11 +124,6 @@ export default function ProfileScreen() {
   const [endYear, setEndYear] = useState<string>('');
   const [endMonth, setEndMonth] = useState<string>('');
 
-  // 確認モーダル用のstate
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-
   // テキスト編集モーダル用のstate
   const [showNameEditModal, setShowNameEditModal] = useState(false);
   const [showBioEditModal, setShowBioEditModal] = useState(false);
@@ -797,54 +792,6 @@ export default function ProfileScreen() {
     }
   };
 
-  // ログアウトモーダルを表示
-  const handleLogoutPress = () => {
-    setShowLogoutModal(true);
-  };
-
-  // ログアウト実行
-  const handleLogoutConfirm = async () => {
-    setShowLogoutModal(false);
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        Alert.alert('エラー', 'ログアウトに失敗しました');
-        return;
-      }
-      setProfile(null);
-      router.replace('/');
-    } catch (error) {
-      Alert.alert('エラー', '予期しないエラーが発生しました');
-    }
-  };
-
-  // 退会モーダルを表示
-  const handleDeleteAccountPress = () => {
-    setShowDeleteModal(true);
-  };
-
-  // 退会実行
-  const handleDeleteAccountConfirm = async () => {
-    setIsDeleting(true);
-    try {
-      const { error } = await supabase.rpc('delete_user_account');
-      if (error) {
-        Alert.alert('エラー', '退会処理に失敗しました');
-        setIsDeleting(false);
-        setShowDeleteModal(false);
-        return;
-      }
-      setShowDeleteModal(false);
-      setProfile(null);
-      Alert.alert('退会完了', 'アカウントが削除されました');
-      router.replace('/');
-    } catch (error) {
-      Alert.alert('エラー', '予期しないエラーが発生しました');
-      setIsDeleting(false);
-      setShowDeleteModal(false);
-    }
-  };
-
   const handleSaveDisplayName = async (newName: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -908,8 +855,6 @@ export default function ProfileScreen() {
     <>
       <ProfileHeader
         profile={profile!}
-        onLogout={handleLogoutPress}
-        onDeleteAccount={handleDeleteAccountPress}
         onEditName={() => setShowNameEditModal(true)}
         followCounts={followCounts}
         onFollowingPress={handleFollowingPress}
@@ -1094,27 +1039,6 @@ export default function ProfileScreen() {
         initialStartMonth={startMonth}
         initialEndYear={endYear}
         initialEndMonth={endMonth}
-      />
-
-      {/* ログアウト確認モーダル */}
-      <ConfirmModal
-        isOpen={showLogoutModal}
-        onClose={() => setShowLogoutModal(false)}
-        onConfirm={handleLogoutConfirm}
-        title="ログアウト"
-        message="ログアウトしますか？"
-        confirmText="ログアウト"
-      />
-
-      {/* 退会確認モーダル */}
-      <ConfirmModal
-        isOpen={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
-        onConfirm={handleDeleteAccountConfirm}
-        title="アプリ退会"
-        message="退会すると、投稿やいいねなど全てのデータが削除されます。この操作は取り消せません。本当に退会しますか？"
-        confirmText="退会"
-        isLoading={isDeleting}
       />
 
       {/* 名前編集モーダル */}
