@@ -2,7 +2,7 @@ import { useRouter, useSegments } from 'expo-router';
 import { Pressable } from 'react-native';
 
 import DefaultAvatar from '@/components/icons/DefaultAvatar';
-import { Text } from '@/components/Themed';
+import { Text } from '@/components/ui/text';
 import { Avatar, AvatarImage } from '@/components/ui/avatar';
 import { HStack } from '@/components/ui/hstack';
 import { VStack } from '@/components/ui/vstack';

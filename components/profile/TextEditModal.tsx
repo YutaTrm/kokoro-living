@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { TextInput } from 'react-native';
 
-import { Text } from '@/components/Themed';
+import { Text } from '@/components/ui/text';
 import { Button, ButtonText } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
 import { Input, InputField } from '@/components/ui/input';

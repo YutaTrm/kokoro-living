@@ -8,7 +8,7 @@ import ConfirmModal from '@/components/ConfirmModal';
 import PostActionButtons from '@/components/PostActionButtons';
 import ReplyItem from '@/components/ReplyItem';
 import Tag from '@/components/Tag';
-import { Text } from '@/components/Themed';
+import { Text } from '@/components/ui/text';
 import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonText } from '@/components/ui/button';
@@ -712,7 +712,7 @@ export default function PostDetailScreen() {
         <Stack.Screen options={{ title: 'ポスト' }} />
         <Box className="flex-1 items-center justify-center p-5">
           <VStack space="md" className="items-center">
-            <Flag size={48} color="#999" />
+            <Icon as={Flag} size="xl" className="text-typography-500" />
             <Text className="text-base text-center text-typography-500">
               この投稿は通報により非表示になりました
             </Text>
@@ -751,7 +751,7 @@ export default function PostDetailScreen() {
                   <Spinner size="small" />
                 ) : (
                   <>
-                    <ChevronDown size={16} color="#666" />
+                    <Icon as={ChevronDown} size="sm" className="text-typography-700" />
                     <Text className="text-sm text-primary-500">
                       さらに表示する（{deepReply.deeperRepliesCount}件）
                     </Text>
@@ -779,7 +779,7 @@ export default function PostDetailScreen() {
           {isReply && parentPost && (
             <Pressable onPress={handleParentPress} className="mb-3">
               <HStack space="xs" className="items-center">
-                <CornerDownRight size={14} color="#666" />
+                <Icon as={CornerDownRight} size="sm" className="text-typography-700" />
                 <Text className="text-sm text-primary-300 pr-4" numberOfLines={1}>
                   {truncateText(parentPost.content)}
                 </Text>
@@ -811,7 +811,7 @@ export default function PostDetailScreen() {
                 trigger={({ ...triggerProps }) => {
                   return (
                     <Pressable {...triggerProps} className="p-2">
-                      <MoreVertical size={20} color="#666" />
+                      <Icon as={MoreVertical} size="md" className="text-typography-700" />
                     </Pressable>
                   );
                 }}
@@ -829,7 +829,7 @@ export default function PostDetailScreen() {
                   </>
                 ) : (
                   <MenuItem key="report" textValue="通報" onPress={handleReport}>
-                    <Flag size={16} color="#666" />
+                    <Icon as={Flag} size="sm" className="text-typography-700" />
                     <MenuItemLabel className="ml-2">投稿を通報</MenuItemLabel>
                   </MenuItem>
                 )}
@@ -841,7 +841,7 @@ export default function PostDetailScreen() {
           {post.is_hidden && isOwnPost && (
             <Box className="bg-error-50 border border-error-200 rounded-md p-3 mb-3">
               <HStack space="sm" className="items-center">
-                <Flag size={16} color="#DC2626" />
+                <Icon as={Flag} size="sm" className="text-error-500" />
                 <Text className="text-sm text-error-500 flex-1">
                   この投稿は通報により非表示になりました（あなた以外には表示されません）
                 </Text>
@@ -853,7 +853,7 @@ export default function PostDetailScreen() {
 
           {post.experienced_at && (
             <HStack space="xs" className="items-center mb-2">
-              <Clock size={16} color="#666" />
+              <Icon as={Clock} size="sm" className="text-typography-700" />
               <Text className="text-sm text-typography-500">{formatExperiencedAt(post.experienced_at)}</Text>
             </HStack>
           )}

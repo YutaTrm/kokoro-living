@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { Alert, Pressable } from 'react-native';
 
 import ConfirmModal from '@/components/ConfirmModal';
-import { Text } from '@/components/Themed';
+import { Text } from '@/components/ui/text';
 import { Button, ButtonIcon, ButtonText } from '@/components/ui/button';
 import { Divider } from '@/components/ui/divider';
 import {

@@ -4,7 +4,7 @@ import { Alert, Image } from 'react-native';
 
 import AppleLogo from '@/components/icons/AppleLogo';
 import XLogo from '@/components/icons/XLogo';
-import { Text } from '@/components/Themed';
+import { Text } from '@/components/ui/text';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonText } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';

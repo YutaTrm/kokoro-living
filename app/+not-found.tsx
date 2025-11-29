@@ -1,6 +1,6 @@
 import { Link, Stack } from 'expo-router';
 
-import { Text } from '@/components/Themed';
+import { Text } from '@/components/ui/text';
 import { Box } from '@/components/ui/box';
 import { Heading } from '@/components/ui/heading';
 

@@ -8,7 +8,7 @@ import DefaultAvatar from '@/components/icons/DefaultAvatar';
 import PostItem from '@/components/PostItem';
 import MedicalSection from '@/components/profile/MedicalSection';
 import ProfileTabBar, { TabType } from '@/components/profile/ProfileTabBar';
-import { Text } from '@/components/Themed';
+import { Text } from '@/components/ui/text';
 import { Avatar, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
 import { Heading } from '@/components/ui/heading';
@@ -533,7 +533,7 @@ export default function UserDetailScreen() {
                     trigger={({ ...triggerProps }) => {
                       return (
                         <Pressable {...triggerProps} className="p-2">
-                          <MoreVertical size={20} color="#666" />
+                          <Icon as={MoreVertical} size="md" className="text-typography-700" />
                         </Pressable>
                       );
                     }}

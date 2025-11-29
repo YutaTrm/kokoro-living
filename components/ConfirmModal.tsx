@@ -1,4 +1,4 @@
-import { Text } from '@/components/Themed';
+import { Text } from '@/components/ui/text';
 import { Button, ButtonText } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
 import {

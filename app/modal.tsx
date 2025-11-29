@@ -2,7 +2,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Platform } from 'react-native';
 
 import EditScreenInfo from '@/components/EditScreenInfo';
-import { Text, View } from '@/components/Themed';
+import { Text } from '@/components/ui/text';
 import { Box } from '@/components/ui/box';
 import { Heading } from '@/components/ui/heading';
 import { Divider } from '@/components/ui/divider';

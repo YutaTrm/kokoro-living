@@ -1,6 +1,6 @@
 import { Pencil } from 'lucide-react-native';
 
-import { Text } from '@/components/Themed';
+import { Text } from '@/components/ui/text';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonIcon } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';

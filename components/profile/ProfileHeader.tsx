@@ -2,7 +2,7 @@ import { Pencil } from 'lucide-react-native';
 import { Pressable, TouchableOpacity } from 'react-native';
 
 import DefaultAvatar from '@/components/icons/DefaultAvatar';
-import { Text } from '@/components/Themed';
+import { Text } from '@/components/ui/text';
 import { Avatar, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
 import { Heading } from '@/components/ui/heading';

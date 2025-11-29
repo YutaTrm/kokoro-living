@@ -2,7 +2,7 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { FlatList } from 'react-native';
 
-import { Text } from '@/components/Themed';
+import { Text } from '@/components/ui/text';
 import UserListItem from '@/components/UserListItem';
 import { Box } from '@/components/ui/box';
 import { Spinner } from '@/components/ui/spinner';
