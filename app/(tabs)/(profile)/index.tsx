@@ -925,9 +925,9 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </HStack>
             {bio ? (
-              <Text className="text-lg border rounded p-1 border-typography-300">{bio}</Text>
+              <Text className="text-lg p-2 bg-background-50 rounded-lg">{bio}</Text>
             ) : (
-              <Text className="text-lg text-typography-400">まだ登録がありません</Text>
+              <Text className="text-lg text-typography-400 text-center py-2">まだ登録がありません</Text>
             )}
           </Box>
 

@@ -515,14 +515,14 @@ export default function UserDetailScreen() {
               <HStack className="justify-between items-start">
                 <VStack>
                   <HStack space="xs" className="items-center">
-                    <Heading size="xl" className="text-primary-300">
+                    <Heading size="xl" className="text-primary-500">
                       {profile.display_name}
                     </Heading>
                     {isOwnProfile && (
-                      <Text className="text-sm text-typography-500">(あなた)</Text>
+                      <Text className="text-xl text-typography-500">(あなた)</Text>
                     )}
                   </HStack>
-                  <Text className="text-sm text-primary-300">
+                  <Text className="text-sm text-typography-400">
                     登録日: {new Date(profile.created_at).toLocaleDateString('ja-JP')}
                   </Text>
                 </VStack>
@@ -550,7 +550,7 @@ export default function UserDetailScreen() {
                 )}
               </HStack>
               {/* フォロー数 */}
-              <HStack space="md" className="items-center mt-2">
+              <HStack space="md" className="items-center">
                 <Pressable onPress={() => handleFollowCountPress('following')}>
                   <HStack space="xs">
                     <Text className="font-bold">{counts.followingCount}</Text>
@@ -577,7 +577,7 @@ export default function UserDetailScreen() {
 
           {/* Bio */}
           {profile.bio && (
-            <Box className="mt-3">
+            <Box className="mt-3 p-2 bg-background-50 rounded-lg">
               <Text className="text-base">{profile.bio}</Text>
             </Box>
           )}
