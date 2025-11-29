@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Pressable, RefreshControl } from 'react-native';
 
 import LoginPrompt from '@/components/LoginPrompt';
+import ReplyIndicator from '@/components/ReplyIndicator';
 import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
 import { HStack } from '@/components/ui/hstack';
@@ -28,6 +29,8 @@ interface Notification {
     avatar_url: string | null;
   };
   post_content?: string | null;
+  parent_post_content?: string | null; // 返信通知の場合、親投稿の内容
+  parent_post_id?: string | null; // 返信通知の場合、親投稿のID
 }
 
 export default function NotificationsScreen() {
@@ -110,6 +113,8 @@ export default function NotificationsScreen() {
       const postIds = (data || []).map((n) => n.post_id).filter(Boolean) as string[];
       let postsMap = new Map<string, string>();
       let postAuthorsMap = new Map<string, string>();
+      let parentPostsContentMap = new Map<string, string>(); // 返信の場合の親投稿内容
+      let parentPostsIdMap = new Map<string, string>(); // 返信の場合の親投稿ID
 
       if (postIds.length > 0) {
         // いいね通知の場合は元の投稿、返信通知の場合は返信自体の親投稿を取得
@@ -141,12 +146,15 @@ export default function NotificationsScreen() {
           }
 
           postsData.forEach((p) => {
-            // 返信通知の場合は親投稿の内容と作成者を使用
+            // 投稿内容は常に自身の内容を表示（返信の場合も返信自体の内容を表示）
+            postsMap.set(p.id, p.content);
+
+            // 返信の場合、親投稿の内容とIDを保存
             if (p.parent_post_id && parentPostsMap.has(p.parent_post_id)) {
-              postsMap.set(p.id, parentPostsMap.get(p.parent_post_id)!);
+              parentPostsContentMap.set(p.id, parentPostsMap.get(p.parent_post_id)!);
+              parentPostsIdMap.set(p.id, p.parent_post_id);
               postAuthorsMap.set(p.id, parentAuthorsMap.get(p.parent_post_id)!);
             } else {
-              postsMap.set(p.id, p.content);
               postAuthorsMap.set(p.id, p.user_id);
             }
           });
@@ -175,6 +183,8 @@ export default function NotificationsScreen() {
             avatar_url: n.actor?.avatar_url || null,
           },
           post_content: n.post_id ? postsMap.get(n.post_id) || null : null,
+          parent_post_content: n.post_id ? parentPostsContentMap.get(n.post_id) || null : null,
+          parent_post_id: n.post_id ? parentPostsIdMap.get(n.post_id) || null : null,
         }));
 
       setNotifications(formatted);
@@ -243,6 +253,10 @@ export default function NotificationsScreen() {
     }
   };
 
+  const handleParentPress = (parentPostId: string) => {
+    router.push(`/(tabs)/(notifications)/post/${parentPostId}`);
+  };
+
   const renderNotification = ({ item }: { item: Notification }) => (
     <Pressable onPress={() => handlePress(item)}>
       <HStack
@@ -251,20 +265,37 @@ export default function NotificationsScreen() {
       >
         {getNotificationIcon(item.type)}
         <VStack className="flex-1" space="xs">
-          <HStack className="items-start justify-between">
-            <HStack space="sm" className="items-center flex-1">
+          <HStack className="items-start">
+            <HStack space="sm" className="flex-1 items-start">
               <Avatar size="sm">
                 <AvatarFallbackText>{item.actor.display_name}</AvatarFallbackText>
                 {item.actor.avatar_url && <AvatarImage source={{ uri: item.actor.avatar_url }} />}
               </Avatar>
               <Text className="flex-1 text-sm">
-                <Text className="font-semibold">{item.actor.display_name}</Text>
+                <Text className="font-semibold">{item.actor.display_name}さん</Text>
                 {getNotificationMessage(item.type)}
               </Text>
             </HStack>
             <Text className="text-sm text-typography-400">{formatRelativeDate(item.created_at)}</Text>
           </HStack>
-          {(item.type === 'like' || item.type === 'reply') && item.post_content && (
+
+          {/* 返信通知の場合：親投稿インジケータ + 返信内容 */}
+          {item.type === 'reply' && item.parent_post_content && item.parent_post_id && (
+            <VStack space="xs">
+              <ReplyIndicator
+                parentContent={item.parent_post_content}
+                onPress={() => handleParentPress(item.parent_post_id!)}
+              />
+              {item.post_content && (
+                <Text className="text-base" numberOfLines={2}>
+                  {item.post_content}
+                </Text>
+              )}
+            </VStack>
+          )}
+
+          {/* いいね通知の場合：投稿内容のみ */}
+          {item.type === 'like' && item.post_content && (
             <Text
               className="text-base text-typography-500"
               numberOfLines={2}
