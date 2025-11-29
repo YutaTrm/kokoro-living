@@ -278,7 +278,7 @@ export default function NotificationsScreen() {
           </HStack>
           {(item.type === 'like' || item.type === 'reply') && item.post_content && (
             <Text
-              className="text-sm text-typography-500 mt-1"
+              className="text-sm text-typography-500"
               numberOfLines={2}
             >
               {item.post_content}

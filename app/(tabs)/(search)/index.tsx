@@ -786,7 +786,7 @@ export default function SearchScreen() {
 
     return (
       <Box className="py-8 items-center">
-        <Text className="text-typography-500">検索結果がありません</Text>
+        <Text className="text-typography-400">検索結果がありません</Text>
       </Box>
     );
   };
@@ -866,7 +866,7 @@ export default function SearchScreen() {
                 onPress={() => setShowTagModal(true)}
                 className="h-6 px-2"
               >
-                <ButtonIcon as={PlusIcon} size="lg" />
+                <ButtonIcon as={PlusIcon} size="md" />
               </Button>
             </View>
           )}

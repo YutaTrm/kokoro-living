@@ -8,7 +8,6 @@ import DefaultAvatar from '@/components/icons/DefaultAvatar';
 import PostItem from '@/components/PostItem';
 import MedicalSection from '@/components/profile/MedicalSection';
 import ProfileTabBar, { TabType } from '@/components/profile/ProfileTabBar';
-import { Text } from '@/components/ui/text';
 import { Avatar, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
 import { Heading } from '@/components/ui/heading';
@@ -16,6 +15,7 @@ import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
 import { Menu, MenuItem, MenuItemLabel } from '@/components/ui/menu';
 import { Spinner } from '@/components/ui/spinner';
+import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
 import { useBlock } from '@/src/hooks/useBlock';
 import { useFollow } from '@/src/hooks/useFollow';
@@ -614,7 +614,7 @@ export default function UserDetailScreen() {
     const message = activeTab === 'posts' ? 'まだ投稿がありません' : 'まだいいねがありません';
     return (
       <Box className="px-5 py-8">
-        <Text className="text-base text-center opacity-50">{message}</Text>
+        <Text className="text-base text-center text-typography-400">{message}</Text>
       </Box>
     );
   };

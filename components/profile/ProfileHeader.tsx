@@ -2,12 +2,12 @@ import { Pencil } from 'lucide-react-native';
 import { Pressable, TouchableOpacity } from 'react-native';
 
 import DefaultAvatar from '@/components/icons/DefaultAvatar';
-import { Text } from '@/components/ui/text';
 import { Avatar, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
 import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
+import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
 
 interface UserProfile {
@@ -85,7 +85,7 @@ export default function ProfileHeader({
             </Text>
           )}
           {profile.createdAt && (
-            <Text className="text-sm text-primary-300">
+            <Text className="text-sm text-typography-400">
               アプリ登録日時: {new Date(profile.createdAt).toLocaleDateString('ja-JP')}
             </Text>
           )}

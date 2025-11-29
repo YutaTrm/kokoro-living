@@ -1,8 +1,8 @@
 import { Tabs, usePathname } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 
-import { useClientOnlyValue } from '@/components/useClientOnlyValue';
 import { Icon } from '@/components/ui/icon';
+import { useClientOnlyValue } from '@/components/useClientOnlyValue';
 import { NotificationProvider, useNotificationContext } from '@/src/contexts/NotificationContext';
 import { supabase } from '@/src/lib/supabase';
 
@@ -41,7 +41,7 @@ function TabsContent() {
             <Icon
               as={House}
               size="xl"
-              className={focused ? 'text-primary-500' : 'text-typography-500'}
+              className={focused ? 'text-primary-500' : 'text-typography-300'}
             />
           ),
         }}
@@ -55,7 +55,7 @@ function TabsContent() {
             <Icon
               as={Search}
               size="xl"
-              className={focused ? 'text-primary-500' : 'text-typography-500'}
+              className={focused ? 'text-primary-500' : 'text-typography-300'}
             />
           ),
         }}
@@ -69,7 +69,7 @@ function TabsContent() {
             <Icon
               as={Bell}
               size="xl"
-              className={focused ? 'text-primary-500' : 'text-typography-500'}
+              className={focused ? 'text-primary-500' : 'text-typography-300'}
             />
           ),
           tabBarBadge: unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : undefined,
@@ -84,7 +84,7 @@ function TabsContent() {
             <Icon
               as={User}
               size="xl"
-              className={focused ? 'text-primary-500' : 'text-typography-500'}
+              className={focused ? 'text-primary-500' : 'text-typography-300'}
             />
           ),
         }}

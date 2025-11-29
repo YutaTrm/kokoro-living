@@ -72,38 +72,41 @@ export default function TermsAgreementScreen() {
   return (
     <Box className="flex-1 bg-background-0">
       <ScrollView contentContainerStyle={{ padding: 20 }}>
-        <VStack space="lg" className="py-8">
+        <VStack space="lg" className="py-12">
           <VStack space="md">
-            <Heading size="2xl" className="text-center">
-              こころのリビングへようこそ
+            <Heading size="xl" className="text-center text-primary-500">
+              『こころのリビング』
+            </Heading>
+            <Heading size="lg" className="text-center">
+              インストールありがとうございます！
             </Heading>
             <Text className="text-center text-typography-500">
-              ご利用前に、利用規約とプライバシーポリシーへの同意が必要です
+              ご利用前にあたっては利用規約とプライバシーポリシーへの同意が必要となります
             </Text>
           </VStack>
 
           <Box className="bg-background-50 p-6 rounded-lg border border-outline-200">
-            <Heading size="lg" className="mb-4">
+            <Heading size="lg" className="mb-2">
               コミュニティガイドライン
             </Heading>
-            <Text className="mb-3">
+            <Text className="mb-2">
               こころのリビングは、すべてのユーザーが安全で快適に利用できる環境を目指しています。
             </Text>
             <Text className="font-semibold mb-2">以下のような行為は禁止されています：</Text>
-            <VStack space="xs" className="ml-4">
+            <VStack space="xs" className="ml-2">
               <Text>• ハラスメント、ヘイトスピーチ、暴力的な発言</Text>
               <Text>• スパム、詐欺行為</Text>
               <Text>• 他人の個人情報の公開</Text>
               <Text>• わいせつなコンテンツ</Text>
               <Text>• その他、利用規約に違反する行為</Text>
             </VStack>
-            <Text className="mt-3 text-typography-700">
+            <Text className="mt-2 text-typography-700">
               違反した場合、アカウント停止の措置を取る場合があります。
             </Text>
           </Box>
 
           <Box className="bg-info-50 p-6 rounded-lg border border-info-200">
-            <Heading size="md" className="mb-3">
+            <Heading size="md" className="mb-2">
               通報機能について
             </Heading>
             <Text>
@@ -114,7 +117,7 @@ export default function TermsAgreementScreen() {
             </Text>
           </Box>
 
-          <VStack space="md" className="mt-4">
+          <VStack space="md" className="mt-2">
             <Checkbox
               value="terms"
               isChecked={termsAccepted}
@@ -163,13 +166,13 @@ export default function TermsAgreementScreen() {
           <Button
             onPress={handleAccept}
             isDisabled={!termsAccepted || !privacyAccepted || isSubmitting}
-            className="mt-6"
+            className="mt-2"
             size="lg"
           >
             <ButtonText>{isSubmitting ? '保存中...' : '同意して始める'}</ButtonText>
           </Button>
 
-          <Text className="text-center text-sm text-typography-400 mt-4">
+          <Text className="text-center text-sm text-typography-400">
             上記に同意いただけない場合、アプリをご利用いただけません
           </Text>
         </VStack>

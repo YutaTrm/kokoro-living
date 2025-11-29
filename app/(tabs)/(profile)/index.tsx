@@ -927,7 +927,7 @@ export default function ProfileScreen() {
             {bio ? (
               <Text className="text-lg border rounded p-1 border-typography-300">{bio}</Text>
             ) : (
-              <Text className="text-lg text-typography-500">まだ登録がありません</Text>
+              <Text className="text-lg text-typography-400">まだ登録がありません</Text>
             )}
           </Box>
 
