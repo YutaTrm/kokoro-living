@@ -3,11 +3,11 @@ import { useEffect, useState } from 'react';
 import { FlatList, RefreshControl } from 'react-native';
 
 import PostItem from '@/components/PostItem';
-import { Text } from '@/components/Themed';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonIcon } from '@/components/ui/button';
 import { AddIcon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
+import { Text } from '@/components/ui/text';
 import { supabase } from '@/src/lib/supabase';
 
 interface Post {
@@ -243,7 +243,7 @@ export default function TabOneScreen() {
     // ローディング完了後、データがない場合はメッセージを表示
     return (
       <Box className="flex-1 items-center justify-center pt-48">
-        <Text className="text-md opacity-50 p-6">
+        <Text className="text-lg opacity-50 p-6">
           ここにはあなたと、あなたがフォローしているユーザーの投稿が表示されます。
           ユーザー検索して仲間を探しましょう！
         </Text>
@@ -357,7 +357,7 @@ export default function TabOneScreen() {
       {/* 投稿ボタンはログイン時のみ表示 */}
       {isLoggedIn && (
         <Button
-          className="absolute right-5 bottom-5 rounded-full h-16 w-16 bg-secondary-400"
+          className="absolute right-5 bottom-5 rounded-full h-16 w-16 bg-primary-400"
           variant="solid"
           size="md"
           onPress={() => router.push('/create-post')}

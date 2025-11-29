@@ -2,10 +2,10 @@ import { Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { FlatList } from 'react-native';
 
-import { Text } from '@/components/Themed';
-import UserListItem from '@/components/UserListItem';
 import { Box } from '@/components/ui/box';
 import { Spinner } from '@/components/ui/spinner';
+import { Text } from '@/components/ui/text';
+import UserListItem from '@/components/UserListItem';
 import { supabase } from '@/src/lib/supabase';
 
 interface User {
@@ -81,7 +81,7 @@ export default function BlocksListScreen() {
     }
     return (
       <Box className="flex-1 items-center justify-center py-8">
-        <Text className="text-base text-typography-400">ブロック中のユーザーはいません</Text>
+        <Text className="text-lg text-typography-400">ブロック中のユーザーはいません</Text>
       </Box>
     );
   };

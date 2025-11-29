@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Text } from '@/components/Themed';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonText } from '@/components/ui/button';
 import { Checkbox, CheckboxIcon, CheckboxIndicator, CheckboxLabel } from '@/components/ui/checkbox';
@@ -12,6 +11,7 @@ import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
 import { CheckIcon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
+import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
 import { supabase } from '@/src/lib/supabase';
 import { checkNGWords } from '@/src/utils/ngWordFilter';
@@ -465,10 +465,10 @@ export default function CreatePostScreen() {
                 <ScrollView className="max-h-40">
                   <Pressable
                     onPress={() => setIsExperiencedAtUnset(true)}
-                    className={`p-3 border-b border-outline-100 ${isExperiencedAtUnset ? 'bg-secondary-300' : ''}`}
+                    className={`p-3 border-b border-outline-100 ${isExperiencedAtUnset ? 'bg-primary-500' : ''}`}
                   >
                     <Text
-                      className={`text-center ${isExperiencedAtUnset ? 'font-semibold text-primary-600' : ''}`}
+                      className={`text-center ${isExperiencedAtUnset ? 'font-semibold text-typography-100' : ''}`}
                     >
                       未設定
                     </Text>
@@ -480,10 +480,10 @@ export default function CreatePostScreen() {
                         setExperiencedYear(year);
                         setIsExperiencedAtUnset(false);
                       }}
-                      className={`p-3 border-b border-outline-100 ${experiencedYear === year && !isExperiencedAtUnset ? 'bg-secondary-300' : ''}`}
+                      className={`p-3 border-b border-outline-100 ${experiencedYear === year && !isExperiencedAtUnset ? 'bg-primary-500' : ''}`}
                     >
                       <Text
-                        className={`text-center ${experiencedYear === year && !isExperiencedAtUnset ? 'font-semibold text-primary-600' : ''}`}
+                        className={`text-center ${experiencedYear === year && !isExperiencedAtUnset ? 'font-semibold text-typography-100' : ''}`}
                       >
                         {year}年
                       </Text>
@@ -500,11 +500,11 @@ export default function CreatePostScreen() {
                         setExperiencedMonth(month);
                         setIsExperiencedAtUnset(false);
                       }}
-                      className={`p-3 border-b border-outline-100 ${experiencedMonth === month && !isExperiencedAtUnset ? 'bg-secondary-300' : ''}`}
+                      className={`p-3 border-b border-outline-100 ${experiencedMonth === month && !isExperiencedAtUnset ? 'bg-primary-500' : ''}`}
                       disabled={isExperiencedAtUnset}
                     >
                       <Text
-                        className={`text-center ${experiencedMonth === month && !isExperiencedAtUnset ? 'font-semibold text-primary-600' : ''} ${isExperiencedAtUnset ? 'text-typography-400' : ''}`}
+                        className={`text-center ${experiencedMonth === month && !isExperiencedAtUnset ? 'font-semibold text-typography-100' : ''} ${isExperiencedAtUnset ? 'text-typography-400' : ''}`}
                       >
                         {month}月
                       </Text>

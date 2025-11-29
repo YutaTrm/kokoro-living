@@ -61,7 +61,7 @@ export default function MedicalSection({
     // ローディング完了後、データがない場合はメッセージを表示
     if (records.length === 0) {
       return (
-        <Text className="text-sm opacity-50 text-center py-2">まだ登録がありません</Text>
+        <Text className="text-lg opacity-50 text-center py-2">まだ登録がありません</Text>
       );
     }
 

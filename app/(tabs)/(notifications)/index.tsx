@@ -5,12 +5,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Pressable, RefreshControl } from 'react-native';
 
 import LoginPrompt from '@/components/LoginPrompt';
-import { Text } from '@/components/Themed';
 import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
 import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
+import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
 import { useNotificationContext } from '@/src/contexts/NotificationContext';
 import { supabase } from '@/src/lib/supabase';
@@ -232,11 +232,11 @@ export default function NotificationsScreen() {
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'like':
-        return <Icon as={Heart} size={20} className="text-secondary-500 fill-secondary-500" />;
+        return <Icon as={Heart} size="xl" className="text-secondary-400 fill-secondary-400" />;
       case 'reply':
-        return <Icon as={MessageCircle} size={20} className="text-info-500" />;
+        return <Icon as={MessageCircle} size="xl" className="text-info-600" />;
       case 'follow':
-        return <Icon as={UserPlus} size={20} className="text-success-500" />;
+        return <Icon as={UserPlus} size="xl" className="text-success-600" />;
       default:
         return null;
     }
@@ -284,7 +284,7 @@ export default function NotificationsScreen() {
               {item.post_content}
             </Text>
           )}
-          <Text className="text-xs text-typography-400 text-right">{formatDate(item.created_at)}</Text>
+          <Text className="text-sm text-typography-400 text-right">{formatDate(item.created_at)}</Text>
         </VStack>
       </HStack>
     </Pressable>
@@ -300,7 +300,7 @@ export default function NotificationsScreen() {
     }
     return (
       <Box className="flex-1 items-center justify-center py-8">
-        <Text className="text-base text-typography-400">通知はありません</Text>
+        <Text className="text-lg text-typography-400">通知はありません</Text>
       </Box>
     );
   };

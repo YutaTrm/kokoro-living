@@ -3,11 +3,11 @@ import { useEffect, useState } from 'react';
 import { Alert, ScrollView, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Text } from '@/components/Themed';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonText } from '@/components/ui/button';
 import { HStack } from '@/components/ui/hstack';
 import { Spinner } from '@/components/ui/spinner';
+import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
 import { supabase } from '@/src/lib/supabase';
 import { checkNGWords } from '@/src/utils/ngWordFilter';
@@ -150,7 +150,7 @@ export default function ReplyScreen() {
               <Text className="text-sm text-typography-500">
                 {parentPost.user.display_name}さんの投稿に返信:
               </Text>
-              <Text className="text-sm text-typography-600 mt-1" numberOfLines={2}>
+              <Text className="text-sm text-typography-500 mt-1" numberOfLines={2}>
                 {truncateText(parentPost.content)}
               </Text>
             </Box>
@@ -159,7 +159,7 @@ export default function ReplyScreen() {
           {/* テキスト入力 */}
           <Box>
             <TextInput
-              className="min-h-[120px] text-typography-900"
+              className="min-h-[120px] text-lg text-typography-600"
               placeholder="返信を入力"
               placeholderTextColor="#999"
               multiline

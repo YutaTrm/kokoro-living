@@ -5,10 +5,11 @@ import { Alert, Pressable, View } from 'react-native';
 
 import DefaultAvatar from '@/components/icons/DefaultAvatar';
 import PostActionButtons from '@/components/PostActionButtons';
-import { Text } from '@/components/Themed';
 import { Avatar, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
 import { HStack } from '@/components/ui/hstack';
+import { Icon } from '@/components/ui/icon';
+import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
 import { supabase } from '@/src/lib/supabase';
 import { getCurrentTab } from '@/src/utils/getCurrentTab';
@@ -237,7 +238,7 @@ export default function ReplyItem({
             <Avatar size="sm">
               <DefaultAvatar size={32} />
             </Avatar>
-            <Text className="text-sm text-typography-400">ミュートユーザーの投稿（タップして表示）</Text>
+            <Text className="text-base text-typography-400">ミュートユーザーの投稿（タップして表示）</Text>
           </HStack>
         </Box>
       </Pressable>
@@ -251,7 +252,7 @@ export default function ReplyItem({
           {/* アバターと点線縦線のコンテナ */}
           <View className="items-center">
             <Pressable onPress={handleAvatarPress}>
-              <Avatar size="sm">
+              <Avatar size="md">
                 {reply.user.avatar_url ? (
                   <AvatarImage source={{ uri: reply.user.avatar_url }} />
                 ) : (
@@ -259,37 +260,31 @@ export default function ReplyItem({
                 )}
               </Avatar>
             </Pressable>
-            {/* 点線の縦線（子返信がある場合に表示） */}
-            {/* {showVerticalLine && (
-              <View
-                className="flex-1 mt-1 border-primary-300 min-h-20 w-1 border-l border"
-              />
-            )} */}
           </View>
 
           {/* 返信内容 */}
           <VStack className="flex-1" space="xs">
+
+            {/* ユーザー名と時間 */}
+            <HStack space="xs" className="items-center">
+              <Text className="font-semibold">{reply.user.display_name}</Text>
+              <Text className="text-xs text-typography-500">{formatDate(reply.created_at)}</Text>
+            </HStack>
+
             {/* 返信インジケーター（親投稿へのリンク） */}
             {parentPostContent && reply.parent_post_id && (
               <Pressable onPress={handleParentPress}>
-                <HStack space="xs" className="items-center mb-1">
-                  <CornerDownRight size={12} />
-                  <Text className="text-xs text-primary-300 pr-4" numberOfLines={1}>
+                <HStack space="xs" className="items-center">
+                  <Icon as={CornerDownRight} size="sm" className="text-typography-600"/>
+                  <Text className="text-sm text-typography-600 pr-4" numberOfLines={1}>
                     {truncateText(parentPostContent)}
                   </Text>
                 </HStack>
               </Pressable>
             )}
 
-            {/* ユーザー名と時間 */}
-            <HStack space="xs" className="items-center">
-              <Text className="font-semibold text-sm">{reply.user.display_name}</Text>
-              <Text className="text-xs text-typography-500">·</Text>
-              <Text className="text-xs text-typography-500">{formatDate(reply.created_at)}</Text>
-            </HStack>
-
             {/* 返信テキスト */}
-            <Text className="text-base leading-5">{reply.content}</Text>
+            <Text className="text-lg leading-5">{reply.content}</Text>
 
             {/* アクションボタン */}
             <Box className="mt-2">

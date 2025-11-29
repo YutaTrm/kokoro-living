@@ -6,7 +6,6 @@ import { FlatList, Pressable, RefreshControl, TextInput, View } from 'react-nati
 import PostItem from '@/components/PostItem';
 import TagFilterModal from '@/components/search/TagFilterModal';
 import Tag from '@/components/Tag';
-import { Text } from '@/components/Themed';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonIcon, ButtonText } from '@/components/ui/button';
 import { HStack } from '@/components/ui/hstack';
@@ -25,6 +24,7 @@ import {
   SelectTrigger,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import { Text } from '@/components/ui/text';
 import UserListItem from '@/components/UserListItem';
 import { useMedicationMasters } from '@/src/hooks/useMedicationMasters';
 import { supabase } from '@/src/lib/supabase';
@@ -824,17 +824,17 @@ export default function SearchScreen() {
               onChange={(value) => setTagFilterMode(value as TagFilterMode)}
             >
               <HStack space="md">
-                <Radio value="or" size="sm">
+                <Radio value="or" size="md">
                   <RadioIndicator>
                     <RadioIcon as={CircleIcon} />
                   </RadioIndicator>
-                  <RadioLabel className="text-md">どれか</RadioLabel>
+                  <RadioLabel className="text-lg">どれか</RadioLabel>
                 </Radio>
-                <Radio value="and" size="sm">
+                <Radio value="and" size="md">
                   <RadioIndicator>
                     <RadioIcon as={CircleIcon} />
                   </RadioIndicator>
-                  <RadioLabel className="text-md">全て</RadioLabel>
+                  <RadioLabel className="text-lg">全て</RadioLabel>
                 </Radio>
               </HStack>
             </RadioGroup>
@@ -861,12 +861,12 @@ export default function SearchScreen() {
                 );
               })}
               <Button
-                size="xs"
+                size="md"
                 variant="outline"
                 onPress={() => setShowTagModal(true)}
                 className="h-6 px-2"
               >
-                <ButtonIcon as={PlusIcon} size="sm" />
+                <ButtonIcon as={PlusIcon} size="lg" />
               </Button>
             </View>
           )}
@@ -878,7 +878,7 @@ export default function SearchScreen() {
         </Text>
         <HStack space="sm" className="mb-3">
           <TextInput
-            className="flex-1 border border-outline-200 rounded-lg px-3 py-2 text-base text-typography-900"
+            className="flex-1 border border-outline-200 rounded-lg px-3 py-2 text-lg text-typography-900"
             placeholder="キーワード"
             placeholderTextColor="#999"
             value={searchQuery}
@@ -928,10 +928,10 @@ export default function SearchScreen() {
 
           <HStack className="flex grow justify-end gap-2">
             {/* 検索クリアボタン */}
-            <Button onPress={handleClear} className="" variant="outline">
+            <Button onPress={handleClear} size="md" className="" variant="outline">
               <ButtonText>クリア</ButtonText>
             </Button>
-            <Button onPress={handleSearch} className="">
+            <Button onPress={handleSearch} size="md" className="">
               <ButtonText>検索</ButtonText>
             </Button>
           </HStack>

@@ -2,14 +2,14 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Linking, ScrollView } from 'react-native';
 
-import { Text } from '@/components/Themed';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonText } from '@/components/ui/button';
 import { Checkbox, CheckboxIcon, CheckboxIndicator, CheckboxLabel } from '@/components/ui/checkbox';
 import { Heading } from '@/components/ui/heading';
+import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
-import { CheckIcon } from 'lucide-react-native';
 import { supabase } from '@/src/lib/supabase';
+import { CheckIcon } from 'lucide-react-native';
 
 export default function TermsAgreementScreen() {
   const router = useRouter();

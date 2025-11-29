@@ -3,7 +3,7 @@ import { Pressable, TouchableOpacity } from 'react-native';
 
 import DefaultAvatar from '@/components/icons/DefaultAvatar';
 import { Text } from '@/components/Themed';
-import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
 import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
@@ -67,20 +67,20 @@ export default function ProfileHeader({
         </Avatar>
         <VStack className="flex-1 justify-center" space="xs">
           <HStack className="items-center" space="xs">
-            <Heading size="lg" className="text-primary-500">
+            <Heading size="xl" className="text-primary-500">
               {profile.userName || 'ユーザー'}
             </Heading>
             <TouchableOpacity onPress={onEditName} className="p-1">
-              <Icon as={Pencil} size="sm" className="text-typography-500" />
+              <Icon as={Pencil} size="md" className="text-typography-500" />
             </TouchableOpacity>
           </HStack>
           {profile.xUserName && profile.userName !== profile.xUserName && (
-            <Text className="text-sm text-primary-300">
+            <Text className="text-base">
               {providerLabel}アカウントの名前: {profile.xUserName}
             </Text>
           )}
           {profile.accountName && (
-            <Text className="text-sm text-primary-300">
+            <Text className="text-base">
               ログイン中の{providerLabel}アカウント: @{profile.accountName}
             </Text>
           )}

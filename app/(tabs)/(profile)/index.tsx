@@ -5,7 +5,6 @@ import { Alert, FlatList, TouchableOpacity } from 'react-native';
 
 import { Pencil } from 'lucide-react-native';
 
-import ConfirmModal from '@/components/ConfirmModal';
 import LoginPrompt from '@/components/LoginPrompt';
 import PostItem from '@/components/PostItem';
 import DatePickerModal from '@/components/profile/DatePickerModal';
@@ -14,13 +13,13 @@ import ProfileHeader from '@/components/profile/ProfileHeader';
 import ProfileTabBar, { TabType } from '@/components/profile/ProfileTabBar';
 import TextEditModal from '@/components/profile/TextEditModal';
 import MultiSelectModal from '@/components/search/MultiSelectModal';
-import { Text } from '@/components/Themed';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonText } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
+import { Text } from '@/components/ui/text';
 import { useFollow } from '@/src/hooks/useFollow';
 import { useMedicationMasters } from '@/src/hooks/useMedicationMasters';
 import { usePostsData } from '@/src/hooks/usePostsData';
@@ -922,13 +921,13 @@ export default function ProfileScreen() {
             <HStack className="justify-between items-center mb-2">
               <Heading size="lg">自由記述</Heading>
               <TouchableOpacity onPress={() => setShowBioEditModal(true)} className="p-1">
-                <Icon as={Pencil} size="sm" className="text-typography-500" />
+                <Icon as={Pencil} size="md" className="text-typography-500" />
               </TouchableOpacity>
             </HStack>
             {bio ? (
-              <Text className="text-base">{bio}</Text>
+              <Text className="text-lg border rounded p-1 border-typography-300">{bio}</Text>
             ) : (
-              <Text className="text-sm opacity-50">まだ登録がありません</Text>
+              <Text className="text-lg text-typography-500">まだ登録がありません</Text>
             )}
           </Box>
 
@@ -991,7 +990,7 @@ export default function ProfileScreen() {
 
     return (
       <Box className="px-5">
-        <Text className="text-base opacity-50 text-center py-8">
+        <Text className="text-lg opacity-50 text-center py-8">
           {messages[activeTab as keyof typeof messages]}
         </Text>
       </Box>
