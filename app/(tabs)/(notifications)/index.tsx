@@ -251,26 +251,27 @@ export default function NotificationsScreen() {
       >
         {getNotificationIcon(item.type)}
         <VStack className="flex-1" space="xs">
-          <Avatar size="sm">
-              <AvatarFallbackText>{item.actor.display_name}</AvatarFallbackText>
-              {item.actor.avatar_url && <AvatarImage source={{ uri: item.actor.avatar_url }} />}
-            </Avatar>
-          <HStack className="items-start" space="xs">
-
-            <Text className="flex-1 text-sm">
-              <Text className="font-semibold">{item.actor.display_name}</Text>
-              {getNotificationMessage(item.type)}
-            </Text>
+          <HStack className="items-start justify-between">
+            <HStack space="sm" className="items-center flex-1">
+              <Avatar size="sm">
+                <AvatarFallbackText>{item.actor.display_name}</AvatarFallbackText>
+                {item.actor.avatar_url && <AvatarImage source={{ uri: item.actor.avatar_url }} />}
+              </Avatar>
+              <Text className="flex-1 text-sm">
+                <Text className="font-semibold">{item.actor.display_name}</Text>
+                {getNotificationMessage(item.type)}
+              </Text>
+            </HStack>
+            <Text className="text-sm text-typography-400">{formatRelativeDate(item.created_at)}</Text>
           </HStack>
           {(item.type === 'like' || item.type === 'reply') && item.post_content && (
             <Text
-              className="text-sm text-typography-500"
+              className="text-base text-typography-500"
               numberOfLines={2}
             >
               {item.post_content}
             </Text>
           )}
-          <Text className="text-sm text-typography-400 text-right">{formatRelativeDate(item.created_at)}</Text>
         </VStack>
       </HStack>
     </Pressable>
