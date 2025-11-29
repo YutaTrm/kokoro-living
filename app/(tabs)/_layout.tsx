@@ -73,6 +73,12 @@ function TabsContent() {
             />
           ),
           tabBarBadge: unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: 'rgb(199, 126, 108)',
+            color: '#FFFFFF',
+            fontSize: 10,
+            fontWeight: '600',
+          },
         }}
       />
       <Tabs.Screen
