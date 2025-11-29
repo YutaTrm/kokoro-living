@@ -6,7 +6,6 @@ import { useState } from 'react';
 import { Alert, Pressable } from 'react-native';
 
 import ConfirmModal from '@/components/ConfirmModal';
-import { Text } from '@/components/ui/text';
 import { Button, ButtonIcon, ButtonText } from '@/components/ui/button';
 import { Divider } from '@/components/ui/divider';
 import {
@@ -21,6 +20,7 @@ import {
 import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
+import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
 import { useTheme } from '@/src/contexts/ThemeContext';
 import { supabase } from '@/src/lib/supabase';
@@ -95,7 +95,7 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
 
   return (
     <>
-      <Drawer isOpen={isOpen} onClose={onClose} size="md" anchor="right">
+      <Drawer isOpen={isOpen} onClose={onClose} size="lg" anchor="right">
         <DrawerBackdrop />
         <DrawerContent className="pt-safe pb-safe">
           <DrawerHeader>
