@@ -431,7 +431,7 @@ export default function CreatePostScreen() {
         </Button>
       </HStack>
 
-      <ScrollView className="flex-1">
+      <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
         <VStack className="p-4" space="lg">
           {/* テキスト入力 */}
           <Box>
@@ -462,7 +462,7 @@ export default function CreatePostScreen() {
             </Heading>
             <HStack space="sm">
               <Box className="flex-1 border border-outline-200 rounded-lg">
-                <ScrollView className="max-h-40">
+                <ScrollView className="max-h-40" nestedScrollEnabled={true}>
                   <Pressable
                     onPress={() => setIsExperiencedAtUnset(true)}
                     className={`p-3 border-b border-outline-100 ${isExperiencedAtUnset ? 'bg-primary-500' : ''}`}
@@ -492,7 +492,7 @@ export default function CreatePostScreen() {
                 </ScrollView>
               </Box>
               <Box className="flex-1 border border-outline-200 rounded-lg">
-                <ScrollView className="max-h-40">
+                <ScrollView className="max-h-40" nestedScrollEnabled={true}>
                   {Array.from({ length: 12 }, (_, i) => (i + 1).toString()).map((month) => (
                     <Pressable
                       key={month}

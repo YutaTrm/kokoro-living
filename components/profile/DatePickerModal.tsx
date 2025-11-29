@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView } from 'react-native';
+import { Alert } from 'react-native';
 
 import { Box } from '@/components/ui/box';
 import { Button, ButtonText } from '@/components/ui/button';
@@ -15,6 +15,19 @@ import {
   ModalFooter,
   ModalHeader,
 } from '@/components/ui/modal';
+import {
+  Select,
+  SelectTrigger,
+  SelectInput,
+  SelectIcon,
+  SelectPortal,
+  SelectBackdrop,
+  SelectContent,
+  SelectDragIndicator,
+  SelectDragIndicatorWrapper,
+  SelectItem,
+  SelectScrollView,
+} from '@/components/ui/select';
 import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
 
@@ -80,39 +93,47 @@ export default function DatePickerModal({
             <Box>
               <Text className="text-base font-semibold mb-2 text-primary-600">開始年月</Text>
               <HStack space="sm">
-                <Box className="flex-1 border border-outline-200 rounded-lg">
-                  <ScrollView className="max-h-40">
-                    {years.map((year) => (
-                      <Pressable
-                        key={year}
-                        onPress={() => setStartYear(year)}
-                        className={`p-3 border-b border-outline-100 ${startYear === year ? 'bg-primary-300' : ''}`}
-                      >
-                        <Text
-                          className={`text-center ${startYear === year ? 'font-semibold text-primary-600' : ''}`}
-                        >
-                          {year}年
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
+                <Box className="flex-1">
+                  <Select selectedValue={startYear} onValueChange={(value) => setStartYear(value)}>
+                    <SelectTrigger>
+                      <SelectInput placeholder="年" value={`${startYear}年`} />
+                      <SelectIcon />
+                    </SelectTrigger>
+                    <SelectPortal>
+                      <SelectBackdrop />
+                      <SelectContent className="max-h-96">
+                        <SelectDragIndicatorWrapper>
+                          <SelectDragIndicator />
+                        </SelectDragIndicatorWrapper>
+                        <SelectScrollView>
+                          {years.map((year) => (
+                            <SelectItem key={year} label={`${year}年`} value={year} />
+                          ))}
+                        </SelectScrollView>
+                      </SelectContent>
+                    </SelectPortal>
+                  </Select>
                 </Box>
-                <Box className="flex-1 border border-outline-200 rounded-lg">
-                  <ScrollView className="max-h-40">
-                    {months.map((month) => (
-                      <Pressable
-                        key={month}
-                        onPress={() => setStartMonth(month)}
-                        className={`p-3 border-b border-outline-100 ${startMonth === month ? 'bg-primary-300' : ''}`}
-                      >
-                        <Text
-                          className={`text-center ${startMonth === month ? 'font-semibold text-primary-600' : ''}`}
-                        >
-                          {month}月
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
+                <Box className="flex-1">
+                  <Select selectedValue={startMonth} onValueChange={(value) => setStartMonth(value)}>
+                    <SelectTrigger>
+                      <SelectInput placeholder="月" value={`${startMonth}月`} />
+                      <SelectIcon />
+                    </SelectTrigger>
+                    <SelectPortal>
+                      <SelectBackdrop />
+                      <SelectContent className="max-h-96">
+                        <SelectDragIndicatorWrapper>
+                          <SelectDragIndicator />
+                        </SelectDragIndicatorWrapper>
+                        <SelectScrollView>
+                          {months.map((month) => (
+                            <SelectItem key={month} label={`${month}月`} value={month} />
+                          ))}
+                        </SelectScrollView>
+                      </SelectContent>
+                    </SelectPortal>
+                  </Select>
                 </Box>
               </HStack>
             </Box>
@@ -135,59 +156,49 @@ export default function DatePickerModal({
                 )}
               </HStack>
               <HStack space="sm">
-                <Box className="flex-1 border border-outline-200 rounded-lg">
-                  <ScrollView className="max-h-40">
-                    <Pressable
-                      onPress={() => setEndYear('')}
-                      className={`p-3 border-b border-outline-100 ${endYear === '' ? 'bg-primary-300' : ''}`}
-                    >
-                      <Text
-                        className={`text-center ${endYear === '' ? 'font-semibold text-primary-600' : ''}`}
-                      >
-                        未設定
-                      </Text>
-                    </Pressable>
-                    {years.map((year) => (
-                      <Pressable
-                        key={year}
-                        onPress={() => setEndYear(year)}
-                        className={`p-3 border-b border-outline-100 ${endYear === year ? 'bg-primary-300' : ''}`}
-                      >
-                        <Text
-                          className={`text-center ${endYear === year ? 'font-semibold text-primary-600' : ''}`}
-                        >
-                          {year}年
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
+                <Box className="flex-1">
+                  <Select selectedValue={endYear} onValueChange={(value) => setEndYear(value)}>
+                    <SelectTrigger>
+                      <SelectInput placeholder="年" value={endYear ? `${endYear}年` : '未設定'} />
+                      <SelectIcon />
+                    </SelectTrigger>
+                    <SelectPortal>
+                      <SelectBackdrop />
+                      <SelectContent className="max-h-96">
+                        <SelectDragIndicatorWrapper>
+                          <SelectDragIndicator />
+                        </SelectDragIndicatorWrapper>
+                        <SelectScrollView>
+                          <SelectItem label="未設定" value="" />
+                          {years.map((year) => (
+                            <SelectItem key={year} label={`${year}年`} value={year} />
+                          ))}
+                        </SelectScrollView>
+                      </SelectContent>
+                    </SelectPortal>
+                  </Select>
                 </Box>
-                <Box className="flex-1 border border-outline-200 rounded-lg">
-                  <ScrollView className="max-h-40">
-                    <Pressable
-                      onPress={() => setEndMonth('')}
-                      className={`p-3 border-b border-outline-100 ${endMonth === '' ? 'bg-primary300' : ''}`}
-                    >
-                      <Text
-                        className={`text-center ${endMonth === '' ? 'font-semibold text-primary-600' : ''}`}
-                      >
-                        未設定
-                      </Text>
-                    </Pressable>
-                    {months.map((month) => (
-                      <Pressable
-                        key={month}
-                        onPress={() => setEndMonth(month)}
-                        className={`p-3 border-b border-outline-100 ${endMonth === month ? 'bg-primary-300' : ''}`}
-                      >
-                        <Text
-                          className={`text-center ${endMonth === month ? 'font-semibold text-primary-600' : ''}`}
-                        >
-                          {month}月
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
+                <Box className="flex-1">
+                  <Select selectedValue={endMonth} onValueChange={(value) => setEndMonth(value)}>
+                    <SelectTrigger>
+                      <SelectInput placeholder="月" value={endMonth ? `${endMonth}月` : '未設定'} />
+                      <SelectIcon />
+                    </SelectTrigger>
+                    <SelectPortal>
+                      <SelectBackdrop />
+                      <SelectContent className="max-h-96">
+                        <SelectDragIndicatorWrapper>
+                          <SelectDragIndicator />
+                        </SelectDragIndicatorWrapper>
+                        <SelectScrollView>
+                          <SelectItem label="未設定" value="" />
+                          {months.map((month) => (
+                            <SelectItem key={month} label={`${month}月`} value={month} />
+                          ))}
+                        </SelectScrollView>
+                      </SelectContent>
+                    </SelectPortal>
+                  </Select>
                 </Box>
               </HStack>
             </Box>
