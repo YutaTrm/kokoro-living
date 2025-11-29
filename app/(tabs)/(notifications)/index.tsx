@@ -1,6 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { Heart, MessageCircle, UserPlus } from 'lucide-react-native';
+import { Heart, MessageCircle, UserRoundPlus } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Pressable, RefreshControl } from 'react-native';
 
@@ -245,9 +245,9 @@ export default function NotificationsScreen() {
       case 'like':
         return <Icon as={Heart} size="xl" className="text-secondary-400 fill-secondary-400" />;
       case 'reply':
-        return <Icon as={MessageCircle} size="xl" className="text-info-600" />;
+        return <Icon as={MessageCircle} size="xl" className="text-typography-600" />;
       case 'follow':
-        return <Icon as={UserPlus} size="xl" className="text-success-600" />;
+        return <Icon as={UserRoundPlus} size="xl" className="text-info-600" />;
       default:
         return null;
     }
