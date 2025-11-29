@@ -24,6 +24,7 @@ import { useFollow } from '@/src/hooks/useFollow';
 import { useMedicationMasters } from '@/src/hooks/useMedicationMasters';
 import { usePostsData } from '@/src/hooks/usePostsData';
 import { supabase } from '@/src/lib/supabase';
+import { handleError, showError, showSuccess } from '@/src/utils/errorHandler';
 import { checkNGWords } from '@/src/utils/ngWordFilter';
 import { sortByStartDate } from '@/src/utils/sortByStartDate';
 
@@ -374,7 +375,7 @@ export default function ProfileScreen() {
         .eq('id', editingRecordId);
 
       if (error) {
-        Alert.alert('エラー', '更新に失敗しました');
+        showError('更新に失敗しました');
         return;
       }
 

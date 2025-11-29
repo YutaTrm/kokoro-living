@@ -10,7 +10,9 @@ import { Box } from '@/components/ui/box';
 import { HStack } from '@/components/ui/hstack';
 import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
+import { useCurrentUser } from '@/src/hooks/useCurrentUser';
 import { supabase } from '@/src/lib/supabase';
+import { formatRelativeDate } from '@/src/utils/dateUtils';
 import { getCurrentTab } from '@/src/utils/getCurrentTab';
 
 interface ReplyItemProps {
@@ -46,7 +48,6 @@ export default function ReplyItem({
   const [isLiked, setIsLiked] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
@@ -58,7 +59,6 @@ export default function ReplyItem({
   const checkLoginStatus = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     setIsLoggedIn(!!session);
-    setCurrentUserId(session?.user?.id ?? null);
   };
 
   const loadCounts = async () => {
@@ -106,21 +106,6 @@ export default function ReplyItem({
     } catch (error) {
       // エラーは無視
     }
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-
-    if (minutes < 1) return 'たった今';
-    if (minutes < 60) return `${minutes}分前`;
-    if (hours < 24) return `${hours}時間前`;
-    if (days < 7) return `${days}日前`;
-    return date.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
   };
 
   const handlePress = () => {
@@ -261,7 +246,7 @@ export default function ReplyItem({
             {/* ユーザー名と時間 */}
             <HStack space="xs" className="items-center">
               <Text className="font-semibold">{reply.user.display_name}</Text>
-              <Text className="text-xs text-typography-500">{formatDate(reply.created_at)}</Text>
+              <Text className="text-xs text-typography-500">{formatRelativeDate(reply.created_at)}</Text>
             </HStack>
 
             {/* 返信インジケーター（親投稿へのリンク） */}

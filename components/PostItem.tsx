@@ -1,6 +1,5 @@
 import { useRouter, useSegments } from 'expo-router';
 import { Flag } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
 import { Pressable, ScrollView } from 'react-native';
 
 import DefaultAvatar from '@/components/icons/DefaultAvatar';
@@ -12,7 +11,8 @@ import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
-import { supabase } from '@/src/lib/supabase';
+import { useCurrentUser } from '@/src/hooks/useCurrentUser';
+import { formatRelativeDate } from '@/src/utils/dateUtils';
 import { getCurrentTab } from '@/src/utils/getCurrentTab';
 
 interface PostItemProps {
@@ -39,30 +39,7 @@ interface PostItemProps {
 export default function PostItem({ post, disableAvatarTap = false }: PostItemProps) {
   const router = useRouter();
   const segments = useSegments();
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const getCurrentUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setCurrentUserId(user?.id ?? null);
-    };
-    getCurrentUser();
-  }, []);
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-
-    if (minutes < 1) return 'たった今';
-    if (minutes < 60) return `${minutes}分前`;
-    if (hours < 24) return `${hours}時間前`;
-    if (days < 7) return `${days}日前`;
-    return date.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
-  };
+  const { currentUserId } = useCurrentUser();
 
   const handlePress = () => {
     const currentTab = getCurrentTab(segments);
@@ -126,7 +103,7 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
             {/* ユーザー名、時間、タグ */}
             <HStack space="xs" className="items-center flex-1">
               <Text className="font-semibold text-base">{displayName}</Text>
-              <Text className="text-sm text-typography-500">{formatDate(post.created_at)}</Text>
+              <Text className="text-sm text-typography-500">{formatRelativeDate(post.created_at)}</Text>
 
               {/* タグ（横スクロール） */}
               {(post.diagnoses.length > 0 || post.treatments.length > 0 || post.medications.length > 0) && (

@@ -14,6 +14,7 @@ import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
 import { useNotificationContext } from '@/src/contexts/NotificationContext';
 import { supabase } from '@/src/lib/supabase';
+import { formatRelativeDate } from '@/src/utils/dateUtils';
 
 interface Notification {
   id: string;
@@ -242,21 +243,6 @@ export default function NotificationsScreen() {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-
-    if (minutes < 1) return 'たった今';
-    if (minutes < 60) return `${minutes}分前`;
-    if (hours < 24) return `${hours}時間前`;
-    if (days < 7) return `${days}日前`;
-    return date.toLocaleDateString('ja-JP');
-  };
-
   const renderNotification = ({ item }: { item: Notification }) => (
     <Pressable onPress={() => handlePress(item)}>
       <HStack
@@ -284,7 +270,7 @@ export default function NotificationsScreen() {
               {item.post_content}
             </Text>
           )}
-          <Text className="text-sm text-typography-400 text-right">{formatDate(item.created_at)}</Text>
+          <Text className="text-sm text-typography-400 text-right">{formatRelativeDate(item.created_at)}</Text>
         </VStack>
       </HStack>
     </Pressable>
