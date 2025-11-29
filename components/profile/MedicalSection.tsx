@@ -61,7 +61,7 @@ export default function MedicalSection({
     // ローディング完了後、データがない場合はメッセージを表示
     if (records.length === 0) {
       return (
-        <Text className="text-lg text-typography-400 text-center py-2">まだ登録がありません</Text>
+        <Text className="text-base text-typography-400 text-center py-2">まだ登録がありません</Text>
       );
     }
 
@@ -70,7 +70,7 @@ export default function MedicalSection({
       <Box key={record.id} className="p-2 bg-background-50 rounded-lg mb-2">
         <HStack className="justify-between items-center">
           <VStack className="flex-1">
-            <Text className="text-lg font-semibold">{record.name}</Text>
+            <Text className="text-base font-semibold">{record.name}</Text>
             <HStack space="xs" className="items-center">
               <Text className="text-base opacity-60">
                 {formatDateRange(record.startDate, record.endDate)}
