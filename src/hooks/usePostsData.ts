@@ -7,6 +7,8 @@ export interface Post {
   content: string;
   created_at: string;
   is_hidden?: boolean;
+  parent_post_id?: string | null;
+  parentContent?: string;
   user: {
     display_name: string;
     user_id: string;
@@ -79,10 +81,12 @@ export const fetchTagsForPosts = async (
 
 export const usePostsData = () => {
   const [userPosts, setUserPosts] = useState<Post[]>([]);
+  const [userReplies, setUserReplies] = useState<Post[]>([]);
   const [likedPosts, setLikedPosts] = useState<Post[]>([]);
   const [bookmarkedPosts, setBookmarkedPosts] = useState<Post[]>([]);
 
   const [loadingPosts, setLoadingPosts] = useState(false);
+  const [loadingReplies, setLoadingReplies] = useState(false);
   const [loadingLikes, setLoadingLikes] = useState(false);
   const [loadingBookmarks, setLoadingBookmarks] = useState(false);
 
@@ -145,6 +149,85 @@ export const usePostsData = () => {
       console.error('投稿取得エラー:', error);
     } finally {
       setLoadingPosts(false);
+    }
+  };
+
+  const loadUserReplies = async () => {
+    setLoadingReplies(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: repliesData, error: repliesError } = await supabase
+        .from('posts')
+        .select('id, content, created_at, user_id, is_hidden, parent_post_id')
+        .eq('user_id', user.id)
+        .not('parent_post_id', 'is', null)
+        .order('created_at', { ascending: false });
+
+      if (repliesError) throw repliesError;
+
+      if (!repliesData || repliesData.length === 0) {
+        setUserReplies([]);
+        return;
+      }
+
+      const { data: userData } = await supabase
+        .from('users')
+        .select('user_id, display_name, avatar_url')
+        .eq('user_id', user.id)
+        .single();
+
+      const postIds = repliesData.map((p) => p.id);
+      const tagsMap = await fetchTagsForPosts(postIds);
+
+      // 親投稿の内容を取得
+      const parentPostIds = [
+        ...new Set(repliesData.map((r) => r.parent_post_id).filter((id) => id !== null)),
+      ];
+      const { data: parentPostsData } = await supabase
+        .from('posts')
+        .select('id, content')
+        .in('id', parentPostIds);
+
+      const parentContentMap = new Map(
+        (parentPostsData || []).map((p) => [p.id, p.content])
+      );
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const formattedReplies: Post[] = repliesData.map((reply: any) => {
+        const tags = tagsMap.get(reply.id) || {
+          diagnoses: [],
+          treatments: [],
+          medications: [],
+        };
+        return {
+          id: reply.id,
+          content: reply.content,
+          created_at: reply.created_at,
+          is_hidden: reply.is_hidden || false,
+          parent_post_id: reply.parent_post_id,
+          parentContent: reply.parent_post_id
+            ? parentContentMap.get(reply.parent_post_id)
+            : undefined,
+          user: {
+            display_name: userData?.display_name || 'Unknown',
+            user_id: reply.user_id,
+            avatar_url: userData?.avatar_url || null,
+          },
+          diagnoses: tags.diagnoses,
+          treatments: tags.treatments,
+          medications: tags.medications,
+        };
+      });
+
+      setUserReplies(formattedReplies);
+    } catch (error) {
+      console.error('返信取得エラー:', error);
+    } finally {
+      setLoadingReplies(false);
     }
   };
 
@@ -294,12 +377,15 @@ export const usePostsData = () => {
 
   return {
     userPosts,
+    userReplies,
     likedPosts,
     bookmarkedPosts,
     loadingPosts,
+    loadingReplies,
     loadingLikes,
     loadingBookmarks,
     loadUserPosts,
+    loadUserReplies,
     loadLikedPosts,
     loadBookmarkedPosts,
   };

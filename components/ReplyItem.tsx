@@ -1,14 +1,13 @@
 import { useRouter, useSegments } from 'expo-router';
-import { CornerDownRight } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
 
 import DefaultAvatar from '@/components/icons/DefaultAvatar';
 import PostActionButtons from '@/components/PostActionButtons';
+import ReplyIndicator from '@/components/ReplyIndicator';
 import { Avatar, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
 import { HStack } from '@/components/ui/hstack';
-import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
 import { supabase } from '@/src/lib/supabase';
@@ -122,12 +121,6 @@ export default function ReplyItem({
     if (hours < 24) return `${hours}時間前`;
     if (days < 7) return `${days}日前`;
     return date.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
-  };
-
-  const truncateText = (text: string, maxLength: number = 30) => {
-    const firstLine = text.split('\n')[0];
-    if (firstLine.length <= maxLength) return firstLine;
-    return firstLine.substring(0, maxLength) + '...';
   };
 
   const handlePress = () => {
@@ -273,14 +266,7 @@ export default function ReplyItem({
 
             {/* 返信インジケーター（親投稿へのリンク） */}
             {parentPostContent && reply.parent_post_id && (
-              <Pressable onPress={handleParentPress}>
-                <HStack space="xs" className="items-center">
-                  <Icon as={CornerDownRight} size="sm" className="text-typography-600"/>
-                  <Text className="text-sm text-typography-600 pr-4" numberOfLines={1}>
-                    {truncateText(parentPostContent)}
-                  </Text>
-                </HStack>
-              </Pressable>
+              <ReplyIndicator parentContent={parentPostContent} onPress={handleParentPress} />
             )}
 
             {/* 返信テキスト */}

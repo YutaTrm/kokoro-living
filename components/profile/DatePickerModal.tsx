@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Alert, Pressable, ScrollView } from 'react-native';
 
-import { Text } from '@/components/ui/text';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonText } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
@@ -16,6 +15,7 @@ import {
   ModalFooter,
   ModalHeader,
 } from '@/components/ui/modal';
+import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
 
 interface DatePickerModalProps {
@@ -86,7 +86,7 @@ export default function DatePickerModal({
                       <Pressable
                         key={year}
                         onPress={() => setStartYear(year)}
-                        className={`p-3 border-b border-outline-100 ${startYear === year ? 'bg-secondary-300' : ''}`}
+                        className={`p-3 border-b border-outline-100 ${startYear === year ? 'bg-primary-300' : ''}`}
                       >
                         <Text
                           className={`text-center ${startYear === year ? 'font-semibold text-primary-600' : ''}`}
@@ -103,7 +103,7 @@ export default function DatePickerModal({
                       <Pressable
                         key={month}
                         onPress={() => setStartMonth(month)}
-                        className={`p-3 border-b border-outline-100 ${startMonth === month ? 'bg-secondary-300' : ''}`}
+                        className={`p-3 border-b border-outline-100 ${startMonth === month ? 'bg-primary-300' : ''}`}
                       >
                         <Text
                           className={`text-center ${startMonth === month ? 'font-semibold text-primary-600' : ''}`}
@@ -139,7 +139,7 @@ export default function DatePickerModal({
                   <ScrollView className="max-h-40">
                     <Pressable
                       onPress={() => setEndYear('')}
-                      className={`p-3 border-b border-outline-100 ${endYear === '' ? 'bg-secondary-300' : ''}`}
+                      className={`p-3 border-b border-outline-100 ${endYear === '' ? 'bg-primary-300' : ''}`}
                     >
                       <Text
                         className={`text-center ${endYear === '' ? 'font-semibold text-primary-600' : ''}`}
@@ -151,7 +151,7 @@ export default function DatePickerModal({
                       <Pressable
                         key={year}
                         onPress={() => setEndYear(year)}
-                        className={`p-3 border-b border-outline-100 ${endYear === year ? 'bg-secondary-300' : ''}`}
+                        className={`p-3 border-b border-outline-100 ${endYear === year ? 'bg-primary-300' : ''}`}
                       >
                         <Text
                           className={`text-center ${endYear === year ? 'font-semibold text-primary-600' : ''}`}
@@ -166,7 +166,7 @@ export default function DatePickerModal({
                   <ScrollView className="max-h-40">
                     <Pressable
                       onPress={() => setEndMonth('')}
-                      className={`p-3 border-b border-outline-100 ${endMonth === '' ? 'bg-secondary-300' : ''}`}
+                      className={`p-3 border-b border-outline-100 ${endMonth === '' ? 'bg-primary300' : ''}`}
                     >
                       <Text
                         className={`text-center ${endMonth === '' ? 'font-semibold text-primary-600' : ''}`}
@@ -178,7 +178,7 @@ export default function DatePickerModal({
                       <Pressable
                         key={month}
                         onPress={() => setEndMonth(month)}
-                        className={`p-3 border-b border-outline-100 ${endMonth === month ? 'bg-secondary-300' : ''}`}
+                        className={`p-3 border-b border-outline-100 ${endMonth === month ? 'bg-primary-300' : ''}`}
                       >
                         <Text
                           className={`text-center ${endMonth === month ? 'font-semibold text-primary-600' : ''}`}

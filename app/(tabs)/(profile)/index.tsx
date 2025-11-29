@@ -93,12 +93,15 @@ export default function ProfileScreen() {
 
   const {
     userPosts,
+    userReplies,
     likedPosts,
     bookmarkedPosts,
     loadingPosts,
+    loadingReplies,
     loadingLikes,
     loadingBookmarks,
     loadUserPosts,
+    loadUserReplies,
     loadLikedPosts,
     loadBookmarkedPosts,
   } = usePostsData();
@@ -183,6 +186,8 @@ export default function ProfileScreen() {
   useEffect(() => {
     if (activeTab === 'posts') {
       loadUserPosts();
+    } else if (activeTab === 'replies') {
+      loadUserReplies();
     } else if (activeTab === 'likes') {
       loadLikedPosts();
     } else if (activeTab === 'bookmarks') {
@@ -955,6 +960,8 @@ export default function ProfileScreen() {
     switch (activeTab) {
       case 'posts':
         return userPosts;
+      case 'replies':
+        return userReplies;
       case 'likes':
         return likedPosts;
       case 'bookmarks':
@@ -970,6 +977,7 @@ export default function ProfileScreen() {
     // ローディング中はスピナーを表示
     const isLoading =
       (activeTab === 'posts' && loadingPosts) ||
+      (activeTab === 'replies' && loadingReplies) ||
       (activeTab === 'likes' && loadingLikes) ||
       (activeTab === 'bookmarks' && loadingBookmarks);
 
@@ -984,6 +992,7 @@ export default function ProfileScreen() {
     // ローディング完了後、データがない場合はメッセージを表示
     const messages = {
       posts: 'まだ投稿がありません',
+      replies: 'まだ返信がありません',
       likes: 'まだいいねがありません',
       bookmarks: 'まだブックマークがありません',
     };

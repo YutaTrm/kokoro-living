@@ -1,9 +1,10 @@
 import { useRouter, useSegments } from 'expo-router';
-import { CornerDownRight, Flag } from 'lucide-react-native';
+import { Flag } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView } from 'react-native';
 
 import DefaultAvatar from '@/components/icons/DefaultAvatar';
+import ReplyIndicator from '@/components/ReplyIndicator';
 import Tag from '@/components/Tag';
 import { Avatar, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
@@ -20,6 +21,7 @@ interface PostItemProps {
     content: string;
     created_at: string;
     parent_post_id?: string | null;
+    parentContent?: string;
     is_hidden?: boolean;
     user: {
       display_name: string;
@@ -75,6 +77,13 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
     router.push(`/(tabs)/${currentTab}/user/${post.user.user_id}`);
   };
 
+  const handleParentPress = () => {
+    if (post.parent_post_id) {
+      const currentTab = getCurrentTab(segments);
+      router.push(`/(tabs)/${currentTab}/post/${post.parent_post_id}`);
+    }
+  };
+
   const displayName = post.isMuted ? 'ミュートユーザー' : post.user.display_name;
   const hasAvatar = !post.isMuted && post.user.avatar_url;
 
@@ -108,11 +117,10 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
           {/* 投稿内容 */}
           <VStack className="flex-1" space="xs">
             {/* 返信インジケーター */}
-            {post.parent_post_id && (
-              <HStack space="xs" className="items-center mb-1">
-                <Icon as={CornerDownRight} size="sm" className="text-typography-500" />
-                <Text className="text-sm text-typography-500">返信</Text>
-              </HStack>
+            {post.parent_post_id && post.parentContent && (
+              <Box className="mb-1">
+                <ReplyIndicator parentContent={post.parentContent} onPress={handleParentPress} />
+              </Box>
             )}
 
             {/* ユーザー名、時間、タグ */}

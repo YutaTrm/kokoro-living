@@ -1,14 +1,14 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { Stack, useLocalSearchParams, useRouter, useSegments } from 'expo-router';
-import { ChevronDown, Clock, CornerDownRight, Edit, Flag, MoreVertical, Trash2 } from 'lucide-react-native';
+import { ChevronDown, Clock, Edit, Flag, MoreVertical, Trash2 } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView as RNScrollView } from 'react-native';
 
 import ConfirmModal from '@/components/ConfirmModal';
 import PostActionButtons from '@/components/PostActionButtons';
+import ReplyIndicator from '@/components/ReplyIndicator';
 import ReplyItem from '@/components/ReplyItem';
 import Tag from '@/components/Tag';
-import { Text } from '@/components/ui/text';
 import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonText } from '@/components/ui/button';
@@ -18,6 +18,7 @@ import { Menu, MenuItem, MenuItemLabel } from '@/components/ui/menu';
 import { Modal, ModalBackdrop, ModalBody, ModalContent, ModalFooter, ModalHeader } from '@/components/ui/modal';
 import { Radio, RadioGroup, RadioIcon, RadioIndicator, RadioLabel } from '@/components/ui/radio';
 import { Spinner } from '@/components/ui/spinner';
+import { Text } from '@/components/ui/text';
 import { Textarea, TextareaInput } from '@/components/ui/textarea';
 import { VStack } from '@/components/ui/vstack';
 import { supabase } from '@/src/lib/supabase';
@@ -582,12 +583,6 @@ export default function PostDetailScreen() {
     return `${year}年${month}月頃`;
   };
 
-  const truncateText = (text: string, maxLength: number = 30) => {
-    const firstLine = text.split('\n')[0];
-    if (firstLine.length <= maxLength) return firstLine;
-    return firstLine.substring(0, maxLength) + '...';
-  };
-
   const handleReply = () => {
     if (!isLoggedIn) {
       Alert.alert('エラー', 'ログインしてください');
@@ -777,14 +772,9 @@ export default function PostDetailScreen() {
         <Box className="px-4 py-4 border-b border-outline-200">
           {/* 返信インジケーター（返信詳細ページの場合） */}
           {isReply && parentPost && (
-            <Pressable onPress={handleParentPress} className="mb-3">
-              <HStack space="xs" className="items-center">
-                <Icon as={CornerDownRight} size="sm" className="text-typography-700" />
-                <Text className="text-sm text-primary-300 pr-4" numberOfLines={1}>
-                  {truncateText(parentPost.content)}
-                </Text>
-              </HStack>
-            </Pressable>
+            <Box className="mb-3">
+              <ReplyIndicator parentContent={parentPost.content} onPress={handleParentPress} />
+            </Box>
           )}
 
           {/* ヘッダー：ユーザー情報とメニューボタン */}
