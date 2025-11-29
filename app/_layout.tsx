@@ -91,14 +91,10 @@ function RootLayoutNav() {
           .eq('user_id', session.user.id)
           .maybeSingle();
 
-        console.log('[_layout] ユーザー情報:', user);
-        console.log('[_layout] terms_accepted_at:', user?.terms_accepted_at);
-
         if (error) {
           console.error('ユーザー情報取得エラー:', error);
           setTermsAccepted(false);
         } else if (!user) {
-          console.log('[_layout] レコードが存在しないため作成');
           // レコードが存在しない場合は作成
           const { error: insertError } = await supabase
             .from('users')
@@ -118,11 +114,9 @@ function RootLayoutNav() {
           }
 
           // 新規作成なので未同意
-          console.log('[_layout] 新規作成 → termsAccepted = false');
           setTermsAccepted(false);
         } else {
           const accepted = user.terms_accepted_at !== null;
-          console.log('[_layout] termsAccepted =', accepted);
           setTermsAccepted(accepted);
         }
       } catch (error) {
@@ -152,13 +146,6 @@ function RootLayoutNav() {
 
   // 同意状態に基づいてリダイレクト
   useEffect(() => {
-    console.log('[_layout リダイレクト判定]', {
-      isLoading,
-      isAuthenticated,
-      termsAccepted,
-      segment0: segments[0],
-    });
-
     if (isLoading) return; // まだチェック中
 
     const inTermsAgreement = segments[0] === 'terms-agreement';
@@ -167,7 +154,6 @@ function RootLayoutNav() {
     // 同意画面から他の画面に遷移した場合、状態を再チェック
     if (isAuthenticated && !inTermsAgreement && !inAuthCallback) {
       const recheckTerms = async () => {
-        console.log('[_layout] ホーム画面に遷移、同意状態を再チェック');
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
           const { data: user } = await supabase
@@ -176,13 +162,11 @@ function RootLayoutNav() {
             .eq('user_id', session.user.id)
             .maybeSingle();
 
-          console.log('[_layout] 再チェック結果:', user?.terms_accepted_at);
           const accepted = user?.terms_accepted_at !== null;
           setTermsAccepted(accepted);
 
           // まだ未同意なら同意画面へ
           if (!accepted) {
-            console.log('[_layout] 未同意のため同意画面へリダイレクト');
             router.replace('/terms-agreement');
           }
         }
