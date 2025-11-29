@@ -20,6 +20,7 @@ import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
+import { VStack } from '@/components/ui/vstack';
 import { useFollow } from '@/src/hooks/useFollow';
 import { useMedicationMasters } from '@/src/hooks/useMedicationMasters';
 import { usePostsData } from '@/src/hooks/usePostsData';
@@ -933,18 +934,29 @@ export default function ProfileScreen() {
 
           {/* 自分のプロフィールを表示 */}
           <Box className="p-4 border-t border-outline-200">
-            <Button
-              onPress={async () => {
-                const { data: { user } } = await supabase.auth.getUser();
-                if (user) {
-                  router.push(`/(tabs)/(profile)/user/${user.id}`);
-                }
-              }}
-              variant="outline"
-              className="w-full"
-            >
-              <ButtonText>自分のプロフィール画面</ButtonText>
-            </Button>
+            <VStack space="md">
+              <Button
+                onPress={async () => {
+                  const { data: { user } } = await supabase.auth.getUser();
+                  if (user) {
+                    router.push(`/(tabs)/(profile)/user/${user.id}`);
+                  }
+                }}
+                variant="outline"
+                className="w-full"
+              >
+                <ButtonText>自分のプロフィール画面</ButtonText>
+              </Button>
+              <Button
+                onPress={() => {
+                  router.push('/(tabs)/(profile)/profile-card');
+                }}
+                variant="outline"
+                className="w-full"
+              >
+                <ButtonText>プロフィールカード</ButtonText>
+              </Button>
+            </VStack>
           </Box>
         </>
       )}

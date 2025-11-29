@@ -88,6 +88,12 @@ export default function ProfileLayout() {
           title: 'ミュートリスト',
         }}
       />
+      <Stack.Screen
+        name="profile-card"
+        options={{
+          title: 'プロフィールカード',
+        }}
+      />
     </Stack>
       <ProfileDrawer isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </>
