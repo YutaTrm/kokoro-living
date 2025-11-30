@@ -97,7 +97,7 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
     <>
       <Drawer isOpen={isOpen} onClose={onClose} size="lg" anchor="right">
         <DrawerBackdrop />
-        <DrawerContent className="pt-safe pb-safe">
+        <DrawerContent className="">
           <DrawerHeader>
             <Heading size="md">メニュー</Heading>
             <DrawerCloseButton>
@@ -200,7 +200,7 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
               </Pressable>
             </VStack>
           </DrawerBody>
-          <DrawerFooter className='mb-8'>
+          <DrawerFooter className='mb-10'>
             <VStack className="w-full gap-2">
               {/* ログアウト */}
               <Button
