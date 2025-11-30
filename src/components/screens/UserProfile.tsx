@@ -2,6 +2,7 @@ import { Stack, useLocalSearchParams, useRouter, useSegments } from 'expo-router
 import { useEffect, useState } from 'react';
 import { Alert, FlatList, Pressable } from 'react-native';
 
+import AddToListModal from '@/components/AddToListModal';
 import ConfirmModal from '@/components/ConfirmModal';
 import FollowButton from '@/components/FollowButton';
 import DefaultAvatar from '@/components/icons/DefaultAvatar';
@@ -22,7 +23,7 @@ import { useFollow } from '@/src/hooks/useFollow';
 import { useMute } from '@/src/hooks/useMute';
 import { supabase } from '@/src/lib/supabase';
 import { sortByStartDate } from '@/src/utils/sortByStartDate';
-import { MessageCircleOff, MoreVertical, ShieldBan } from 'lucide-react-native';
+import { ListPlus, MessageCircleOff, MoreVertical, ShieldBan } from 'lucide-react-native';
 
 interface UserProfile {
   user_id: string;
@@ -68,6 +69,7 @@ export default function UserDetailScreen() {
   const [isBlockProcessing, setIsBlockProcessing] = useState(false);
   const [showMuteModal, setShowMuteModal] = useState(false);
   const [isMuteProcessing, setIsMuteProcessing] = useState(false);
+  const [isAddToListModalOpen, setIsAddToListModalOpen] = useState(false);
   const [diagnoses, setDiagnoses] = useState<MedicalRecord[]>([]);
   const [treatments, setTreatments] = useState<MedicalRecord[]>([]);
   const [medications, setMedications] = useState<MedicalRecord[]>([]);
@@ -538,6 +540,10 @@ export default function UserDetailScreen() {
                       );
                     }}
                   >
+                    <MenuItem key="addToList" textValue="リストに追加" onPress={() => setIsAddToListModalOpen(true)}>
+                      <Icon as={ListPlus} size="md" className="text-typography-700" />
+                      <MenuItemLabel className="ml-2">リストに追加</MenuItemLabel>
+                    </MenuItem>
                     <MenuItem key="mute" textValue={isMuted ? 'ミュート解除' : 'ミュート'} onPress={handleMutePress}>
                       <Icon as={MessageCircleOff} size="md" className="text-typography-700" />
                       <MenuItemLabel className="ml-2">{isMuted ? 'ミュート解除' : 'ミュート'}</MenuItemLabel>
@@ -718,6 +724,15 @@ export default function UserDetailScreen() {
         confirmText={isMuted ? 'ミュート解除' : 'ミュート'}
         isLoading={isMuteProcessing}
       />
+
+      {/* リストに追加モーダル */}
+      {id && (
+        <AddToListModal
+          isOpen={isAddToListModalOpen}
+          onClose={() => setIsAddToListModalOpen(false)}
+          userId={id}
+        />
+      )}
     </>
   );
 }

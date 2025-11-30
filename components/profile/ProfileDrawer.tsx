@@ -200,7 +200,7 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
               </Pressable>
             </VStack>
           </DrawerBody>
-          <DrawerFooter className='mb-10'>
+          <DrawerFooter className="mb-10">
             <VStack className="w-full gap-2">
               {/* ログアウト */}
               <Button

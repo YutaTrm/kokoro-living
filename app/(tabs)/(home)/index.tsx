@@ -1,14 +1,22 @@
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { FlatList, RefreshControl } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation, useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import { List } from 'lucide-react-native';
+import { useEffect, useLayoutEffect, useState } from 'react';
+import { Alert, FlatList, Pressable, RefreshControl } from 'react-native';
 
+import CreateListModal from '@/components/home/CreateListModal';
+import EditListModal from '@/components/home/EditListModal';
+import HomeDrawer from '@/components/home/HomeDrawer';
 import PostItem from '@/components/PostItem';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonIcon } from '@/components/ui/button';
-import { AddIcon } from '@/components/ui/icon';
+import { AddIcon, Icon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
 import { supabase } from '@/src/lib/supabase';
+
+const SELECTED_LIST_KEY = 'selected_list_id';
 
 interface Post {
   id: string;
@@ -25,13 +33,76 @@ interface Post {
   medications: string[];
 }
 
+interface List {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
 export default function TabOneScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [posts, setPosts] = useState<Post[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+
+  // リスト機能のstate
+  const [selectedListId, setSelectedListId] = useState<string | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingList, setEditingList] = useState<List | null>(null);
+
+  // ヘッダーにドロワーアイコンを設定
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <Pressable onPress={() => setIsDrawerOpen(true)} style={{ marginLeft: 5, padding: 4 }}>
+          <Icon as={List} size="lg" className="text-typography-900" />
+        </Pressable>
+      ),
+    });
+  }, [navigation]);
+
+  // 選択中のリストをAsyncStorageから読み込み
+  useEffect(() => {
+    const loadSelectedList = async () => {
+      try {
+        const saved = await AsyncStorage.getItem(SELECTED_LIST_KEY);
+        if (saved) {
+          setSelectedListId(saved);
+        }
+      } catch (error) {
+        console.error('リスト選択の読み込みエラー:', error);
+      }
+    };
+    loadSelectedList();
+  }, []);
+
+  // 選択中のリストが変わったらAsyncStorageに保存
+  useEffect(() => {
+    const saveSelectedList = async () => {
+      try {
+        if (selectedListId === null) {
+          await AsyncStorage.removeItem(SELECTED_LIST_KEY);
+        } else {
+          await AsyncStorage.setItem(SELECTED_LIST_KEY, selectedListId);
+        }
+      } catch (error) {
+        console.error('リスト選択の保存エラー:', error);
+      }
+    };
+    saveSelectedList();
+  }, [selectedListId]);
+
+  // リストが変わったら投稿を再読み込み
+  useEffect(() => {
+    if (!loading) {
+      loadPosts();
+    }
+  }, [selectedListId]);
 
   useEffect(() => {
     checkLoginStatus();
@@ -62,14 +133,6 @@ export default function TabOneScreen() {
       let postsError;
 
       if (user) {
-        // ログイン済み: 自分がフォローしている人のIDを取得
-        const { data: followingData } = await supabase
-          .from('follows')
-          .select('following_id')
-          .eq('follower_id', user.id);
-
-        const followingIds = followingData?.map(f => f.following_id) || [];
-
         // ミュートしているユーザーIDを取得
         const { data: mutesData } = await supabase
           .from('mutes')
@@ -78,35 +141,75 @@ export default function TabOneScreen() {
 
         const mutedIds = mutesData?.map(m => m.muted_id) || [];
 
-        // 自分の投稿（非表示を含む）
-        const { data: myPosts } = await supabase
-          .from('posts')
-          .select('id, content, created_at, user_id, is_hidden')
-          .eq('user_id', user.id)
-          .is('parent_post_id', null)
-          .order('created_at', { ascending: false })
-          .limit(50);
+        // リストが選択されている場合
+        if (selectedListId) {
+          // リストに追加されたユーザーIDを取得
+          const { data: listMembersData } = await supabase
+            .from('list_members')
+            .select('user_id')
+            .eq('list_id', selectedListId);
 
-        // フォローしている人の投稿（非表示を除外）
-        const { data: followingPosts, error: followingError } = await supabase
-          .from('posts')
-          .select('id, content, created_at, user_id, is_hidden')
-          .in('user_id', followingIds)
-          .is('parent_post_id', null)
-          .eq('is_hidden', false)
-          .order('created_at', { ascending: false })
-          .limit(50);
+          const listMemberIds = listMembersData?.map(m => m.user_id) || [];
 
-        // マージして時系列順にソート
-        const allPosts = [...(myPosts || []), ...(followingPosts || [])];
-        // ミュートユーザーの投稿を除外（自分の投稿は除外しない）
-        const filteredPosts = allPosts.filter(p =>
-          p.user_id === user.id || !mutedIds.includes(p.user_id)
-        );
-        postsData = filteredPosts.sort((a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        ).slice(0, 50);
-        postsError = followingError;
+          if (listMemberIds.length === 0) {
+            // リストにメンバーがいない場合
+            setPosts([]);
+            return;
+          }
+
+          // リストメンバーの投稿を取得（非表示を除外）
+          const { data: listPosts, error: listError } = await supabase
+            .from('posts')
+            .select('id, content, created_at, user_id, is_hidden')
+            .in('user_id', listMemberIds)
+            .is('parent_post_id', null)
+            .eq('is_hidden', false)
+            .order('created_at', { ascending: false })
+            .limit(50);
+
+          // ミュートユーザーの投稿を除外
+          const filteredPosts = (listPosts || []).filter(p => !mutedIds.includes(p.user_id));
+          postsData = filteredPosts;
+          postsError = listError;
+        } else {
+          // タイムライン: 自分がフォローしている人のIDを取得
+          const { data: followingData } = await supabase
+            .from('follows')
+            .select('following_id')
+            .eq('follower_id', user.id);
+
+          const followingIds = followingData?.map(f => f.following_id) || [];
+
+          // 自分の投稿（非表示を含む）
+          const { data: myPosts } = await supabase
+            .from('posts')
+            .select('id, content, created_at, user_id, is_hidden')
+            .eq('user_id', user.id)
+            .is('parent_post_id', null)
+            .order('created_at', { ascending: false })
+            .limit(50);
+
+          // フォローしている人の投稿（非表示を除外）
+          const { data: followingPosts, error: followingError } = await supabase
+            .from('posts')
+            .select('id, content, created_at, user_id, is_hidden')
+            .in('user_id', followingIds)
+            .is('parent_post_id', null)
+            .eq('is_hidden', false)
+            .order('created_at', { ascending: false })
+            .limit(50);
+
+          // マージして時系列順にソート
+          const allPosts = [...(myPosts || []), ...(followingPosts || [])];
+          // ミュートユーザーの投稿を除外（自分の投稿は除外しない）
+          const filteredPosts = allPosts.filter(p =>
+            p.user_id === user.id || !mutedIds.includes(p.user_id)
+          );
+          postsData = filteredPosts.sort((a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          ).slice(0, 50);
+          postsError = followingError;
+        }
       } else {
         // 未ログイン: すべての投稿を取得（非表示を除外）
         const result = await supabase
@@ -244,8 +347,9 @@ export default function TabOneScreen() {
     return (
       <Box className="flex-1 items-center justify-center pt-48">
         <Text className="text-lg opacity-50 p-6">
-          ここにはあなたと、あなたがフォローしているユーザーの投稿が表示されます。
-          ユーザー検索して仲間を探しましょう！
+          {selectedListId
+            ? 'まだリストには誰も追加されていません'
+            : 'ここにはあなたと、あなたがフォローしているユーザーの投稿が表示されます。ユーザー検索して仲間を探しましょう！'}
         </Text>
       </Box>
     );
@@ -333,6 +437,33 @@ export default function TabOneScreen() {
     }
   };
 
+  const handleSelectList = (listId: string | null) => {
+    setSelectedListId(listId);
+  };
+
+  const handleCreateList = () => {
+    setIsDrawerOpen(false);
+    setIsCreateModalOpen(true);
+  };
+
+  const handleEditList = (list: List) => {
+    setEditingList(list);
+    setIsDrawerOpen(false);
+    setIsEditModalOpen(true);
+  };
+
+  const handleListCreated = () => {
+    // ドロワーを再度開く
+    setIsCreateModalOpen(false);
+    setIsDrawerOpen(true);
+  };
+
+  const handleListUpdated = () => {
+    // ドロワーを再度開く
+    setIsEditModalOpen(false);
+    setIsDrawerOpen(true);
+  };
+
   if (loading) {
     return (
       <Box className="flex-1 items-center justify-center">
@@ -365,6 +496,31 @@ export default function TabOneScreen() {
           <ButtonIcon as={AddIcon} size="lg" className="text-white" />
         </Button>
       )}
+
+      {/* ホームドロワー */}
+      <HomeDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        selectedListId={selectedListId}
+        onSelectList={handleSelectList}
+        onCreateList={handleCreateList}
+        onEditList={handleEditList}
+      />
+
+      {/* リスト作成モーダル */}
+      <CreateListModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onCreated={handleListCreated}
+      />
+
+      {/* リスト編集モーダル */}
+      <EditListModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onUpdated={handleListUpdated}
+        list={editingList}
+      />
     </Box>
   );
 }
