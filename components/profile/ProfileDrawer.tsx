@@ -97,7 +97,7 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
     <>
       <Drawer isOpen={isOpen} onClose={onClose} size="lg" anchor="right">
         <DrawerBackdrop />
-        <DrawerContent className="">
+        <DrawerContent className="pt-safe pb-safe">
           <DrawerHeader>
             <Heading size="md">メニュー</Heading>
             <DrawerCloseButton>
