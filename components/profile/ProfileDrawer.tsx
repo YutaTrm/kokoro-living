@@ -160,8 +160,8 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
 
               <Divider className="my-2" />
 
-              {/* サービス情報 */}
-              {/* <Text className="text-sm text-typography-500 mb-2">サービス情報</Text> */}
+              {/* その他 */}
+              <Text className="text-sm text-typography-500 mb-2">その他</Text>
 
               {/* 利用規約 */}
               <Pressable
@@ -194,13 +194,13 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
                 }
               >
                 <HStack space="md" className="items-center">
-                  <Text className="text-lg -mr-2">サポート</Text>
+                  <Text className="text-lg -mr-2">サポートページ</Text>
                   {/* <Icon as={ExternalLink} size="md" className="text-typography-700" /> */}
                 </HStack>
               </Pressable>
             </VStack>
           </DrawerBody>
-          <DrawerFooter>
+          <DrawerFooter className='mb-8'>
             <VStack className="w-full gap-2">
               {/* ログアウト */}
               <Button
