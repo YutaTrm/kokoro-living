@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { LogOut, MessageCircleOff, Monitor, Moon, ShieldBan, Sun, UserX, X } from 'lucide-react-native';
+import { LogOut, MessageCircleOff, Moon, ShieldBan, Sun, UserX, X } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, Pressable } from 'react-native';
 
@@ -129,20 +129,6 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
 
               {/* テーマ設定 */}
               <Text className="text-sm text-typography-500 mb-2">テーマ</Text>
-
-              {/* システム設定 */}
-              <Pressable onPress={() => setThemeMode('system')}>
-                <HStack space="md" className="items-center">
-                  <Icon
-                    as={Monitor}
-                    size="md"
-                    className={themeMode === 'system' ? 'text-primary-500' : 'text-typography-700'}
-                  />
-                  <Text className={`text-lg -ml-2 ${themeMode === 'system' ? 'text-primary-500 font-semibold' : ''}`}>
-                    システム設定
-                  </Text>
-                </HStack>
-              </Pressable>
 
               {/* ライト */}
               <Pressable onPress={() => setThemeMode('light')} className="">
