@@ -123,7 +123,7 @@ export default function ReplyScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-background-0" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-background-0" edges={['top', 'bottom']}>
       {/* ヘッダー */}
       <HStack className="justify-between items-center px-4 py-3 border-b border-outline-200">
         <Button variant="link" onPress={() => router.back()}>
