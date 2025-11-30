@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ChevronDownIcon, CircleIcon, PlusIcon, XIcon } from 'lucide-react-native';
+import { ChevronDownIcon, CircleIcon, XIcon } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, TextInput, View } from 'react-native';
 
@@ -9,7 +9,7 @@ import Tag from '@/components/Tag';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonIcon, ButtonText } from '@/components/ui/button';
 import { HStack } from '@/components/ui/hstack';
-import { Icon } from '@/components/ui/icon';
+import { AddIcon, Icon } from '@/components/ui/icon';
 import { Radio, RadioGroup, RadioIcon, RadioIndicator, RadioLabel } from '@/components/ui/radio';
 import {
   Select,
@@ -866,7 +866,7 @@ export default function SearchScreen() {
                 onPress={() => setShowTagModal(true)}
                 className="h-6 px-2"
               >
-                <ButtonIcon as={PlusIcon} size="md" />
+                <ButtonIcon as={AddIcon} size="sm" />
               </Button>
             </View>
           )}
