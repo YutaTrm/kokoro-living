@@ -147,6 +147,7 @@ const ModalBackdrop = React.forwardRef<
           duration: 250,
         },
       }}
+      onPress={() => {}}
       {...props}
       className={modalBackdropStyle({
         class: className,
