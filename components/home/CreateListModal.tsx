@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, TextInput } from 'react-native';
 
 import { Button, ButtonText } from '@/components/ui/button';
@@ -22,24 +22,39 @@ interface CreateListModalProps {
 }
 
 export default function CreateListModal({ isOpen, onClose, onCreated }: CreateListModalProps) {
-  const [name, setName] = useState('');
+  const [charCount, setCharCount] = useState(0);
   const [isCreating, setIsCreating] = useState(false);
+  const nameRef = useRef('');
+  const inputRef = useRef<TextInput>(null);
 
   const maxLength = 20;
-  const remainingChars = maxLength - name.length;
+  const remainingChars = maxLength - charCount;
+
+  useEffect(() => {
+    if (isOpen) {
+      nameRef.current = '';
+      setCharCount(0);
+    }
+  }, [isOpen]);
+
+  const handleChangeText = (text: string) => {
+    nameRef.current = text;
+    setCharCount(text.length);
+  };
 
   const handleClose = () => {
-    setName('');
+    nameRef.current = '';
+    setCharCount(0);
     onClose();
   };
 
   const handleCreate = async () => {
-    if (!name.trim()) {
+    if (!nameRef.current.trim()) {
       Alert.alert('エラー', 'リスト名を入力してください');
       return;
     }
 
-    if (name.length > maxLength) {
+    if (nameRef.current.length > maxLength) {
       Alert.alert('エラー', `リスト名は${maxLength}文字以内で入力してください`);
       return;
     }
@@ -67,12 +82,13 @@ export default function CreateListModal({ isOpen, onClose, onCreated }: CreateLi
 
       const { error } = await supabase.from('lists').insert({
         user_id: user.id,
-        name: name.trim(),
+        name: nameRef.current.trim(),
       });
 
       if (error) throw error;
 
-      setName('');
+      nameRef.current = '';
+      setCharCount(0);
       onCreated();
       onClose();
     } catch (error) {
@@ -96,10 +112,11 @@ export default function CreateListModal({ isOpen, onClose, onCreated }: CreateLi
             <VStack space="xs">
               <Text className="text-sm text-typography-700">リスト名</Text>
               <TextInput
+                ref={inputRef}
                 className="border border-outline-200 rounded-lg px-3 py-2 text-base text-typography-900"
                 placeholder="例: お気に入り"
-                value={name}
-                onChangeText={setName}
+                defaultValue=""
+                onChangeText={handleChangeText}
                 maxLength={maxLength}
                 autoFocus
               />
@@ -115,7 +132,7 @@ export default function CreateListModal({ isOpen, onClose, onCreated }: CreateLi
           <Button variant="outline" onPress={handleClose} className="mr-2">
             <ButtonText>キャンセル</ButtonText>
           </Button>
-          <Button onPress={handleCreate} isDisabled={isCreating || !name.trim()}>
+          <Button onPress={handleCreate} isDisabled={isCreating || charCount === 0}>
             <ButtonText>{isCreating ? '作成中...' : '作成'}</ButtonText>
           </Button>
         </ModalFooter>

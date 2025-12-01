@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, TextInput } from 'react-native';
 
 import { Button, ButtonText } from '@/components/ui/button';
@@ -28,32 +28,45 @@ interface EditListModalProps {
 }
 
 export default function EditListModal({ isOpen, onClose, onUpdated, list }: EditListModalProps) {
-  const [name, setName] = useState('');
+  const [charCount, setCharCount] = useState(0);
   const [isUpdating, setIsUpdating] = useState(false);
+  const nameRef = useRef('');
+  const inputRef = useRef<TextInput>(null);
 
   const maxLength = 20;
-  const remainingChars = maxLength - name.length;
+  const remainingChars = maxLength - charCount;
 
   useEffect(() => {
-    if (list) {
-      setName(list.name);
+    if (list && isOpen) {
+      nameRef.current = list.name;
+      setCharCount(list.name.length);
+      // TextInputの値をリセット
+      if (inputRef.current) {
+        inputRef.current.setNativeProps({ text: list.name });
+      }
     }
-  }, [list]);
+  }, [list, isOpen]);
+
+  const handleChangeText = (text: string) => {
+    nameRef.current = text;
+    setCharCount(text.length);
+  };
 
   const handleClose = () => {
-    setName('');
+    nameRef.current = '';
+    setCharCount(0);
     onClose();
   };
 
   const handleUpdate = async () => {
     if (!list) return;
 
-    if (!name.trim()) {
+    if (!nameRef.current.trim()) {
       Alert.alert('エラー', 'リスト名を入力してください');
       return;
     }
 
-    if (name.length > maxLength) {
+    if (nameRef.current.length > maxLength) {
       Alert.alert('エラー', `リスト名は${maxLength}文字以内で入力してください`);
       return;
     }
@@ -62,12 +75,13 @@ export default function EditListModal({ isOpen, onClose, onUpdated, list }: Edit
     try {
       const { error } = await supabase
         .from('lists')
-        .update({ name: name.trim() })
+        .update({ name: nameRef.current.trim() })
         .eq('id', list.id);
 
       if (error) throw error;
 
-      setName('');
+      nameRef.current = '';
+      setCharCount(0);
       onUpdated();
       onClose();
     } catch (error) {
@@ -93,10 +107,11 @@ export default function EditListModal({ isOpen, onClose, onUpdated, list }: Edit
             <VStack space="xs">
               <Text className="text-sm text-typography-700">リスト名</Text>
               <TextInput
+                ref={inputRef}
                 className="border border-outline-200 rounded-lg px-3 py-2 text-base text-typography-900"
                 placeholder="例: お気に入り"
-                value={name}
-                onChangeText={setName}
+                defaultValue={list?.name || ''}
+                onChangeText={handleChangeText}
                 maxLength={maxLength}
                 autoFocus
               />
@@ -112,7 +127,7 @@ export default function EditListModal({ isOpen, onClose, onUpdated, list }: Edit
           <Button variant="outline" onPress={handleClose} className="mr-2">
             <ButtonText>キャンセル</ButtonText>
           </Button>
-          <Button onPress={handleUpdate} isDisabled={isUpdating || !name.trim()}>
+          <Button onPress={handleUpdate} isDisabled={isUpdating || charCount === 0}>
             <ButtonText>{isUpdating ? '更新中...' : '更新'}</ButtonText>
           </Button>
         </ModalFooter>
