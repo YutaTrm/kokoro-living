@@ -1,10 +1,10 @@
+import { Button, ButtonText } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
 import { Modal, ModalBackdrop, ModalBody, ModalContent } from '@/components/ui/modal';
 import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
-import { Button, ButtonText } from '@/components/ui/button';
 import { MOOD_EMOJIS, MOOD_LABELS } from '@/src/hooks/useMoodCheckin';
 import React from 'react';
 import { Alert, Pressable } from 'react-native';
@@ -53,7 +53,7 @@ export function MoodCheckinModal({
                   <Pressable
                     key={mood}
                     onPress={() => handleMoodSelect(mood)}
-                    className="bg-background-50 rounded-lg p-4 border border-outline-200 active:bg-background-100"
+                    className="bg-background-50 rounded-lg p-2 border border-outline-200 active:bg-background-100"
                   >
                     <HStack space="md" className="items-center">
                       <Text className="text-2xl">{MOOD_EMOJIS[mood as keyof typeof MOOD_EMOJIS]}</Text>

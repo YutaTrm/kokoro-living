@@ -30,6 +30,24 @@ export const MOOD_LABELS = {
   5: 'とても良い',
 } as const;
 
+// 5時基準の日付を取得（0時～4時59分は前日扱い）
+function get5amBasedDate(): string {
+  const now = new Date();
+
+  // JST = UTC + 9時間
+  const jstOffset = 9 * 60 * 60 * 1000;
+  const jstTime = new Date(now.getTime() + jstOffset);
+
+  // 5時未満の場合は1日前にする（5時間を引く）
+  const adjustedTime = new Date(jstTime.getTime() - 5 * 60 * 60 * 1000);
+
+  const year = adjustedTime.getUTCFullYear();
+  const month = String(adjustedTime.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(adjustedTime.getUTCDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
 export function useMoodCheckin() {
   const [todayCheckin, setTodayCheckin] = useState<MoodCheckin | null>(null);
   const [stats, setStats] = useState<MoodStats>({ totalCheckins: 0, sameMoodCount: 0, moodCounts: {} });
@@ -45,10 +63,8 @@ export function useMoodCheckin() {
         return;
       }
 
-      // JST基準で今日の日付を取得
-      const today = new Date().toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
-      const [year, month, day] = today.split('/');
-      const todayStart = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      // 5時基準で今日の日付を取得
+      const todayStart = get5amBasedDate();
 
       const { data, error } = await supabase
         .from('mood_checkins')
@@ -74,9 +90,8 @@ export function useMoodCheckin() {
   // 統計情報を取得
   const fetchStats = async (mood?: number) => {
     try {
-      const today = new Date().toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
-      const [year, month, day] = today.split('/');
-      const todayStart = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      // 5時基準で今日の日付を取得
+      const todayStart = get5amBasedDate();
 
       // 今日の全チェックインデータを取得
       const { data: allCheckins, error: allError } = await supabase

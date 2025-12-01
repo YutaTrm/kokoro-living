@@ -34,6 +34,42 @@ interface MonthStats {
   moodCounts: Record<number, number>;
 }
 
+// created_atから5時基準の日付を取得（0時～4時59分は前日扱い）
+function get5amBasedDateFromTimestamp(timestamp: string): string {
+  const date = new Date(timestamp);
+
+  // JST = UTC + 9時間
+  const jstOffset = 9 * 60 * 60 * 1000;
+  const jstTime = new Date(date.getTime() + jstOffset);
+
+  // 5時間を引く（5時未満の場合は前日扱い）
+  const adjustedTime = new Date(jstTime.getTime() - 5 * 60 * 60 * 1000);
+
+  const year = adjustedTime.getUTCFullYear();
+  const month = String(adjustedTime.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(adjustedTime.getUTCDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+// 5時基準の今日の日付を取得
+function get5amBasedToday(): string {
+  const now = new Date();
+
+  // JST = UTC + 9時間
+  const jstOffset = 9 * 60 * 60 * 1000;
+  const jstTime = new Date(now.getTime() + jstOffset);
+
+  // 5時間を引く（5時未満の場合は前日扱い）
+  const adjustedTime = new Date(jstTime.getTime() - 5 * 60 * 60 * 1000);
+
+  const year = adjustedTime.getUTCFullYear();
+  const month = String(adjustedTime.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(adjustedTime.getUTCDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
 export default function MoodHistoryScreen() {
   const router = useRouter();
   const navigation = useNavigation();
@@ -224,8 +260,8 @@ export default function MoodHistoryScreen() {
                   if (!date) return <View style={{ width: 40, height: 60 }} />;
 
                   const dateStr = date.dateString;
-                  const checkin = checkins.find(c => c.created_at.split('T')[0] === dateStr);
-                  const isToday = new Date().toISOString().split('T')[0] === dateStr;
+                  const checkin = checkins.find(c => get5amBasedDateFromTimestamp(c.created_at) === dateStr);
+                  const isToday = get5amBasedToday() === dateStr;
                   const isDisabled = state === 'disabled';
 
                   return (
