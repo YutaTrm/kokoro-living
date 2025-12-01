@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, TextInput } from 'react-native';
 
 import { Button, ButtonText } from '@/components/ui/button';
+import { Input, InputField } from '@/components/ui/input';
 import {
   Modal,
   ModalBackdrop,
@@ -48,8 +49,10 @@ export default function EditListModal({ isOpen, onClose, onUpdated, list }: Edit
   }, [list, isOpen]);
 
   const handleChangeText = (text: string) => {
-    nameRef.current = text;
-    setCharCount(text.length);
+    // 改行を削除（multilineだが1行にする）
+    const singleLineText = text.replace(/\n/g, '');
+    nameRef.current = singleLineText;
+    setCharCount(singleLineText.length);
   };
 
   const handleClose = () => {
@@ -106,15 +109,18 @@ export default function EditListModal({ isOpen, onClose, onUpdated, list }: Edit
           <VStack space="md">
             <VStack space="xs">
               <Text className="text-sm text-typography-700">リスト名</Text>
-              <TextInput
-                ref={inputRef}
-                className="border border-outline-200 rounded-lg px-3 py-2 text-base text-typography-900"
-                placeholder="例: お気に入り"
-                defaultValue={list?.name || ''}
-                onChangeText={handleChangeText}
-                maxLength={maxLength}
-                autoFocus
-              />
+              <Input size="md">
+                <InputField
+                  ref={inputRef}
+                  placeholder="例: お気に入り"
+                  defaultValue={list?.name || ''}
+                  onChangeText={handleChangeText}
+                  maxLength={maxLength}
+                  multiline={true}
+                  autoComplete="off"
+                  keyboardType="default"
+                />
+              </Input>
               <Text
                 className={`text-sm text-right ${remainingChars < 0 ? 'text-error-500' : 'text-typography-500'}`}
               >
