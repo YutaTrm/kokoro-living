@@ -44,3 +44,4 @@ scripts/*.local.js
 # generated native folders
 /ios
 /android
+*.md
