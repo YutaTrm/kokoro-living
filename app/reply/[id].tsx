@@ -163,6 +163,7 @@ export default function ReplyScreen() {
               placeholder="返信を入力"
               placeholderTextColor="#999"
               multiline
+              textAlignVertical="top"
               value={content}
               onChangeText={setContent}
               maxLength={maxLength}

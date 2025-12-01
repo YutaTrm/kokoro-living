@@ -440,6 +440,7 @@ export default function CreatePostScreen() {
               placeholder="状態や感情など自由に記述してください"
               placeholderTextColor="#999"
               multiline
+              textAlignVertical="top"
               value={content}
               onChangeText={setContent}
               maxLength={maxLength}
