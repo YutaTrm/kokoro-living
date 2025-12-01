@@ -561,7 +561,7 @@ export default function TabOneScreen() {
           size="md"
           onPress={() => router.push('/create-post')}
         >
-          <ButtonIcon as={AddIcon} size="lg" className="text-white" />
+          <ButtonIcon as={AddIcon} size="xl" className="text-white w-6 h-6" />
         </Button>
       )}
 

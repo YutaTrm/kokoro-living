@@ -1,18 +1,27 @@
 import { useNavigation, useRouter } from 'expo-router';
-import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { useEffect, useLayoutEffect, useState } from 'react';
-import { Pressable, ScrollView } from 'react-native';
+import { ScrollView, View } from 'react-native';
+import { Calendar, DateData, LocaleConfig } from 'react-native-calendars';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Box } from '@/components/ui/box';
-import { HStack } from '@/components/ui/hstack';
-import { VStack } from '@/components/ui/vstack';
-import { Text } from '@/components/ui/text';
 import { Heading } from '@/components/ui/heading';
-import { Icon } from '@/components/ui/icon';
+import { HStack } from '@/components/ui/hstack';
 import { Spinner } from '@/components/ui/spinner';
-import { supabase } from '@/src/lib/supabase';
+import { Text } from '@/components/ui/text';
+import { VStack } from '@/components/ui/vstack';
 import { MOOD_EMOJIS, MOOD_LABELS } from '@/src/hooks/useMoodCheckin';
+import { supabase } from '@/src/lib/supabase';
+
+// 日本語ロケール設定
+LocaleConfig.locales['jp'] = {
+  monthNames: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
+  monthNamesShort: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
+  dayNames: ['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'],
+  dayNamesShort: ['日', '月', '火', '水', '木', '金', '土'],
+  today: '今日'
+};
+LocaleConfig.defaultLocale = 'jp';
 
 interface MoodCheckin {
   id: string;
@@ -34,6 +43,7 @@ export default function MoodHistoryScreen() {
   const [stats, setStats] = useState<MonthStats>({ totalCheckins: 0, moodCounts: {} });
   const [firstCheckinMonth, setFirstCheckinMonth] = useState<Date | null>(null);
   const [lastCheckinMonth, setLastCheckinMonth] = useState<Date | null>(null);
+  const [totalAllCheckins, setTotalAllCheckins] = useState(0);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -70,6 +80,9 @@ export default function MoodHistoryScreen() {
         // 月の初日に設定
         setFirstCheckinMonth(new Date(firstDate.getFullYear(), firstDate.getMonth(), 1));
         setLastCheckinMonth(new Date(lastDate.getFullYear(), lastDate.getMonth(), 1));
+
+        // 全期間のチェックイン回数を設定
+        setTotalAllCheckins(data.length);
       }
     } catch (error) {
       console.error('チェックイン範囲取得エラー:', error);
@@ -120,109 +133,47 @@ export default function MoodHistoryScreen() {
     }
   };
 
-  const goToPreviousMonth = () => {
-    const prevMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
-    // 最初のチェックイン月より前には戻れない
-    if (!firstCheckinMonth || prevMonth >= firstCheckinMonth) {
-      setCurrentMonth(prevMonth);
-    }
+  // マークされた日付を作成
+  const markedDates: { [key: string]: any } = {};
+  checkins.forEach(c => {
+    const dateStr = c.created_at.split('T')[0]; // YYYY-MM-DD形式
+    const mood = c.mood;
+    markedDates[dateStr] = {
+      marked: true,
+      dotColor: 'transparent',
+      customStyles: {
+        container: {
+          backgroundColor: new Date().toISOString().split('T')[0] === dateStr ? '#e0f2fe' : 'transparent',
+        },
+        text: {
+          color: '#000',
+        },
+      },
+    };
+  });
+
+  const handleMonthChange = (month: DateData) => {
+    const newMonth = new Date(month.year, month.month - 1, 1);
+
+    // 範囲チェック
+    if (firstCheckinMonth && newMonth < firstCheckinMonth) return;
+    if (lastCheckinMonth && newMonth > lastCheckinMonth) return;
+
+    setCurrentMonth(newMonth);
   };
 
-  const goToNextMonth = () => {
-    const nextMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
-    // 最後のチェックイン月より後には進めない
-    if (!lastCheckinMonth || nextMonth <= lastCheckinMonth) {
-      setCurrentMonth(nextMonth);
-    }
-  };
+  const currentDateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-01`;
 
-  const renderCalendar = () => {
-    const year = currentMonth.getFullYear();
-    const month = currentMonth.getMonth();
-    const firstDay = new Date(year, month, 1).getDay(); // 0=日曜日
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
+  // 範囲制限用の日付文字列
+  const minDateStr = firstCheckinMonth
+    ? `${firstCheckinMonth.getFullYear()}-${String(firstCheckinMonth.getMonth() + 1).padStart(2, '0')}-01`
+    : undefined;
 
-    // チェックインデータを日付ごとにマップ
-    const checkinsMap = new Map<string, number>();
-    checkins.forEach(c => {
-      const date = new Date(c.created_at);
-      const day = date.getDate();
-      checkinsMap.set(day.toString(), c.mood);
-    });
+  const maxDateStr = lastCheckinMonth
+    ? `${lastCheckinMonth.getFullYear()}-${String(lastCheckinMonth.getMonth() + 1).padStart(2, '0')}-${new Date(lastCheckinMonth.getFullYear(), lastCheckinMonth.getMonth() + 1, 0).getDate()}`
+    : undefined;
 
-    const weeks: JSX.Element[] = [];
-    let days: JSX.Element[] = [];
-
-    // 曜日ヘッダー
-    const weekDays = ['日', '月', '火', '水', '木', '金', '土'];
-    const weekDayHeader = (
-      <HStack key="header" className="justify-between mb-2">
-        {weekDays.map((day, i) => (
-          <Box key={i} className="w-[14%] items-center">
-            <Text size="xs" className="text-typography-500">{day}</Text>
-          </Box>
-        ))}
-      </HStack>
-    );
-
-    // 月初の空白
-    for (let i = 0; i < firstDay; i++) {
-      days.push(
-        <Box key={`empty-${i}`} className="w-[14%] aspect-square" />
-      );
-    }
-
-    // 日付セル
-    for (let day = 1; day <= daysInMonth; day++) {
-      const mood = checkinsMap.get(day.toString());
-      const isToday =
-        new Date().getDate() === day &&
-        new Date().getMonth() === month &&
-        new Date().getFullYear() === year;
-
-      days.push(
-        <Box
-          key={day}
-          className={`w-[14%] aspect-square items-center justify-start pt-1 ${
-            isToday ? 'bg-primary-100 rounded-lg' : ''
-          }`}
-        >
-          <Text size="xs" className="text-typography-900">{day}</Text>
-          {mood && (
-            <Text className="text-xl mt-1">{MOOD_EMOJIS[mood as keyof typeof MOOD_EMOJIS]}</Text>
-          )}
-        </Box>
-      );
-
-      // 週末（土曜日）で改行
-      if (days.length === 7) {
-        weeks.push(
-          <HStack key={`week-${weeks.length}`} className="justify-between mb-2">
-            {days}
-          </HStack>
-        );
-        days = [];
-      }
-    }
-
-    // 最終週の残り
-    if (days.length > 0) {
-      weeks.push(
-        <HStack key={`week-${weeks.length}`} className="justify-between mb-2">
-          {days}
-        </HStack>
-      );
-    }
-
-    return (
-      <VStack space="sm">
-        {weekDayHeader}
-        {weeks}
-      </VStack>
-    );
-  };
-
-  // ボタンの無効化判定
+  // 矢印ボタンの無効化判定
   const canGoPrevious = firstCheckinMonth
     ? new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1) >= firstCheckinMonth
     : false;
@@ -235,35 +186,6 @@ export default function MoodHistoryScreen() {
     <SafeAreaView className="flex-1 bg-background-0" edges={['bottom']}>
       <ScrollView className="flex-1">
         <VStack className="p-4" space="xl">
-          {/* 月選択 */}
-          <HStack className="items-center justify-between">
-            <Pressable
-              onPress={goToPreviousMonth}
-              disabled={!canGoPrevious}
-              className="p-2"
-            >
-              <Icon
-                as={ChevronLeft}
-                size="lg"
-                className={canGoPrevious ? 'text-typography-900' : 'text-typography-300'}
-              />
-            </Pressable>
-            <Heading size="lg">
-              {currentMonth.getFullYear()}年{currentMonth.getMonth() + 1}月
-            </Heading>
-            <Pressable
-              onPress={goToNextMonth}
-              disabled={!canGoNext}
-              className="p-2"
-            >
-              <Icon
-                as={ChevronRight}
-                size="lg"
-                className={canGoNext ? 'text-typography-900' : 'text-typography-300'}
-              />
-            </Pressable>
-          </HStack>
-
           {/* ローディング */}
           {loading ? (
             <Box className="items-center py-8">
@@ -272,13 +194,79 @@ export default function MoodHistoryScreen() {
           ) : (
             <>
               {/* カレンダー */}
-              <Box className="bg-background-50 rounded-lg p-4">
-                {renderCalendar()}
-              </Box>
+              <Calendar
+                current={currentDateStr}
+                onMonthChange={handleMonthChange}
+                minDate={minDateStr}
+                maxDate={maxDateStr}
+                disableArrowLeft={!canGoPrevious}
+                disableArrowRight={!canGoNext}
+                hideExtraDays
+                theme={{
+                  textDayFontSize: 14,
+                  textMonthFontSize: 18,
+                  textMonthFontWeight: 'bold',
+                }}
+                style={{
+                  borderRadius: 12,
+                  padding: 8,
+                }}
+                renderHeader={(date) => {
+                  const year = currentMonth.getFullYear();
+                  const month = currentMonth.getMonth() + 1;
+                  return (
+                    <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>
+                      {year} {month}月
+                    </Text>
+                  );
+                }}
+                dayComponent={({ date, state }) => {
+                  if (!date) return <View style={{ width: 40, height: 60 }} />;
+
+                  const dateStr = date.dateString;
+                  const checkin = checkins.find(c => c.created_at.split('T')[0] === dateStr);
+                  const isToday = new Date().toISOString().split('T')[0] === dateStr;
+                  const isDisabled = state === 'disabled';
+
+                  return (
+                    <View style={{
+                      alignItems: 'center',
+                      justifyContent: 'flex-start',
+                      paddingTop: 2,
+                      backgroundColor: isToday ? '#e0f2fe' : 'transparent',
+                      // borderRadius: 8,
+                      width: 40,
+                      height: 50,
+                    }}>
+                      <Text style={{
+                        fontSize: 14,
+                        color: isDisabled ? '#d1d5db' : '#000',
+                        fontWeight: isToday ? 'bold' : 'normal',
+                      }}>
+                        {date.day}
+                      </Text>
+                      {checkin && !isDisabled && (
+                        <Text style={{ fontSize: 20, marginTop: -2, lineHeight: 24 }}>
+                          {MOOD_EMOJIS[checkin.mood as keyof typeof MOOD_EMOJIS]}
+                        </Text>
+                      )}
+                    </View>
+                  );
+                }}
+              />
 
               {/* 統計情報 */}
               <VStack space="md" className="bg-background-50 rounded-lg p-4">
-                <Heading size="sm">今月の統計</Heading>
+                <HStack space="md">
+                  <Heading size="sm">全期間のチェックイン回数 </Heading>
+                  <Text className="text-typography-600">
+                    {totalAllCheckins}回
+                  </Text>
+                </HStack>
+
+                <Heading size="sm">
+                  {currentMonth.getFullYear()}年{currentMonth.getMonth() + 1}月の統計
+                </Heading>
                 <Text>チェックイン回数: {stats.totalCheckins}回</Text>
 
                 {Object.keys(stats.moodCounts).length > 0 && (
