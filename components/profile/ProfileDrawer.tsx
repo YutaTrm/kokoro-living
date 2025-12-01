@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { LogOut, MessageCircleOff, Moon, ShieldBan, Sun, UserX, X } from 'lucide-react-native';
+import { History, LogOut, MessageCircleOff, Moon, ShieldBan, Sun, UserX, X } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, Pressable } from 'react-native';
 
@@ -44,6 +44,11 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
   const handleMuteList = () => {
     onClose();
     router.push('/(tabs)/(profile)/mutes');
+  };
+
+  const handleMoodHistory = () => {
+    onClose();
+    router.push('/(tabs)/(profile)/mood-history');
   };
 
   const handleOpenLink = async (url: string) => {
@@ -122,6 +127,19 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
                 <HStack space="md" className="items-center">
                   <Icon as={MessageCircleOff} size="md" className="text-typography-700" />
                   <Text className="text-lg -ml-2">ミュートリスト</Text>
+                </HStack>
+              </Pressable>
+
+              <Divider className="my-2" />
+
+              {/* その他 */}
+              <Text className="text-sm text-typography-500 mb-2">記録</Text>
+
+              {/* 気分チェックイン履歴 */}
+              <Pressable onPress={handleMoodHistory}>
+                <HStack space="md" className="items-center">
+                  <Icon as={History} size="md" className="text-typography-700" />
+                  <Text className="text-lg -ml-2">チェックイン履歴</Text>
                 </HStack>
               </Pressable>
 

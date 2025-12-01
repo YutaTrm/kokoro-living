@@ -8,12 +8,16 @@ import { Alert, FlatList, Pressable, RefreshControl } from 'react-native';
 import CreateListModal from '@/components/home/CreateListModal';
 import EditListModal from '@/components/home/EditListModal';
 import HomeDrawer from '@/components/home/HomeDrawer';
+import { MoodCheckinModal } from '@/components/MoodCheckinModal';
 import PostItem from '@/components/PostItem';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonIcon } from '@/components/ui/button';
+import { HStack } from '@/components/ui/hstack';
 import { AddIcon, Icon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
+import { VStack } from '@/components/ui/vstack';
+import { MOOD_EMOJIS, MOOD_LABELS, useMoodCheckin } from '@/src/hooks/useMoodCheckin';
 import { supabase } from '@/src/lib/supabase';
 
 const SELECTED_LIST_KEY = 'selected_list_id';
@@ -54,6 +58,11 @@ export default function TabOneScreen() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingList, setEditingList] = useState<List | null>(null);
+
+  // 気分チェックイン機能
+  const { todayCheckin, stats, submitting, submitCheckin, hasCheckedIn } = useMoodCheckin();
+  const [isMoodModalOpen, setIsMoodModalOpen] = useState(false);
+  const [isMoodCardExpanded, setIsMoodCardExpanded] = useState(false);
 
   // ヘッダーにドロワーアイコンを設定
   useLayoutEffect(() => {
@@ -103,6 +112,17 @@ export default function TabOneScreen() {
       loadPosts();
     }
   }, [selectedListId]);
+
+  // 起動時に気分チェックインモーダルを表示（未チェックインかつログイン済みの場合）
+  useEffect(() => {
+    if (!loading && isLoggedIn && !hasCheckedIn) {
+      // 少し遅延させてからモーダルを表示（UX改善）
+      const timer = setTimeout(() => {
+        setIsMoodModalOpen(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, isLoggedIn, hasCheckedIn]);
 
   useEffect(() => {
     checkLoginStatus();
@@ -464,6 +484,10 @@ export default function TabOneScreen() {
     setIsDrawerOpen(true);
   };
 
+  const handleMoodSubmit = async (mood: number) => {
+    await submitCheckin(mood);
+  };
+
   if (loading) {
     return (
       <Box className="flex-1 items-center justify-center">
@@ -485,10 +509,54 @@ export default function TabOneScreen() {
         }
         ListEmptyComponent={renderEmptyComponent}
       />
+      {/* 気分チェックイン - 展開可能カード */}
+      {isLoggedIn && hasCheckedIn && todayCheckin && (
+        <Pressable
+          onPress={() => setIsMoodCardExpanded(!isMoodCardExpanded)}
+          className="absolute bottom-5 left-5 bg-background-0 rounded-2xl shadow-lg border border-outline-200"
+          style={{
+            padding: 12,
+            maxWidth: isMoodCardExpanded ? 240 : 160,
+            zIndex: 10,
+          }}
+        >
+          {!isMoodCardExpanded ? (
+            // 縮小時：コンパクト表示
+            <HStack space="sm" className="items-center">
+              <Text className="text-2xl">{MOOD_EMOJIS[todayCheckin.mood as keyof typeof MOOD_EMOJIS]}</Text>
+              <Text className="text-sm text-typography-600">同じ気分 {stats.sameMoodCount}人</Text>
+            </HStack>
+          ) : (
+            // 展開時：全気分の統計
+            <VStack space="sm" className='w-[40vw]'>
+              <Text className="text-xs text-typography-500 font-semibold">今日の気分</Text>
+              <Text className="text-xs text-typography-500 mb-1">チェックイン: {stats.totalCheckins}人</Text>
+              {[5, 4, 3, 2, 1].map((mood) => {
+                const count = stats.moodCounts[mood] || 0;
+                const isCurrent = mood === todayCheckin.mood;
+                return (
+                  <HStack
+                    key={mood}
+                    space="sm"
+                    className="items-center"
+                  >
+                    <Text className="text-xl">{MOOD_EMOJIS[mood as keyof typeof MOOD_EMOJIS]}</Text>
+                    <Text className={`text-xs flex-1 text-typography-600 ${isCurrent ? 'text-bold text-secondary-500' : ''}`}>
+                      {MOOD_LABELS[mood as keyof typeof MOOD_LABELS]}
+                    </Text>
+                    <Text className="text-xs text-typography-500">{count}人</Text>
+                  </HStack>
+                );
+              })}
+            </VStack>
+          )}
+        </Pressable>
+      )}
+
       {/* 投稿ボタンはログイン時のみ表示 */}
       {isLoggedIn && (
         <Button
-          className="absolute right-5 bottom-5 rounded-full h-16 w-16 bg-primary-400"
+          className="absolute right-5 bottom-5 rounded-full shadow-lg h-16 w-16 bg-primary-400"
           variant="solid"
           size="md"
           onPress={() => router.push('/create-post')}
@@ -520,6 +588,14 @@ export default function TabOneScreen() {
         onClose={() => setIsEditModalOpen(false)}
         onUpdated={handleListUpdated}
         list={editingList}
+      />
+
+      {/* 気分チェックインモーダル */}
+      <MoodCheckinModal
+        visible={isMoodModalOpen}
+        onClose={() => setIsMoodModalOpen(false)}
+        onSubmit={handleMoodSubmit}
+        submitting={submitting}
       />
     </Box>
   );
