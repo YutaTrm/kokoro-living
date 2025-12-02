@@ -26,6 +26,7 @@ interface Post {
   id: string;
   content: string;
   created_at: string;
+  experienced_at?: string | null;
   is_hidden?: boolean;
   user: {
     display_name: string;
@@ -35,6 +36,10 @@ interface Post {
   diagnoses: string[];
   treatments: string[];
   medications: string[];
+  repliesCount?: number;
+  likesCount?: number;
+  isLikedByCurrentUser?: boolean;
+  hasRepliedByCurrentUser?: boolean;
 }
 
 interface List {
@@ -180,7 +185,7 @@ export default function TabOneScreen() {
           // リストメンバーの投稿を取得（非表示を除外）
           const { data: listPosts, error: listError } = await supabase
             .from('posts')
-            .select('id, content, created_at, user_id, is_hidden')
+            .select('id, content, created_at, experienced_at, user_id, is_hidden')
             .in('user_id', listMemberIds)
             .is('parent_post_id', null)
             .eq('is_hidden', false)
@@ -203,7 +208,7 @@ export default function TabOneScreen() {
           // 自分の投稿（非表示を含む）
           const { data: myPosts } = await supabase
             .from('posts')
-            .select('id, content, created_at, user_id, is_hidden')
+            .select('id, content, created_at, experienced_at, user_id, is_hidden')
             .eq('user_id', user.id)
             .is('parent_post_id', null)
             .order('created_at', { ascending: false })
@@ -212,7 +217,7 @@ export default function TabOneScreen() {
           // フォローしている人の投稿（非表示を除外）
           const { data: followingPosts, error: followingError } = await supabase
             .from('posts')
-            .select('id, content, created_at, user_id, is_hidden')
+            .select('id, content, created_at, experienced_at, user_id, is_hidden')
             .in('user_id', followingIds)
             .is('parent_post_id', null)
             .eq('is_hidden', false)
@@ -234,7 +239,7 @@ export default function TabOneScreen() {
         // 未ログイン: すべての投稿を取得（非表示を除外）
         const result = await supabase
           .from('posts')
-          .select('id, content, created_at, user_id, is_hidden')
+          .select('id, content, created_at, experienced_at, user_id, is_hidden')
           .is('parent_post_id', null)
           .eq('is_hidden', false)
           .order('created_at', { ascending: false })
@@ -324,10 +329,63 @@ export default function TabOneScreen() {
         }
       });
 
+      // 返信数を取得
+      const { data: repliesData } = await supabase
+        .from('posts')
+        .select('parent_post_id')
+        .in('parent_post_id', postIds);
+
+      const repliesMap = new Map<string, number>();
+      repliesData?.forEach((r: any) => {
+        const count = repliesMap.get(r.parent_post_id) || 0;
+        repliesMap.set(r.parent_post_id, count + 1);
+      });
+
+      // いいね数を取得
+      const { data: likesData } = await supabase
+        .from('likes')
+        .select('post_id')
+        .in('post_id', postIds);
+
+      const likesMap = new Map<string, number>();
+      likesData?.forEach((l: any) => {
+        const count = likesMap.get(l.post_id) || 0;
+        likesMap.set(l.post_id, count + 1);
+      });
+
+      // 自分がいいね・返信しているかどうかを取得
+      const myLikesMap = new Map<string, boolean>();
+      const myRepliesMap = new Map<string, boolean>();
+
+      if (user) {
+        // 自分のいいねを取得
+        const { data: myLikesData } = await supabase
+          .from('likes')
+          .select('post_id')
+          .eq('user_id', user.id)
+          .in('post_id', postIds);
+
+        myLikesData?.forEach((l: any) => {
+          myLikesMap.set(l.post_id, true);
+        });
+
+        // 自分の返信を取得
+        const { data: myRepliesData } = await supabase
+          .from('posts')
+          .select('parent_post_id')
+          .eq('user_id', user.id)
+          .in('parent_post_id', postIds);
+
+        myRepliesData?.forEach((r: any) => {
+          myRepliesMap.set(r.parent_post_id, true);
+        });
+      }
+
       const formattedPosts: Post[] = postsData.map((post: any) => ({
         id: post.id,
         content: post.content,
         created_at: post.created_at,
+        experienced_at: post.experienced_at || null,
         is_hidden: post.is_hidden || false,
         user: {
           display_name: usersMap.get(post.user_id)?.display_name || 'Unknown',
@@ -337,6 +395,10 @@ export default function TabOneScreen() {
         diagnoses: diagnosesMap.get(post.id) || [],
         treatments: treatmentsMap.get(post.id) || [],
         medications: medicationsMap.get(post.id) || [],
+        repliesCount: repliesMap.get(post.id) || 0,
+        likesCount: likesMap.get(post.id) || 0,
+        isLikedByCurrentUser: myLikesMap.get(post.id) || false,
+        hasRepliedByCurrentUser: myRepliesMap.get(post.id) || false,
       }));
 
       setPosts(formattedPosts);

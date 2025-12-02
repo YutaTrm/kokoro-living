@@ -1,5 +1,5 @@
 import { useRouter, useSegments } from 'expo-router';
-import { Flag } from 'lucide-react-native';
+import { Clock, Flag, Heart, MessageCircle } from 'lucide-react-native';
 import { Pressable, ScrollView } from 'react-native';
 
 import DefaultAvatar from '@/components/icons/DefaultAvatar';
@@ -12,7 +12,7 @@ import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
 import { useCurrentUser } from '@/src/hooks/useCurrentUser';
-import { formatRelativeDate } from '@/src/utils/dateUtils';
+import { formatExperiencedAt, formatRelativeDate } from '@/src/utils/dateUtils';
 import { getCurrentTab } from '@/src/utils/getCurrentTab';
 
 interface PostItemProps {
@@ -20,6 +20,7 @@ interface PostItemProps {
     id: string;
     content: string;
     created_at: string;
+    experienced_at?: string | null;
     parent_post_id?: string | null;
     parentContent?: string;
     is_hidden?: boolean;
@@ -32,6 +33,10 @@ interface PostItemProps {
     treatments: string[];
     medications: string[];
     isMuted?: boolean;
+    repliesCount?: number;
+    likesCount?: number;
+    isLikedByCurrentUser?: boolean;
+    hasRepliedByCurrentUser?: boolean;
   };
   disableAvatarTap?: boolean;
 }
@@ -131,6 +136,50 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
             <Text className="text-lg leading-5" numberOfLines={3} ellipsizeMode="tail">
               {post.content}
             </Text>
+
+            {/* 体験日とアクションボタン（横並び） */}
+            <HStack className="items-center justify-between">
+              {/* 体験日（左側） */}
+              {post.experienced_at ? (
+                <HStack space="xs" className="items-center">
+                  <Icon as={Clock} size="sm" className="text-typography-500" />
+                  <Text className="text-sm text-typography-500">{formatExperiencedAt(post.experienced_at)}</Text>
+                </HStack>
+              ) : (
+                <Box />
+              )}
+
+              {/* アクションボタン（右側） */}
+              <HStack space="lg" className="items-center">
+                {/* 返信数 */}
+                <HStack space="xs" className="items-center">
+                  <Icon
+                    as={MessageCircle}
+                    size="sm"
+                    className={post.hasRepliedByCurrentUser ? "text-primary-500" : "text-typography-500"}
+                  />
+                  {(post.repliesCount ?? 0) > 0 && (
+                    <Text className={`text-sm ${post.hasRepliedByCurrentUser ? "text-primary-500" : "text-typography-500"}`}>
+                      {post.repliesCount}
+                    </Text>
+                  )}
+                </HStack>
+
+                {/* いいね数 */}
+                <HStack space="xs" className="items-center">
+                  <Icon
+                    as={Heart}
+                    size="sm"
+                    className={post.isLikedByCurrentUser ? "text-secondary-400 fill-secondary-400" : "text-typography-500"}
+                  />
+                  {(post.likesCount ?? 0) > 0 && (
+                    <Text className={`text-sm ${post.isLikedByCurrentUser ? "text-secondary-400" : "text-typography-500"}`}>
+                      {post.likesCount}
+                    </Text>
+                  )}
+                </HStack>
+              </HStack>
+            </HStack>
 
             {/* 非表示警告バナー（自分の投稿のみ） */}
             {post.is_hidden && currentUserId === post.user.user_id && (
