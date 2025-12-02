@@ -18,6 +18,7 @@ import { Menu, MenuItem, MenuItemLabel } from '@/components/ui/menu';
 import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
+import { useMasterData } from '@/src/contexts/MasterDataContext';
 import { useBlock } from '@/src/hooks/useBlock';
 import { useFollow } from '@/src/hooks/useFollow';
 import { useMute } from '@/src/hooks/useMute';
@@ -59,6 +60,7 @@ export default function UserDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const segments = useSegments();
+  const { data: masterData } = useMasterData();
   const { isFollowing, isLoading: followLoading, toggleFollow, counts, isOwnProfile, currentUserId } = useFollow(id ?? null);
   const { isBlocked, isLoading: blockLoading, toggleBlock } = useBlock(id ?? null);
   const { isMuted, isLoading: muteLoading, toggleMute } = useMute(id ?? null);
@@ -160,21 +162,17 @@ export default function UserDetailScreen() {
         .select('id, ingredient_id, ingredients(id, name, display_flag, display_order), products(name), start_date, end_date')
         .eq('user_id', id);
 
-      const { data: allProducts } = await supabase.from('products').select('ingredient_id, name');
-
       if (medicationsData) {
         const productsByIngredient = new Map<string, string[]>();
-        if (allProducts) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          allProducts.forEach((p: any) => {
-            const existing = productsByIngredient.get(p.ingredient_id);
-            if (existing) {
-              existing.push(p.name);
-            } else {
-              productsByIngredient.set(p.ingredient_id, [p.name]);
-            }
-          });
-        }
+        // マスターデータからproductsを取得（キャッシュ利用）
+        masterData.products.forEach((p) => {
+          const existing = productsByIngredient.get(p.ingredient_id);
+          if (existing) {
+            existing.push(p.name);
+          } else {
+            productsByIngredient.set(p.ingredient_id, [p.name]);
+          }
+        });
 
         const ingredientMap = new Map<
           string,

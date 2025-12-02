@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 
 import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
+import { MasterDataProvider } from '@/src/contexts/MasterDataContext';
 import { ThemeProvider, useTheme } from '@/src/contexts/ThemeContext';
 import { supabase } from '@/src/lib/supabase';
 import '@/global.css';
@@ -54,7 +55,9 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider>
-      <RootLayoutNav />
+      <MasterDataProvider>
+        <RootLayoutNav />
+      </MasterDataProvider>
     </ThemeProvider>
   );
 }

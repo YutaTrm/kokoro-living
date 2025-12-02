@@ -20,6 +20,7 @@ import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
+import { useMasterData } from '@/src/contexts/MasterDataContext';
 import { useFollow } from '@/src/hooks/useFollow';
 import { useMedicationMasters } from '@/src/hooks/useMedicationMasters';
 import { usePostsData } from '@/src/hooks/usePostsData';
@@ -79,6 +80,7 @@ interface MasterData {
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { data: masterData } = useMasterData();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('profile');
@@ -196,38 +198,27 @@ export default function ProfileScreen() {
     }
   }, [activeTab]);
 
-  const loadMasterData = async () => {
+  const loadMasterData = () => {
     try {
-      // 診断名マスター（display_flag=trueのみ、display_order順）
-      const { data: diagData } = await supabase
-        .from('diagnoses')
-        .select('id, name')
-        .eq('display_flag', true)
-        .order('display_order', { ascending: true });
-      if (diagData) setDiagnosisMasters(diagData);
+      // 診断名マスター（display_flag=falseを除外、display_order順）
+      const diagData = masterData.diagnoses
+        .filter((d) => d.display_flag !== false)
+        .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
+      setDiagnosisMasters(diagData.map((d) => ({ id: d.id, name: d.name })));
 
       // 服薬マスターはuseMedicationMastersフックで取得
 
-      // 治療法マスター（display_flag=trueのみ、display_order順）
-      const { data: treatData } = await supabase
-        .from('treatments')
-        .select('id, name')
-        .eq('display_flag', true)
-        .order('display_order', { ascending: true });
-      if (treatData) setTreatmentMasters(treatData);
+      // 治療法マスター（display_flag=falseを除外、display_order順）
+      const treatData = masterData.treatments
+        .filter((t) => t.display_flag !== false)
+        .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
+      setTreatmentMasters(treatData.map((t) => ({ id: t.id, name: t.name })));
 
       // ステータスマスター（display_order > 0のみ、display_order順）
-      const { data: statusData, error: statusError } = await supabase
-        .from('statuses')
-        .select('id, name')
-        .gt('display_order', 0)
-        .order('display_order', { ascending: true });
-
-      if (statusError) {
-        console.error('ステータス読み込みエラー:', statusError);
-      }
-
-      if (statusData) setStatusMasters(statusData);
+      const statusData = masterData.statuses
+        .filter((s) => (s.display_order ?? 0) > 0)
+        .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
+      setStatusMasters(statusData.map((s) => ({ id: s.id, name: s.name })));
     } catch (error) {
       console.error('マスターデータ読み込みエラー:', error);
     }

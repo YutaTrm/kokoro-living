@@ -13,6 +13,7 @@ import { CheckIcon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
+import { useMasterData } from '@/src/contexts/MasterDataContext';
 import { supabase } from '@/src/lib/supabase';
 import { checkNGWords } from '@/src/utils/ngWordFilter';
 
@@ -29,6 +30,7 @@ const SELECTED_TAGS_KEY = 'last_selected_tags';
 export default function CreatePostScreen() {
   const router = useRouter();
   const { postId } = useLocalSearchParams<{ postId?: string }>();
+  const { data: masterData } = useMasterData();
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingTags, setLoadingTags] = useState(true);
@@ -129,24 +131,17 @@ export default function CreatePostScreen() {
         .select('id, ingredient_id, ingredients(name), products(name)')
         .eq('user_id', user.id);
 
-      // 全製品マスターを取得（成分IDごとの製品名リスト用）
-      const { data: allProducts } = await supabase
-        .from('products')
-        .select('ingredient_id, name');
-
       if (medications) {
-        // 成分IDごとの製品名をマップ化
+        // 成分IDごとの製品名をマップ化（マスターデータから取得、キャッシュ利用）
         const productsByIngredient = new Map<string, string[]>();
-        if (allProducts) {
-          allProducts.forEach((p: { ingredient_id: string; name: string }) => {
-            const existing = productsByIngredient.get(p.ingredient_id);
-            if (existing) {
-              existing.push(p.name);
-            } else {
-              productsByIngredient.set(p.ingredient_id, [p.name]);
-            }
-          });
-        }
+        masterData.products.forEach((p) => {
+          const existing = productsByIngredient.get(p.ingredient_id);
+          if (existing) {
+            existing.push(p.name);
+          } else {
+            productsByIngredient.set(p.ingredient_id, [p.name]);
+          }
+        });
 
         // 成分IDでグループ化
         const ingredientMap = new Map<string, {

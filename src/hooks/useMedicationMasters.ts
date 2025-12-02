@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { supabase } from '@/src/lib/supabase';
+import { useMasterData } from '@/src/contexts/MasterDataContext';
 
 export interface MedicationMaster {
   id: string;
@@ -13,53 +13,53 @@ export interface MedicationMaster {
  * 成分リスト（name昇順）+ 製品リスト（name昇順）の順で返す
  */
 export function useMedicationMasters() {
+  const { data: masterData, loading: masterLoading } = useMasterData();
   const [medications, setMedications] = useState<MedicationMaster[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadMedicationMasters();
-  }, []);
+    if (!masterLoading) {
+      loadMedicationMasters();
+    }
+  }, [masterLoading, masterData]);
 
-  const loadMedicationMasters = async () => {
+  const loadMedicationMasters = () => {
     setLoading(true);
     try {
       const medicationList: MedicationMaster[] = [];
 
-      // 成分リスト（display_flag=true、name昇順）
-      const { data: ingredientData } = await supabase
-        .from('ingredients')
-        .select('id, name')
-        .eq('display_flag', true)
-        .order('name', { ascending: true });
+      // 成分リスト（display_flag=falseを除外、name昇順）
+      const filteredIngredients = masterData.ingredients
+        .filter((i) => i.display_flag !== false)
+        .sort((a, b) => a.name.localeCompare(b.name));
 
-      if (ingredientData) {
-        ingredientData.forEach((i: { id: string; name: string }) => {
-          medicationList.push({
-            id: `ingredient-${i.id}`,
-            name: i.name,
-            ingredientId: i.id,
-          });
+      filteredIngredients.forEach((i) => {
+        medicationList.push({
+          id: `ingredient-${i.id}`,
+          name: i.name,
+          ingredientId: i.id,
         });
-      }
+      });
 
       // 製品リスト（name昇順）
-      const { data: prodData } = await supabase
-        .from('products')
-        .select('id, name, ingredient_id, ingredients(id, name)')
-        .order('name', { ascending: true });
+      // display_flag=falseの成分に紐づく製品も除外
+      const sortedProducts = [...masterData.products]
+        .filter((p) => {
+          const ingredient = masterData.ingredients.find((i) => i.id === p.ingredient_id);
+          return ingredient && ingredient.display_flag !== false;
+        })
+        .sort((a, b) => a.name.localeCompare(b.name));
 
-      if (prodData) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        prodData.forEach((p: any) => {
-          if (p.ingredients) {
-            medicationList.push({
-              id: `product-${p.id}`,
-              name: `${p.name}(${p.ingredients.name})`,
-              ingredientId: p.ingredient_id,
-            });
-          }
-        });
-      }
+      sortedProducts.forEach((p) => {
+        const ingredient = masterData.ingredients.find((i) => i.id === p.ingredient_id);
+        if (ingredient) {
+          medicationList.push({
+            id: `product-${p.id}`,
+            name: `${p.name}(${ingredient.name})`,
+            ingredientId: p.ingredient_id,
+          });
+        }
+      });
 
       setMedications(medicationList);
     } catch (error) {

@@ -26,6 +26,7 @@ import {
 import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
 import UserListItem from '@/components/UserListItem';
+import { useMasterData } from '@/src/contexts/MasterDataContext';
 import { useMedicationMasters } from '@/src/hooks/useMedicationMasters';
 import { supabase } from '@/src/lib/supabase';
 
@@ -66,6 +67,7 @@ type SortOption = 'created_at' | 'updated_at' | 'experienced_at';
 const SEARCH_TAGS_KEY = 'search_selected_tags';
 
 export default function SearchScreen() {
+  const { data: masterData } = useMasterData();
   const [searchTab, setSearchTab] = useState<SearchTab>('users');
   const [searchQuery, setSearchQuery] = useState('');
   const [posts, setPosts] = useState<Post[]>([]);
@@ -122,22 +124,18 @@ export default function SearchScreen() {
     try {
       const tags: TagOption[] = [];
 
-      // 診断名を取得（display_flag = true のみ、display_order順）
-      const { data: diagnoses } = await supabase
-        .from('diagnoses')
-        .select('id, name')
-        .eq('display_flag', true)
-        .order('display_order', { ascending: true });
+      // 診断名を取得（display_flag=falseを除外、display_order順）
+      const diagnoses = masterData.diagnoses
+        .filter((d) => d.display_flag !== false)
+        .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
 
-      if (diagnoses) {
-        diagnoses.forEach((d) => {
-          tags.push({
-            id: `diagnosis-${d.id}`,
-            name: d.name,
-            type: 'diagnosis',
-          });
+      diagnoses.forEach((d) => {
+        tags.push({
+          id: `diagnosis-${d.id}`,
+          name: d.name,
+          type: 'diagnosis',
         });
-      }
+      });
 
       // 服薬（useMedicationMastersフックから取得）
       medicationMasters.forEach((med) => {
@@ -148,39 +146,31 @@ export default function SearchScreen() {
         });
       });
 
-      // 治療法を取得（display_flag = true のみ、display_order順）
-      const { data: treatments } = await supabase
-        .from('treatments')
-        .select('id, name')
-        .eq('display_flag', true)
-        .order('display_order', { ascending: true });
+      // 治療法を取得（display_flag=falseを除外、display_order順）
+      const treatments = masterData.treatments
+        .filter((t) => t.display_flag !== false)
+        .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
 
-      if (treatments) {
-        treatments.forEach((t) => {
-          tags.push({
-            id: `treatment-${t.id}`,
-            name: t.name,
-            type: 'treatment',
-          });
+      treatments.forEach((t) => {
+        tags.push({
+          id: `treatment-${t.id}`,
+          name: t.name,
+          type: 'treatment',
         });
-      }
+      });
 
-      // ステータスを取得（display_flag = true のみ、display_order順）
-      const { data: statuses } = await supabase
-        .from('statuses')
-        .select('id, name')
-        .eq('display_flag', true)
-        .order('display_order', { ascending: true });
+      // ステータスを取得（display_flag=falseを除外、display_order順）
+      const statuses = masterData.statuses
+        .filter((s) => s.display_flag !== false)
+        .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
 
-      if (statuses) {
-        statuses.forEach((s) => {
-          tags.push({
-            id: `status-${s.id}`,
-            name: s.name,
-            type: 'status',
-          });
+      statuses.forEach((s) => {
+        tags.push({
+          id: `status-${s.id}`,
+          name: s.name,
+          type: 'status',
         });
-      }
+      });
 
       setAvailableTags(tags);
     } catch (error) {
