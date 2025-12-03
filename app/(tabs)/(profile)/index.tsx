@@ -92,6 +92,9 @@ export default function ProfileScreen() {
   const [aiReflections, setAiReflections] = useState<any[]>([]);
   const [loadingReflections, setLoadingReflections] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [ticketCount, setTicketCount] = useState(0);
+  const [hasFreeQuota, setHasFreeQuota] = useState(false);
+  const [loadingTicketInfo, setLoadingTicketInfo] = useState(false);
 
   const [diagnoses, setDiagnoses] = useState<MedicalRecord[]>([]);
   const [medications, setMedications] = useState<MedicalRecord[]>([]);
@@ -224,13 +227,50 @@ export default function ProfileScreen() {
     }
   }, []);
 
+  // チケット情報を取得
+  const loadTicketInfo = useCallback(async () => {
+    setLoadingTicketInfo(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // チケット数を取得
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('ai_reflection_tickets')
+        .eq('user_id', user.id)
+        .single();
+
+      if (userError) throw userError;
+
+      setTicketCount(userData?.ai_reflection_tickets || 0);
+
+      // 無料枠をチェック
+      const { data: hasFreeQuotaData, error: quotaError } = await supabase.rpc(
+        'check_free_reflection_quota',
+        { p_user_id: user.id }
+      );
+
+      if (quotaError) {
+        console.error('無料枠チェックエラー:', quotaError);
+      }
+
+      setHasFreeQuota(hasFreeQuotaData || false);
+    } catch (error) {
+      console.error('チケット情報取得エラー:', error);
+    } finally {
+      setLoadingTicketInfo(false);
+    }
+  }, []);
+
   // AI振り返りタブにフォーカスが当たった時にリロード
   useFocusEffect(
     useCallback(() => {
       if (activeTab === 'ai-reflection') {
         loadAiReflections();
+        loadTicketInfo();
       }
-    }, [activeTab, loadAiReflections])
+    }, [activeTab, loadAiReflections, loadTicketInfo])
   );
 
   // AI振り返りを生成
@@ -283,6 +323,7 @@ export default function ProfileScreen() {
 
       // 成功
       await loadAiReflections();
+      await loadTicketInfo();
       Alert.alert('成功', 'AI振り返りが生成されました！');
     } catch (error: any) {
       console.error('生成エラー:', error);
@@ -1047,7 +1088,7 @@ export default function ProfileScreen() {
             {/* 説明 */}
             <Card className="p-4 bg-info-50">
               <VStack space="sm">
-                <Heading size="sm">AI振り返りについて</Heading>
+                <Heading size="md">AI振り返りについて</Heading>
                 <Text className="text-sm text-typography-600">
                   投稿、返信、チェックイン等を元にAIが振り返りを生成します。
                 </Text>
@@ -1063,25 +1104,71 @@ export default function ProfileScreen() {
               </VStack>
             </Card>
 
-            {/* 生成ボタン */}
-            <Button
-              onPress={handleGenerateReflection}
-              isDisabled={generating}
-              size="lg"
-              className="w-full"
-            >
-              {generating ? (
-                <>
-                  <ButtonSpinner />
-                  <ButtonText>生成中...</ButtonText>
-                </>
-              ) : (
-                <>
-                  <ButtonIcon as={Sparkles} />
-                  <ButtonText>AI振り返りを生成</ButtonText>
-                </>
-              )}
-            </Button>
+            {/* チケット情報 */}
+            {loadingTicketInfo ? (
+              <Box className="py-4 items-center">
+                <Spinner />
+              </Box>
+            ) : (
+              <Card className="p-4 bg-background-50">
+                <VStack space="sm">
+                  <Heading size="sm">利用可能回数</Heading>
+                  <HStack space="md" className="items-center">
+                    <VStack space="xs" className="flex-1">
+                      <Text className="text-xs text-typography-500">今月の無料枠</Text>
+                      <Text className="text-lg font-semibold">
+                        {hasFreeQuota ? '残り1回' : '使用済み'}
+                      </Text>
+                    </VStack>
+                    <VStack space="xs" className="flex-1">
+                      <Text className="text-xs text-typography-500">チケット残数</Text>
+                      <Text className="text-lg font-semibold">
+                        {ticketCount}回
+                      </Text>
+                    </VStack>
+                  </HStack>
+                </VStack>
+              </Card>
+            )}
+
+            {/* 生成ボタン or 購入ボタン */}
+            {hasFreeQuota || ticketCount > 0 ? (
+              <Button
+                onPress={handleGenerateReflection}
+                isDisabled={generating}
+                size="lg"
+                className="w-full"
+              >
+                {generating ? (
+                  <>
+                    <ButtonSpinner />
+                    <ButtonText>生成中...</ButtonText>
+                  </>
+                ) : (
+                  <>
+                    <ButtonIcon as={Sparkles} />
+                    <ButtonText>AI振り返りを生成</ButtonText>
+                  </>
+                )}
+              </Button>
+            ) : (
+              <VStack space="md">
+                <Card className="p-4 bg-warning-50">
+                  <Text className="text-sm text-center text-typography-700">
+                    今月の無料枠とチケットを使い切りました。{'\n'}
+                    チケットを購入すると振り返りを生成できます。
+                  </Text>
+                </Card>
+                <Button
+                  onPress={() => Alert.alert('準備中', 'アプリ内課金機能は準備中です')}
+                  size="lg"
+                  className="w-full"
+                  variant="solid"
+                >
+                  <ButtonText>2回分を100円で購入</ButtonText>
+                </Button>
+              </VStack>
+            )}
 
             {/* 振り返り一覧 */}
             {loadingReflections ? (
@@ -1098,9 +1185,6 @@ export default function ProfileScreen() {
                         {new Date(aiReflections[0].created_at).toLocaleString('ja-JP')}
                       </Text>
                       <Text className="text-base leading-6">{aiReflections[0].content}</Text>
-                      <Text className="text-xs text-typography-400">
-                        使用トークン: {aiReflections[0].tokens_used}
-                      </Text>
                     </VStack>
                   </Card>
                 </VStack>
@@ -1137,9 +1221,6 @@ export default function ProfileScreen() {
                 <VStack space="sm" className="items-center">
                   <Text className="text-center text-typography-500">
                     まだ振り返りがありません
-                  </Text>
-                  <Text className="text-center text-sm text-typography-400">
-                    「AI振り返りを生成」ボタンで作成できます
                   </Text>
                 </VStack>
               </Card>

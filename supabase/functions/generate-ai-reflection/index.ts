@@ -118,6 +118,51 @@ serve(async (req) => {
       );
     }
 
+    // チケットチェック：無料枠またはチケットが必要
+    // 1. 今月の無料枠をチェック
+    const { data: hasFreeQuota, error: quotaError } = await supabase.rpc(
+      'check_free_reflection_quota',
+      { p_user_id: userId }
+    );
+
+    if (quotaError) {
+      console.error('無料枠チェックエラー:', quotaError);
+    }
+
+    let useFree = false;
+
+    if (hasFreeQuota) {
+      // 無料枠がある
+      useFree = true;
+    } else {
+      // 無料枠がない → チケットをチェック
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('ai_reflection_tickets')
+        .eq('user_id', userId)
+        .single();
+
+      if (userError) throw userError;
+
+      const ticketCount = userData?.ai_reflection_tickets || 0;
+
+      if (ticketCount < 1) {
+        // チケットも無い
+        return new Response(
+          JSON.stringify({
+            error: 'チケットが不足しています。購入してください。'
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      // チケットがある
+      useFree = false;
+    }
+
     // ユーザーの医療情報を取得
     // 診断名
     const { data: userDiagnoses } = await supabase
@@ -275,13 +320,27 @@ ${checkinsText}
     const reflectionText = claudeData.content[0].text;
     const tokensUsed = claudeData.usage.input_tokens + claudeData.usage.output_tokens;
 
-    // 5. Supabaseに保存
+    // 5. チケット消費（無料でない場合）
+    if (!useFree) {
+      const { error: consumeError } = await supabase.rpc(
+        'consume_ai_reflection_ticket',
+        { p_user_id: userId }
+      );
+
+      if (consumeError) {
+        console.error('チケット消費エラー:', consumeError);
+        throw new Error('チケット消費に失敗しました');
+      }
+    }
+
+    // 6. Supabaseに保存
     const { data: savedReflection, error: saveError } = await supabase
       .from('ai_reflections')
       .insert({
         user_id: userId,
         content: reflectionText,
         tokens_used: tokensUsed,
+        is_free: useFree,
       })
       .select()
       .single();

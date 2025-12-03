@@ -109,16 +109,11 @@ export default function AIReflectionDetailScreen() {
             </VStack>
           </Card>
 
-          {/* メタ情報 */}
+          {/* 注意書き */}
           <Card className="p-4 bg-background-50">
-            <VStack space="sm">
-              <Text className="text-xs text-typography-500">
-                使用トークン: {reflection.tokens_used}
-              </Text>
-              <Text className="text-xs text-typography-400">
-                ※ AIによる分析のため、生成結果が正確でない場合があります。
-              </Text>
-            </VStack>
+            <Text className="text-xs text-typography-400">
+              ※ AIによる分析のため、生成結果が正確でない場合があります。
+            </Text>
           </Card>
         </VStack>
       </ScrollView>
