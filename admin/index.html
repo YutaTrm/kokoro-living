@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>こころのリビング 管理画面</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-100">
+    <!-- ヘッダー -->
+    <nav class="bg-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <h1 class="text-xl font-bold text-gray-800">こころのリビング 管理画面</h1>
+                </div>
+                <div class="flex items-center">
+                    <span id="adminEmail" class="text-sm text-gray-600 mr-4"></span>
+                    <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded">
+                        ログアウト
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ログイン画面 -->
+    <div id="loginSection" class="hidden max-w-md mx-auto mt-20 bg-white p-8 rounded-lg shadow-md">
+        <h2 class="text-2xl font-bold mb-6 text-center">管理者ログイン</h2>
+        <div class="space-y-4">
+            <input type="email" id="loginEmail" placeholder="メールアドレス"
+                   class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <input type="password" id="loginPassword" placeholder="パスワード"
+                   class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <button onclick="login()"
+                    class="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-md font-semibold">
+                ログイン
+            </button>
+            <div id="loginError" class="text-red-500 text-sm text-center hidden"></div>
+        </div>
+    </div>
+
+    <!-- メインコンテンツ -->
+    <div id="mainContent" class="hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- タブ -->
+        <div class="mb-6 border-b border-gray-200">
+            <nav class="-mb-px flex space-x-8">
+                <button onclick="showTab('reports')"
+                        class="tab-button border-b-2 border-blue-500 py-4 px-1 text-blue-600 font-medium">
+                    通報一覧
+                </button>
+                <button onclick="showTab('posts')"
+                        class="tab-button border-b-2 border-transparent py-4 px-1 text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium">
+                    投稿一覧
+                </button>
+                <button onclick="showTab('users')"
+                        class="tab-button border-b-2 border-transparent py-4 px-1 text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium">
+                    ユーザー一覧
+                </button>
+            </nav>
+        </div>
+
+        <!-- 通報一覧 -->
+        <div id="reportsTab" class="tab-content">
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                    <h2 class="text-lg font-semibold">通報一覧</h2>
+                    <button onclick="loadReports()" class="text-blue-500 hover:text-blue-600">
+                        🔄 更新
+                    </button>
+                </div>
+                <div id="reportsList" class="divide-y divide-gray-200">
+                    <div class="text-center py-8 text-gray-500">読み込み中...</div>
+                </div>
+                <div class="px-6 py-4 border-t border-gray-200 flex justify-between items-center">
+                    <button id="reportsPrev" onclick="prevReportsPage()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                        ← 前へ
+                    </button>
+                    <span id="reportsPageInfo" class="text-sm text-gray-600">ページ 1</span>
+                    <button id="reportsNext" onclick="nextReportsPage()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                        次へ →
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 投稿一覧 -->
+        <div id="postsTab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                    <h2 class="text-lg font-semibold">投稿一覧</h2>
+                    <div class="flex gap-2">
+                        <select id="postFilter" onchange="postsPage = 1; loadPosts()" class="border border-gray-300 rounded px-3 py-1">
+                            <option value="all">すべて</option>
+                            <option value="hidden">非表示のみ</option>
+                            <option value="visible">表示中のみ</option>
+                        </select>
+                        <button onclick="loadPosts()" class="text-blue-500 hover:text-blue-600">
+                            🔄 更新
+                        </button>
+                    </div>
+                </div>
+                <div id="postsList" class="divide-y divide-gray-200">
+                    <div class="text-center py-8 text-gray-500">読み込み中...</div>
+                </div>
+                <div class="px-6 py-4 border-t border-gray-200 flex justify-between items-center">
+                    <button id="postsPrev" onclick="prevPostsPage()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                        ← 前へ
+                    </button>
+                    <span id="postsPageInfo" class="text-sm text-gray-600">ページ 1</span>
+                    <button id="postsNext" onclick="nextPostsPage()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                        次へ →
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ユーザー一覧 -->
+        <div id="usersTab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                    <h2 class="text-lg font-semibold">ユーザー一覧</h2>
+                    <button onclick="loadUsers()" class="text-blue-500 hover:text-blue-600">
+                        🔄 更新
+                    </button>
+                </div>
+                <div id="usersList" class="divide-y divide-gray-200">
+                    <div class="text-center py-8 text-gray-500">読み込み中...</div>
+                </div>
+                <div class="px-6 py-4 border-t border-gray-200 flex justify-between items-center">
+                    <button id="usersPrev" onclick="prevUsersPage()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                        ← 前へ
+                    </button>
+                    <span id="usersPageInfo" class="text-sm text-gray-600">ページ 1</span>
+                    <button id="usersNext" onclick="nextUsersPage()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                        次へ →
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

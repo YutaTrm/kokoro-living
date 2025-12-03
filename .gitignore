@@ -38,6 +38,9 @@ apple-jwt.txt
 AuthKey_*.p8
 scripts/*.local.js
 
+# Admin panel config
+admin/config.js
+
 # typescript
 *.tsbuildinfo
 
