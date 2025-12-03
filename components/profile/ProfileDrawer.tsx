@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { History, LogOut, MessageCircleOff, Moon, ShieldBan, Sun, UserX, X } from 'lucide-react-native';
+import { Sparkles, History, LogOut, MessageCircleOff, Moon, ShieldBan, Sun, UserX, X } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, Pressable } from 'react-native';
 
@@ -49,6 +49,11 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
   const handleMoodHistory = () => {
     onClose();
     router.push('/(tabs)/(profile)/mood-history');
+  };
+
+  const handleAIReflectionTest = () => {
+    onClose();
+    router.push('/(tabs)/(profile)/ai-reflection-test');
   };
 
   const handleOpenLink = async (url: string) => {
@@ -142,6 +147,16 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
                   <Text className="text-lg -ml-2">チェックイン履歴</Text>
                 </HStack>
               </Pressable>
+
+              {/* AI振り返りテスト */}
+              {__DEV__ && (
+                <Pressable onPress={handleAIReflectionTest}>
+                  <HStack space="md" className="items-center">
+                    <Icon as={Sparkles} size="md" className="text-typography-700" />
+                    <Text className="text-lg -ml-2">AI振り返りテスト 🧪</Text>
+                  </HStack>
+                </Pressable>
+              )}
 
               <Divider className="my-2" />
 
