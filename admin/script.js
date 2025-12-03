@@ -12,6 +12,7 @@ const PAGE_SIZE = 50;
 let reportsPage = 1;
 let postsPage = 1;
 let usersPage = 1;
+let checkinsPage = 1;
 
 // ページ読み込み時の処理
 window.addEventListener('DOMContentLoaded', async () => {
@@ -118,6 +119,9 @@ function showTab(tabName) {
     } else if (tabName === 'users') {
         document.getElementById('usersTab').classList.remove('hidden');
         loadUsers();
+    } else if (tabName === 'checkins') {
+        document.getElementById('checkinsTab').classList.remove('hidden');
+        loadCheckins();
     }
 }
 
@@ -174,73 +178,85 @@ async function loadReports() {
 
         const postUsersMap = new Map(postUsers?.map(u => [u.user_id, u]) || []);
 
-        container.innerHTML = reports.map(report => {
+        const rows = reports.map(report => {
             const reporter = usersMap.get(report.reporter_id);
             const post = postsMap.get(report.post_id);
             const postUser = post ? postUsersMap.get(post.user_id) : null;
 
             return `
-            <div class="p-6 hover:bg-gray-50">
-                <div class="flex justify-between items-start mb-3">
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4">
                     <div class="flex items-center gap-2">
                         ${reporter?.avatar_url ?
                             `<img src="${reporter.avatar_url}" class="w-8 h-8 rounded-full">` :
                             '<div class="w-8 h-8 rounded-full bg-gray-300"></div>'
                         }
-                        <div>
-                            <span class="text-sm font-semibold text-gray-700">通報者:</span>
-                            <span class="text-sm text-gray-600">${reporter?.display_name || '削除済み'}</span>
-                            <span class="text-xs text-gray-400 ml-2">${new Date(report.created_at).toLocaleString('ja-JP')}</span>
-                        </div>
+                        <span class="text-sm text-gray-800">${reporter?.display_name || '削除済み'}</span>
                     </div>
-                    <span class="px-3 py-1 text-xs font-semibold rounded-full ${getReasonColor(report.reason)}">
+                </td>
+                <td class="px-6 py-4">
+                    ${post ? `
+                        <div class="flex items-center gap-2">
+                            ${postUser?.avatar_url ?
+                                `<img src="${postUser.avatar_url}" class="w-8 h-8 rounded-full">` :
+                                '<div class="w-8 h-8 rounded-full bg-gray-300"></div>'
+                            }
+                            <span class="text-sm text-gray-800">${postUser?.display_name || '削除済み'}</span>
+                        </div>
+                    ` : '<span class="text-gray-400">-</span>'}
+                </td>
+                <td class="px-6 py-4">
+                    <span class="px-2 py-1 text-xs font-semibold rounded-full ${getReasonColor(report.reason)}">
                         ${getReasonText(report.reason)}
                     </span>
-                </div>
-
-                ${post ? `
-                    <div class="mb-2 flex items-center gap-2">
-                        ${postUser?.avatar_url ?
-                            `<img src="${postUser.avatar_url}" class="w-8 h-8 rounded-full">` :
-                            '<div class="w-8 h-8 rounded-full bg-gray-300"></div>'
-                        }
-                        <div>
-                            <span class="text-sm font-semibold text-gray-700">通報対象ユーザー:</span>
-                            <span class="text-sm text-gray-600">${postUser?.display_name || '削除済み'}</span>
+                </td>
+                <td class="px-6 py-4 max-w-md">
+                    ${post ? `<p class="text-sm text-gray-600 truncate">${post.content}</p>` : '<span class="text-gray-400">-</span>'}
+                    ${report.description ? `<p class="text-xs text-gray-500 mt-1">${report.description}</p>` : ''}
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
+                    ${new Date(report.created_at).toLocaleString('ja-JP', {
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    })}
+                </td>
+                <td class="px-6 py-4">
+                    ${post ? `
+                        <div class="flex flex-col gap-1">
+                            ${!post.is_hidden ? `
+                                <button onclick="hidePost('${report.post_id}')"
+                                        class="text-xs text-red-600 hover:text-red-800 whitespace-nowrap">
+                                    非表示にする
+                                </button>
+                            ` : `
+                                <span class="text-xs text-gray-500">非表示済み</span>
+                            `}
                         </div>
-                    </div>
-                    <div class="mb-2">
-                        <span class="text-sm font-semibold text-gray-700">投稿内容:</span>
-                        <p class="text-sm text-gray-600 mt-1 p-3 bg-gray-100 rounded">${post.content}</p>
-                    </div>
-                ` : ''}
-
-                ${report.description ? `
-                    <div class="mb-3">
-                        <span class="text-sm font-semibold text-gray-700">詳細:</span>
-                        <p class="text-sm text-gray-600 mt-1">${report.description}</p>
-                    </div>
-                ` : ''}
-
-                ${post ? `
-                    <div class="flex gap-2 mt-3">
-                        <button onclick="viewPost('${report.post_id}')"
-                                class="text-sm text-blue-600 hover:text-blue-800">
-                            投稿を確認
-                        </button>
-                        ${!post.is_hidden ? `
-                            <button onclick="hidePost('${report.post_id}')"
-                                    class="text-sm text-red-600 hover:text-red-800">
-                                投稿を非表示にする
-                            </button>
-                        ` : `
-                            <span class="text-sm text-gray-500">（投稿は非表示済み）</span>
-                        `}
-                    </div>
-                ` : ''}
-            </div>
-        `;
+                    ` : ''}
+                </td>
+            </tr>
+            `;
         }).join('');
+
+        container.innerHTML = `
+            <table class="w-full">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">通報者</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">対象ユーザー</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">理由</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">内容</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">日時</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">操作</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    ${rows}
+                </tbody>
+            </table>
+        `;
     } catch (error) {
         console.error('通報読み込みエラー:', error);
         container.innerHTML = '<div class="text-center py-8 text-red-500">エラーが発生しました</div>';
@@ -291,43 +307,67 @@ async function loadPosts() {
 
         const usersMap = new Map(users?.map(u => [u.user_id, u]) || []);
 
-        container.innerHTML = posts.map(post => {
+        const rows = posts.map(post => {
             const user = usersMap.get(post.user_id);
 
             return `
-            <div class="p-6 hover:bg-gray-50 ${post.is_hidden ? 'bg-red-50' : ''}">
-                <div class="flex justify-between items-start mb-2">
+            <tr class="hover:bg-gray-50 ${post.is_hidden ? 'bg-red-50' : ''}">
+                <td class="px-6 py-4">
                     <div class="flex items-center gap-2">
                         ${user?.avatar_url ?
                             `<img src="${user.avatar_url}" class="w-10 h-10 rounded-full">` :
                             '<div class="w-10 h-10 rounded-full bg-gray-300"></div>'
                         }
-                        <div>
-                            <span class="text-sm font-semibold text-gray-700">${user?.display_name || '削除済み'}</span>
-                            <span class="text-xs text-gray-400 ml-2">${new Date(post.created_at).toLocaleString('ja-JP')}</span>
-                        </div>
+                        <span class="text-sm font-semibold text-gray-700">${user?.display_name || '削除済み'}</span>
                     </div>
-                    ${post.is_hidden ? '<span class="px-3 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">非表示</span>' : ''}
-                </div>
-
-                <p class="text-sm text-gray-800 mb-3">${post.content}</p>
-
-                <div class="flex gap-2">
+                </td>
+                <td class="px-6 py-4 max-w-md">
+                    <p class="text-sm text-gray-800">${post.content}</p>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
+                    ${new Date(post.created_at).toLocaleString('ja-JP', {
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    })}
+                </td>
+                <td class="px-6 py-4">
+                    ${post.is_hidden ? '<span class="px-3 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">非表示</span>' : '<span class="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">表示中</span>'}
+                </td>
+                <td class="px-6 py-4">
                     ${!post.is_hidden ? `
                         <button onclick="hidePost('${post.id}')"
-                                class="text-sm text-red-600 hover:text-red-800">
+                                class="text-xs text-red-600 hover:text-red-800 whitespace-nowrap">
                             非表示にする
                         </button>
                     ` : `
                         <button onclick="showPost('${post.id}')"
-                                class="text-sm text-green-600 hover:text-green-800">
+                                class="text-xs text-green-600 hover:text-green-800 whitespace-nowrap">
                             表示に戻す
                         </button>
                     `}
-                </div>
-            </div>
+                </td>
+            </tr>
             `;
         }).join('');
+
+        container.innerHTML = `
+            <table class="w-full">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ユーザー</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">内容</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">日時</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ステータス</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">操作</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    ${rows}
+                </tbody>
+            </table>
+        `;
     } catch (error) {
         console.error('投稿読み込みエラー:', error);
         container.innerHTML = '<div class="text-center py-8 text-red-500">エラーが発生しました</div>';
@@ -359,26 +399,62 @@ async function loadUsers() {
             return;
         }
 
-        container.innerHTML = users.map(user => `
-            <div class="p-6 hover:bg-gray-50">
-                <div class="flex items-center gap-4">
+        // auth.users から認証情報を取得
+        const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers();
+        const authUsersMap = new Map(authUsers?.users?.map(u => [u.id, u]) || []);
+
+        const rows = users.map(user => {
+            const authUser = authUsersMap.get(user.user_id);
+            const provider = authUser?.app_metadata?.provider || authUser?.identities?.[0]?.provider || '不明';
+            const authDisplayName = authUser?.user_metadata?.full_name || authUser?.user_metadata?.name || '';
+
+            return `
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4">
                     ${user.avatar_url ?
                         `<img src="${user.avatar_url}" class="w-12 h-12 rounded-full">` :
                         '<div class="w-12 h-12 rounded-full bg-gray-300"></div>'
                     }
-                    <div class="flex-1">
-                        <div class="flex items-center gap-2">
-                            <span class="font-semibold text-gray-800">${user.display_name}</span>
-                            ${user.is_admin ? '<span class="px-2 py-1 text-xs font-semibold rounded bg-blue-100 text-blue-800">管理者</span>' : ''}
-                        </div>
-                        <div class="text-sm text-gray-500 mt-1">
-                            登録日: ${new Date(user.created_at).toLocaleDateString('ja-JP')}
-                        </div>
-                        ${user.bio ? `<p class="text-sm text-gray-600 mt-2">${user.bio}</p>` : ''}
+                </td>
+                <td class="px-6 py-4">
+                    <div class="flex items-center gap-2">
+                        <span class="font-semibold text-gray-800">${user.display_name}</span>
+                        ${user.is_admin ? '<span class="px-2 py-1 text-xs font-semibold rounded bg-blue-100 text-blue-800">管理者</span>' : ''}
                     </div>
-                </div>
-            </div>
-        `).join('');
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-600">
+                    ${authDisplayName || '-'}
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
+                    ${new Date(user.created_at).toLocaleDateString('ja-JP')}
+                </td>
+                <td class="px-6 py-4">
+                    <span class="px-2 py-1 bg-gray-100 rounded text-xs text-gray-600">${provider}</span>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">
+                    ${user.bio || '-'}
+                </td>
+            </tr>
+            `;
+        }).join('');
+
+        container.innerHTML = `
+            <table class="w-full">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">アバター</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ユーザー名</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Auth名</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">登録日</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">プロバイダー</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Bio</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    ${rows}
+                </tbody>
+            </table>
+        `;
     } catch (error) {
         console.error('ユーザー読み込みエラー:', error);
         container.innerHTML = '<div class="text-center py-8 text-red-500">エラーが発生しました</div>';
@@ -515,4 +591,118 @@ function prevUsersPage() {
 function nextUsersPage() {
     usersPage++;
     loadUsers();
+}
+
+// チェックイン一覧のページング
+function prevCheckinsPage() {
+    if (checkinsPage > 1) {
+        checkinsPage--;
+        loadCheckins();
+    }
+}
+
+function nextCheckinsPage() {
+    checkinsPage++;
+    loadCheckins();
+}
+
+// チェックイン一覧読み込み
+async function loadCheckins() {
+    const container = document.getElementById('checkinsList');
+    container.innerHTML = '<div class="text-center py-8 text-gray-500">読み込み中...</div>';
+
+    try {
+        const start = (checkinsPage - 1) * PAGE_SIZE;
+        const end = start + PAGE_SIZE - 1;
+
+        // チェックインデータを取得
+        const { data: checkins, error: checkinsError, count } = await supabaseAdmin
+            .from('mood_checkins')
+            .select('*', { count: 'exact' })
+            .order('created_at', { ascending: false })
+            .range(start, end);
+
+        if (checkinsError) throw checkinsError;
+
+        // ページング情報を更新
+        updatePagination('checkins', checkinsPage, count);
+
+        if (checkins.length === 0) {
+            container.innerHTML = '<div class="text-center py-8 text-gray-500">チェックインはありません</div>';
+            return;
+        }
+
+        // ユーザー情報を取得
+        const userIds = [...new Set(checkins.map(c => c.user_id))];
+        const { data: users } = await supabaseAdmin
+            .from('users')
+            .select('user_id, display_name, avatar_url')
+            .in('user_id', userIds);
+
+        const usersMap = new Map(users?.map(u => [u.user_id, u]) || []);
+
+        // 気分の絵文字マッピング
+        const MOOD_EMOJIS = {
+            1: '😞',
+            2: '😔',
+            3: '😐',
+            4: '🙂',
+            5: '😊',
+        };
+
+        const MOOD_LABELS = {
+            1: 'とても良くない',
+            2: '良くない',
+            3: '普通',
+            4: '良い',
+            5: 'とても良い',
+        };
+
+        const rows = checkins.map(checkin => {
+            const user = usersMap.get(checkin.user_id);
+
+            return `
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4">
+                    ${user?.avatar_url ?
+                        `<img src="${user.avatar_url}" class="w-10 h-10 rounded-full">` :
+                        '<div class="w-10 h-10 rounded-full bg-gray-300"></div>'
+                    }
+                </td>
+                <td class="px-6 py-4 font-semibold text-gray-800">${user?.display_name || '削除済み'}</td>
+                <td class="px-6 py-4 text-center text-3xl">${MOOD_EMOJIS[checkin.mood]}</td>
+                <td class="px-6 py-4 text-gray-600">${MOOD_LABELS[checkin.mood]}</td>
+                <td class="px-6 py-4 text-gray-500 whitespace-nowrap">
+                    ${new Date(checkin.created_at).toLocaleString('ja-JP', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    })}
+                </td>
+            </tr>
+            `;
+        }).join('');
+
+        container.innerHTML = `
+            <table class="w-full">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">アバター</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ユーザー名</th>
+                        <th class="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">気分</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ラベル</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">日時</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    ${rows}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error('チェックイン読み込みエラー:', error);
+        container.innerHTML = '<div class="text-center py-8 text-red-500">エラーが発生しました</div>';
+    }
 }

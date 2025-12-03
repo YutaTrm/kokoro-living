@@ -60,6 +60,10 @@
                         class="tab-button border-b-2 border-transparent py-4 px-1 text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium">
                     ユーザー一覧
                 </button>
+                <button onclick="showTab('checkins')"
+                        class="tab-button border-b-2 border-transparent py-4 px-1 text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium">
+                    チェックイン一覧
+                </button>
             </nav>
         </div>
 
@@ -103,7 +107,7 @@
                         </button>
                     </div>
                 </div>
-                <div id="postsList" class="divide-y divide-gray-200">
+                <div id="postsList" class="overflow-x-auto">
                     <div class="text-center py-8 text-gray-500">読み込み中...</div>
                 </div>
                 <div class="px-6 py-4 border-t border-gray-200 flex justify-between items-center">
@@ -127,7 +131,7 @@
                         🔄 更新
                     </button>
                 </div>
-                <div id="usersList" class="divide-y divide-gray-200">
+                <div id="usersList" class="overflow-x-auto">
                     <div class="text-center py-8 text-gray-500">読み込み中...</div>
                 </div>
                 <div class="px-6 py-4 border-t border-gray-200 flex justify-between items-center">
@@ -136,6 +140,30 @@
                     </button>
                     <span id="usersPageInfo" class="text-sm text-gray-600">ページ 1</span>
                     <button id="usersNext" onclick="nextUsersPage()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                        次へ →
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- チェックイン一覧 -->
+        <div id="checkinsTab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                    <h2 class="text-lg font-semibold">チェックイン一覧</h2>
+                    <button onclick="loadCheckins()" class="text-blue-500 hover:text-blue-600">
+                        🔄 更新
+                    </button>
+                </div>
+                <div id="checkinsList" class="overflow-x-auto">
+                    <div class="text-center py-8 text-gray-500">読み込み中...</div>
+                </div>
+                <div class="px-6 py-4 border-t border-gray-200 flex justify-between items-center">
+                    <button id="checkinsPrev" onclick="prevCheckinsPage()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                        ← 前へ
+                    </button>
+                    <span id="checkinsPageInfo" class="text-sm text-gray-600">ページ 1</span>
+                    <button id="checkinsNext" onclick="nextCheckinsPage()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">
                         次へ →
                     </button>
                 </div>
