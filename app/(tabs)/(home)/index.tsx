@@ -129,6 +129,13 @@ export default function TabOneScreen() {
     }
   }, [loading, isLoggedIn, hasCheckedIn]);
 
+  // チェックイン済みになったらモーダルを閉じる
+  useEffect(() => {
+    if (hasCheckedIn && isMoodModalOpen) {
+      setIsMoodModalOpen(false);
+    }
+  }, [hasCheckedIn, isMoodModalOpen]);
+
   useEffect(() => {
     checkLoginStatus();
 
@@ -547,6 +554,11 @@ export default function TabOneScreen() {
   };
 
   const handleMoodSubmit = async (mood: number) => {
+    // 既にチェックイン済みの場合は送信しない
+    if (hasCheckedIn) {
+      setIsMoodModalOpen(false);
+      return;
+    }
     await submitCheckin(mood);
   };
 

@@ -48,6 +48,50 @@ function get5amBasedDate(): string {
   return `${year}-${month}-${day}`;
 }
 
+// 5時基準の時刻範囲を取得（今日の5時～明日の5時）
+function get5amBasedTimeRange(): { start: string; end: string } {
+  const now = new Date();
+
+  // JST（UTC+9）での現在時刻を取得
+  const jstOffset = 9 * 60; // 分単位
+  const jstTime = new Date(now.getTime() + jstOffset * 60 * 1000);
+
+  // JSTでの年月日と時刻を取得
+  const year = jstTime.getUTCFullYear();
+  const month = jstTime.getUTCMonth();
+  const date = jstTime.getUTCDate();
+  const hour = jstTime.getUTCHours();
+
+  // 5時未満の場合は前日扱い
+  let baseDate = new Date(Date.UTC(year, month, date));
+  if (hour < 5) {
+    baseDate = new Date(Date.UTC(year, month, date - 1));
+  }
+
+  // 基準日のJST 05:00 をUTCに変換（JST 05:00 = UTC 20:00前日）
+  const startJST = new Date(Date.UTC(
+    baseDate.getUTCFullYear(),
+    baseDate.getUTCMonth(),
+    baseDate.getUTCDate(),
+    5, 0, 0, 0
+  ));
+  const start = new Date(startJST.getTime() - jstOffset * 60 * 1000);
+
+  // 翌日のJST 05:00
+  const endJST = new Date(Date.UTC(
+    baseDate.getUTCFullYear(),
+    baseDate.getUTCMonth(),
+    baseDate.getUTCDate() + 1,
+    5, 0, 0, 0
+  ));
+  const end = new Date(endJST.getTime() - jstOffset * 60 * 1000);
+
+  return {
+    start: start.toISOString(),
+    end: end.toISOString(),
+  };
+}
+
 export function useMoodCheckin() {
   const [todayCheckin, setTodayCheckin] = useState<MoodCheckin | null>(null);
   const [stats, setStats] = useState<MoodStats>({ totalCheckins: 0, sameMoodCount: 0, moodCounts: {} });
@@ -63,14 +107,15 @@ export function useMoodCheckin() {
         return;
       }
 
-      // 5時基準で今日の日付を取得
-      const todayStart = get5amBasedDate();
+      // 5時基準で今日の時刻範囲を取得
+      const { start, end } = get5amBasedTimeRange();
 
       const { data, error } = await supabase
         .from('mood_checkins')
         .select('*')
         .eq('user_id', user.id)
-        .gte('created_at', todayStart)
+        .gte('created_at', start)
+        .lt('created_at', end)
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
@@ -90,14 +135,15 @@ export function useMoodCheckin() {
   // 統計情報を取得
   const fetchStats = async (mood?: number) => {
     try {
-      // 5時基準で今日の日付を取得
-      const todayStart = get5amBasedDate();
+      // 5時基準で今日の時刻範囲を取得
+      const { start, end } = get5amBasedTimeRange();
 
       // 今日の全チェックインデータを取得
       const { data: allCheckins, error: allError } = await supabase
         .from('mood_checkins')
         .select('mood')
-        .gte('created_at', todayStart);
+        .gte('created_at', start)
+        .lt('created_at', end);
 
       if (allError) throw allError;
 
