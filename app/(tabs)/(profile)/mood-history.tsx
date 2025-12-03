@@ -242,6 +242,15 @@ export default function MoodHistoryScreen() {
                   textDayFontSize: 14,
                   textMonthFontSize: 18,
                   textMonthFontWeight: 'bold',
+                  // @ts-ignore - カスタムスタイルシート
+                  'stylesheet.calendar.main': {
+                    week: {
+                      marginTop: 0,
+                      marginBottom: 4,
+                      flexDirection: 'row',
+                      justifyContent: 'space-around',
+                    },
+                  },
                 }}
                 style={{
                   borderRadius: 12,
@@ -269,10 +278,10 @@ export default function MoodHistoryScreen() {
                       alignItems: 'center',
                       justifyContent: 'flex-start',
                       paddingTop: 2,
-                      backgroundColor: isToday ? '#e0f2fe' : 'transparent',
+                      backgroundColor: isToday ? '#e0f2fe' : 'transparent',//transparent
                       // borderRadius: 8,
                       width: 40,
-                      height: 50,
+                      height: 60,
                     }}>
                       <Text style={{
                         fontSize: 14,
@@ -282,9 +291,21 @@ export default function MoodHistoryScreen() {
                         {date.day}
                       </Text>
                       {checkin && !isDisabled && (
-                        <Text style={{ fontSize: 20, marginTop: -2, lineHeight: 24 }}>
-                          {MOOD_EMOJIS[checkin.mood as keyof typeof MOOD_EMOJIS]}
-                        </Text>
+                        <View style={{ alignItems: 'center', marginTop: -2 }}>
+                          <Text style={{ fontSize: 20, lineHeight: 24 }}>
+                            {MOOD_EMOJIS[checkin.mood as keyof typeof MOOD_EMOJIS]}
+                          </Text>
+                          <Text style={{ fontSize: 10, color: '#6b7280', marginTop: -6 }}>
+                            {(() => {
+                              const date = new Date(checkin.created_at);
+                              const jstOffset = 9 * 60 * 60 * 1000;
+                              const jstTime = new Date(date.getTime() + jstOffset);
+                              const hours = String(jstTime.getUTCHours()).padStart(2, '0');
+                              const minutes = String(jstTime.getUTCMinutes()).padStart(2, '0');
+                              return `${hours}:${minutes}`;
+                            })()}
+                          </Text>
+                        </View>
                       )}
                     </View>
                   );
