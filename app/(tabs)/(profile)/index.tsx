@@ -1,9 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Alert, FlatList, TouchableOpacity } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Alert, FlatList, Pressable, TouchableOpacity } from 'react-native';
 
-import { Pencil } from 'lucide-react-native';
+import { Pencil, Sparkles } from 'lucide-react-native';
+import { useFocusEffect } from 'expo-router';
 
 import LoginPrompt from '@/components/LoginPrompt';
 import PostItem from '@/components/PostItem';
@@ -14,12 +15,14 @@ import ProfileTabBar, { TabType } from '@/components/profile/ProfileTabBar';
 import TextEditModal from '@/components/profile/TextEditModal';
 import MultiSelectModal from '@/components/search/MultiSelectModal';
 import { Box } from '@/components/ui/box';
-import { Button, ButtonText } from '@/components/ui/button';
+import { Button, ButtonIcon, ButtonSpinner, ButtonText } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
+import { VStack } from '@/components/ui/vstack';
 import { useMasterData } from '@/src/contexts/MasterDataContext';
 import { useFollow } from '@/src/hooks/useFollow';
 import { useMedicationMasters } from '@/src/hooks/useMedicationMasters';
@@ -86,6 +89,9 @@ export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState<TabType>('profile');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const { counts: followCounts } = useFollow(currentUserId);
+  const [aiReflections, setAiReflections] = useState<any[]>([]);
+  const [loadingReflections, setLoadingReflections] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
   const [diagnoses, setDiagnoses] = useState<MedicalRecord[]>([]);
   const [medications, setMedications] = useState<MedicalRecord[]>([]);
@@ -191,12 +197,100 @@ export default function ProfileScreen() {
       loadUserPosts();
     } else if (activeTab === 'replies') {
       loadUserReplies();
-    } else if (activeTab === 'likes') {
-      loadLikedPosts();
-    } else if (activeTab === 'bookmarks') {
-      loadBookmarkedPosts();
+    } else if (activeTab === 'ai-reflection') {
+      loadAiReflections();
     }
   }, [activeTab]);
+
+  const loadAiReflections = useCallback(async () => {
+    setLoadingReflections(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('ai_reflections')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      setAiReflections(data || []);
+    } catch (error) {
+      console.error('振り返り取得エラー:', error);
+    } finally {
+      setLoadingReflections(false);
+    }
+  }, []);
+
+  // AI振り返りタブにフォーカスが当たった時にリロード
+  useFocusEffect(
+    useCallback(() => {
+      if (activeTab === 'ai-reflection') {
+        loadAiReflections();
+      }
+    }, [activeTab, loadAiReflections])
+  );
+
+  // AI振り返りを生成
+  const handleGenerateReflection = async () => {
+    setGenerating(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        Alert.alert('エラー', 'ログインしてください');
+        return;
+      }
+
+      // Supabase Functionを呼び出し
+      const { data, error } = await supabase.functions.invoke('generate-ai-reflection', {
+        body: { userId: user.id },
+      });
+
+      if (error) {
+        console.error('Function error:', error);
+
+        // エラーメッセージを抽出
+        let errorMessage = '生成に失敗しました';
+
+        try {
+          // error.context は Response オブジェクト
+          if (error.context && typeof error.context.json === 'function') {
+            const errorData = await error.context.json();
+            console.log('Error data:', errorData);
+            errorMessage = errorData.error || errorMessage;
+          } else if (data?.error) {
+            errorMessage = data.error;
+          } else if (error.message) {
+            errorMessage = error.message;
+          }
+        } catch (e) {
+          console.error('Error parsing response:', e);
+          // デフォルトメッセージを使用
+        }
+
+        Alert.alert('エラー', errorMessage);
+        return;
+      }
+
+      if (data?.error) {
+        Alert.alert('エラー', data.error);
+        return;
+      }
+
+      // 成功
+      await loadAiReflections();
+      Alert.alert('成功', 'AI振り返りが生成されました！');
+    } catch (error: any) {
+      console.error('生成エラー:', error);
+      Alert.alert('エラー', error.message || '生成に失敗しました');
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   const loadMasterData = () => {
     try {
@@ -945,6 +1039,116 @@ export default function ProfileScreen() {
           </Box>
         </>
       )}
+
+      {/* AI振り返りタブの内容 */}
+      {activeTab === 'ai-reflection' && (
+        <Box className="p-4">
+          {loadingReflections ? (
+            <Box className="py-8 items-center">
+              <Spinner size="large" />
+            </Box>
+          ) : (
+            <VStack space="xl">
+              {/* 説明 */}
+              <Card className="p-4 bg-info-50">
+                <VStack space="sm">
+                  <Heading size="sm">AI振り返りについて</Heading>
+                  <Text className="text-sm text-typography-600">
+                    投稿・返信・気分チェックインをもとにAIが振り返りを生成します。
+                  </Text>
+                  <Text className="text-sm text-typography-600 font-semibold">
+                    前回の生成から3日以上経過し、新しいデータが十分に溜まっている必要があります。
+                  </Text>
+                  <Text className="text-xs text-typography-500 mt-2">
+                    ※ 生成には15秒〜1分程度かかります。画面を切り替えても生成は継続されます。
+                  </Text>
+                  <Text className="text-xs text-typography-500">
+                    ※ AIによる分析のため、生成結果が正確でない場合があります。
+                  </Text>
+                </VStack>
+              </Card>
+
+              {/* 生成ボタン */}
+              <Button
+                onPress={handleGenerateReflection}
+                isDisabled={generating}
+                size="lg"
+                className="w-full"
+              >
+                {generating ? (
+                  <>
+                    <ButtonSpinner />
+                    <ButtonText>生成中...</ButtonText>
+                  </>
+                ) : (
+                  <>
+                    <ButtonIcon as={Sparkles} />
+                    <ButtonText>AI振り返りを生成</ButtonText>
+                  </>
+                )}
+              </Button>
+
+              {/* 最新の振り返り */}
+              {aiReflections.length > 0 ? (
+                <>
+                  <VStack space="md">
+                    <Heading size="md">生成された振り返り</Heading>
+                    <Card key={aiReflections[0].id} className="p-4">
+                      <VStack space="sm">
+                        <Text className="text-xs text-typography-500">
+                          {new Date(aiReflections[0].created_at).toLocaleString('ja-JP')}
+                        </Text>
+                        <Text className="text-base leading-6">{aiReflections[0].content}</Text>
+                        <Text className="text-xs text-typography-400">
+                          使用トークン: {aiReflections[0].tokens_used}
+                        </Text>
+                      </VStack>
+                    </Card>
+                  </VStack>
+
+                  {/* 過去の振り返り */}
+                  {aiReflections.length > 1 && (
+                    <VStack space="md">
+                      <Heading size="md">過去の振り返り</Heading>
+                      {aiReflections.slice(1).map((reflection) => (
+                        <Pressable
+                          key={reflection.id}
+                          onPress={() => router.push(`/(tabs)/(profile)/ai-reflection/${reflection.id}`)}
+                        >
+                          <Card className="p-4">
+                            <VStack space="sm">
+                              <Text className="text-xs text-typography-500">
+                                {new Date(reflection.created_at).toLocaleString('ja-JP')}
+                              </Text>
+                              <Text className="text-sm text-typography-600 line-clamp-2">
+                                {reflection.content}
+                              </Text>
+                              <Text className="text-xs text-primary-500">
+                                タップして詳細を見る →
+                              </Text>
+                            </VStack>
+                          </Card>
+                        </Pressable>
+                      ))}
+                    </VStack>
+                  )}
+                </>
+              ) : (
+                <Card className="p-8">
+                  <VStack space="sm" className="items-center">
+                    <Text className="text-center text-typography-500">
+                      まだ振り返りがありません
+                    </Text>
+                    <Text className="text-center text-sm text-typography-400">
+                      「AI振り返りを生成」ボタンで作成できます
+                    </Text>
+                  </VStack>
+                </Card>
+              )}
+            </VStack>
+          )}
+        </Box>
+      )}
     </>
   );
 
@@ -954,24 +1158,18 @@ export default function ProfileScreen() {
         return userPosts;
       case 'replies':
         return userReplies;
-      case 'likes':
-        return likedPosts;
-      case 'bookmarks':
-        return bookmarkedPosts;
       default:
         return [];
     }
   };
 
   const renderEmptyComponent = () => {
-    if (activeTab === 'profile') return null;
+    if (activeTab === 'profile' || activeTab === 'ai-reflection') return null;
 
     // ローディング中はスピナーを表示
     const isLoading =
       (activeTab === 'posts' && loadingPosts) ||
-      (activeTab === 'replies' && loadingReplies) ||
-      (activeTab === 'likes' && loadingLikes) ||
-      (activeTab === 'bookmarks' && loadingBookmarks);
+      (activeTab === 'replies' && loadingReplies);
 
     if (isLoading) {
       return (
@@ -985,8 +1183,6 @@ export default function ProfileScreen() {
     const messages = {
       posts: 'まだ投稿がありません',
       replies: 'まだ返信がありません',
-      likes: 'まだいいねがありません',
-      bookmarks: 'まだブックマークがありません',
     };
 
     return (
