@@ -406,8 +406,8 @@ async function loadUsers() {
         // ユーザーIDリスト
         const userIds = users.map(u => u.user_id);
 
-        // 各ユーザーの診断名・服薬・治療・ステータスを並列取得
-        const [diagnosesData, medicationsData, treatmentsData, statusesData] = await Promise.all([
+        // 各ユーザーの診断名・服薬・治療・ステータス・フォロー情報を並列取得
+        const [diagnosesData, medicationsData, treatmentsData, statusesData, followingData, followersData] = await Promise.all([
             supabaseAdmin
                 .from('user_diagnoses')
                 .select('user_id, diagnoses(name)')
@@ -423,8 +423,30 @@ async function loadUsers() {
             supabaseAdmin
                 .from('user_statuses')
                 .select('user_id, statuses(name)')
-                .in('user_id', userIds)
+                .in('user_id', userIds),
+            supabaseAdmin
+                .from('follows')
+                .select('follower_id')
+                .in('follower_id', userIds),
+            supabaseAdmin
+                .from('follows')
+                .select('following_id')
+                .in('following_id', userIds)
         ]);
+
+        // フォロー数・フォロワー数をカウント
+        const followingCountMap = new Map();
+        const followersCountMap = new Map();
+        userIds.forEach(userId => {
+            followingCountMap.set(userId, 0);
+            followersCountMap.set(userId, 0);
+        });
+        followingData.data?.forEach(f => {
+            followingCountMap.set(f.follower_id, (followingCountMap.get(f.follower_id) || 0) + 1);
+        });
+        followersData.data?.forEach(f => {
+            followersCountMap.set(f.following_id, (followersCountMap.get(f.following_id) || 0) + 1);
+        });
 
         // ユーザーIDごとにタグをグループ化
         const userTagsMap = new Map();
@@ -477,6 +499,8 @@ async function loadUsers() {
             const provider = authUser?.app_metadata?.provider || authUser?.identities?.[0]?.provider || '不明';
             const authDisplayName = authUser?.user_metadata?.full_name || authUser?.user_metadata?.name || '';
             const tags = userTagsMap.get(user.user_id) || { diagnoses: [], medications: [], treatments: [], statuses: [] };
+            const followingCount = followingCountMap.get(user.user_id) || 0;
+            const followersCount = followersCountMap.get(user.user_id) || 0;
 
             // タグHTML生成
             const tagsHtml = [
@@ -489,10 +513,13 @@ async function loadUsers() {
             return `
             <tr class="hover:bg-gray-50">
                 <td class="px-6 py-4">
-                    ${user.avatar_url ?
-                        `<img src="${user.avatar_url}" class="w-12 h-12 rounded-full">` :
-                        '<div class="w-12 h-12 rounded-full bg-gray-300"></div>'
-                    }
+                    <div class="flex flex-col items-center gap-1">
+                        ${user.avatar_url ?
+                            `<img src="${user.avatar_url}" class="w-12 h-12 rounded-full">` :
+                            '<div class="w-12 h-12 rounded-full bg-gray-300"></div>'
+                        }
+                        <span class="px-2 py-1 bg-gray-100 rounded text-xs text-gray-600">${provider}</span>
+                    </div>
                 </td>
                 <td class="px-6 py-4">
                     <div class="flex flex-col gap-1">
@@ -501,8 +528,10 @@ async function loadUsers() {
                             ${user.is_admin ? '<span class="px-2 py-1 text-xs font-semibold rounded bg-blue-100 text-blue-800">管理者</span>' : ''}
                         </div>
                         ${authDisplayName ? `<span class="text-xs text-gray-500">Auth: ${authDisplayName}</span>` : ''}
-                        <span class="px-2 py-1 bg-gray-100 rounded text-xs text-gray-600 w-fit">${provider}</span>
                     </div>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
+                    [${followingCount},${followersCount}]
                 </td>
                 <td class="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">
                     ${user.bio || '-'}
@@ -525,6 +554,7 @@ async function loadUsers() {
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">アバター</th>
                         <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ユーザー名</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">FF</th>
                         <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Bio</th>
                         <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">タグ</th>
                         <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">登録日</th>
