@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { CalendarDays, LogOut, MessageCircleOff, Moon, ShieldBan, Sun, UserX, X } from 'lucide-react-native';
+import { Bookmark, Heart, History, LogOut, MessageCircleOff, Moon, ShieldBan, Sun, UserX, X } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, Pressable } from 'react-native';
 
@@ -49,6 +49,16 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
   const handleMoodHistory = () => {
     onClose();
     router.push('/(tabs)/(profile)/mood-history');
+  };
+
+  const handleLikes = () => {
+    onClose();
+    router.push('/(tabs)/(profile)/likes');
+  };
+
+  const handleBookmarks = () => {
+    onClose();
+    router.push('/(tabs)/(profile)/bookmarks');
   };
 
   const handleOpenLink = async (url: string) => {
@@ -132,14 +142,30 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
 
               <Divider className="my-2" />
 
-              {/* その他 */}
+              {/* 記録 */}
               <Text className="text-sm text-typography-500 mb-2">記録</Text>
 
               {/* 気分チェックイン履歴 */}
               <Pressable onPress={handleMoodHistory}>
                 <HStack space="md" className="items-center">
-                  <Icon as={CalendarDays} size="md" className="text-typography-700" />
+                  <Icon as={History} size="md" className="text-typography-700" />
                   <Text className="text-lg -ml-2">チェックイン履歴</Text>
+                </HStack>
+              </Pressable>
+
+              {/* いいね一覧 */}
+              <Pressable onPress={handleLikes}>
+                <HStack space="md" className="items-center">
+                  <Icon as={Heart} size="md" className="text-typography-700" />
+                  <Text className="text-lg -ml-2">いいね一覧</Text>
+                </HStack>
+              </Pressable>
+
+              {/* ブックマーク一覧 */}
+              <Pressable onPress={handleBookmarks}>
+                <HStack space="md" className="items-center">
+                  <Icon as={Bookmark} size="md" className="text-typography-700" />
+                  <Text className="text-lg -ml-2">ブックマーク一覧</Text>
                 </HStack>
               </Pressable>
 
