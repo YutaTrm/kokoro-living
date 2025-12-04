@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, FlatList, TouchableOpacity } from 'react-native';
@@ -26,6 +27,7 @@ import { useMedicationMasters } from '@/src/hooks/useMedicationMasters';
 import { usePostsData } from '@/src/hooks/usePostsData';
 import { supabase } from '@/src/lib/supabase';
 import { handleError, showError, showSuccess } from '@/src/utils/errorHandler';
+import { pickAndCompressImage } from '@/src/utils/imageCompression';
 import { checkNGWords } from '@/src/utils/ngWordFilter';
 import { sortByStartDate } from '@/src/utils/sortByStartDate';
 
@@ -763,7 +765,7 @@ export default function ProfileScreen() {
       // usersテーブルからプロフィール情報を取得
       const { data: userData, error: userError } = await supabase
         .from('users')
-        .select('display_name, created_at, bio, provider')
+        .select('display_name, created_at, bio, provider, avatar_url')
         .eq('user_id', user.id)
         .single();
 
@@ -773,7 +775,9 @@ export default function ProfileScreen() {
 
       const xName = user.user_metadata?.name || null;
       const userProfile: UserProfile = {
-        avatarUrl: user.user_metadata?.avatar_url || null,
+        // avatar_urlがusersテーブルに存在する場合はそれを使用（nullでも優先）
+        // 存在しない場合のみOAuth画像にフォールバック
+        avatarUrl: userData ? userData.avatar_url : (user.user_metadata?.avatar_url || null),
         userName: userData?.display_name || xName,
         xUserName: xName,
         accountName: user.user_metadata?.user_name || null,
@@ -851,6 +855,151 @@ export default function ProfileScreen() {
     }
   };
 
+  // アバター変更
+  const handleAvatarChange = async () => {
+    try {
+      const compressedUri = await pickAndCompressImage();
+      if (!compressedUri) return;
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('未ログイン');
+
+      // 古いアバターを削除（存在する場合）
+      if (profile?.avatarUrl && profile.avatarUrl.includes('/avatars/')) {
+        const oldPath = profile.avatarUrl.split('/avatars/')[1];
+        if (oldPath) {
+          console.log('古い画像を削除:', oldPath);
+          const { error: deleteError } = await supabase.storage.from('avatars').remove([oldPath]);
+          if (deleteError) {
+            console.error('古い画像の削除エラー:', deleteError);
+          }
+        }
+      }
+
+      // ファイル名を生成
+      const fileExt = 'jpg';
+      const fileName = `${Date.now()}.${fileExt}`;
+      const filePath = `${user.id}/${fileName}`;
+
+      // Supabase Storageにアップロード
+      const base64 = await FileSystem.readAsStringAsync(compressedUri, {
+        encoding: 'base64',
+      });
+
+      // Base64をUint8Arrayに変換
+      const byteCharacters = atob(base64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, byteArray, {
+          contentType: 'image/jpeg',
+          upsert: false,
+        });
+
+      if (uploadError) throw uploadError;
+
+      // 公開URLを取得
+      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
+
+      // usersテーブルのavatar_urlを更新
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ avatar_url: publicUrl })
+        .eq('user_id', user.id);
+
+      if (updateError) throw updateError;
+
+      Alert.alert('成功', 'プロフィール画像を更新しました');
+      loadUserProfile();
+    } catch (error) {
+      console.error('画像アップロードエラー:', error);
+      Alert.alert('エラー', '画像のアップロードに失敗しました');
+    }
+  };
+
+  // アバター削除
+  const handleAvatarDelete = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('未ログイン');
+
+      // Storageから削除
+      if (profile?.avatarUrl && profile.avatarUrl.includes('/avatars/')) {
+        const oldPath = profile.avatarUrl.split('/avatars/')[1];
+        if (oldPath) {
+          console.log('削除するファイルパス:', oldPath);
+          const { error: deleteError } = await supabase.storage.from('avatars').remove([oldPath]);
+          if (deleteError) {
+            console.error('Storage削除エラー:', deleteError);
+          } else {
+            console.log('Storageから削除成功');
+          }
+        }
+      }
+
+      // usersテーブルのavatar_urlをnullに更新
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ avatar_url: null })
+        .eq('user_id', user.id);
+
+      if (updateError) throw updateError;
+
+      Alert.alert('成功', 'プロフィール画像を削除しました');
+      loadUserProfile();
+    } catch (error) {
+      console.error('画像削除エラー:', error);
+      Alert.alert('エラー', '画像の削除に失敗しました');
+    }
+  };
+
+  // プロバイダーのアバターに戻す
+  const handleAvatarReset = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('未ログイン');
+
+      const oauthAvatarUrl = user.user_metadata?.avatar_url;
+      if (!oauthAvatarUrl) {
+        Alert.alert('エラー', 'プロバイダーのアバター画像が見つかりません');
+        return;
+      }
+
+      // カスタムアバターをStorageから削除
+      if (profile?.avatarUrl && profile.avatarUrl.includes('/avatars/')) {
+        const oldPath = profile.avatarUrl.split('/avatars/')[1];
+        if (oldPath) {
+          console.log('削除するファイルパス:', oldPath);
+          const { error: deleteError } = await supabase.storage.from('avatars').remove([oldPath]);
+          if (deleteError) {
+            console.error('Storage削除エラー:', deleteError);
+          } else {
+            console.log('Storageから削除成功');
+          }
+        }
+      }
+
+      // usersテーブルのavatar_urlをOAuthアバターに更新
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ avatar_url: oauthAvatarUrl })
+        .eq('user_id', user.id);
+
+      if (updateError) throw updateError;
+
+      Alert.alert('成功', 'プロバイダーのアバター画像に戻しました');
+      loadUserProfile();
+    } catch (error) {
+      console.error('アバターリセットエラー:', error);
+      Alert.alert('エラー', 'アバターのリセットに失敗しました');
+    }
+  };
+
 
   const handleFollowingPress = () => {
     if (currentUserId) {
@@ -869,6 +1018,9 @@ export default function ProfileScreen() {
       <ProfileHeader
         profile={profile!}
         onEditName={() => setShowNameEditModal(true)}
+        onAvatarChange={handleAvatarChange}
+        onAvatarDelete={handleAvatarDelete}
+        onAvatarReset={handleAvatarReset}
         followCounts={followCounts}
         onFollowingPress={handleFollowingPress}
         onFollowersPress={handleFollowersPress}
