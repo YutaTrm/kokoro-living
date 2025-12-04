@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert } from 'react-native';
 
 import { Box } from '@/components/ui/box';
@@ -58,6 +58,16 @@ export default function DatePickerModal({
   const [startMonth, setStartMonth] = useState(initialStartMonth || '1');
   const [endYear, setEndYear] = useState(initialEndYear || '');
   const [endMonth, setEndMonth] = useState(initialEndMonth || '');
+
+  // モーダルが開かれたときに初期値をリセット
+  useEffect(() => {
+    if (isOpen) {
+      setStartYear(initialStartYear || currentYear.toString());
+      setStartMonth(initialStartMonth || '1');
+      setEndYear(initialEndYear || '');
+      setEndMonth(initialEndMonth || '');
+    }
+  }, [isOpen, initialStartYear, initialStartMonth, initialEndYear, initialEndMonth, currentYear]);
 
   const handleSave = () => {
     const startDate = `${startYear}-${startMonth.padStart(2, '0')}-01`;
