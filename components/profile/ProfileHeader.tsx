@@ -6,6 +6,7 @@ import ConfirmModal from '@/components/ConfirmModal';
 import DefaultAvatar from '@/components/icons/DefaultAvatar';
 import { Avatar, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
+import { Button, ButtonIcon } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
@@ -91,9 +92,12 @@ export default function ProfileHeader({
               offset={5}
               trigger={({ ...triggerProps }) => {
                 return (
-                  <Pressable
+                  <Button
                     {...triggerProps}
-                    className="bg-primary-500 rounded-full p-1.5"
+                    size="xs"
+                    variant="solid"
+                    action="primary"
+                    className="rounded-full px-2 py-0"
                     style={{
                       elevation: 3,
                       shadowColor: '#000',
@@ -102,8 +106,8 @@ export default function ProfileHeader({
                       shadowRadius: 3.84,
                     }}
                   >
-                    <Icon as={Camera} size="xs" className="text-white" />
-                  </Pressable>
+                    <ButtonIcon as={Camera} size="sm" />
+                  </Button>
                 );
               }}
             >
