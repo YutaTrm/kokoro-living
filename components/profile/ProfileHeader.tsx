@@ -1,4 +1,4 @@
-import { Camera, Pencil, RotateCcw, Trash2, Upload } from 'lucide-react-native';
+import { Camera, Image, Pencil, RotateCcw, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, TouchableOpacity } from 'react-native';
 
@@ -112,7 +112,7 @@ export default function ProfileHeader({
               }}
             >
               <MenuItem key="change" textValue="変更" onPress={onAvatarChange}>
-                <Icon as={Upload} size="sm" className="text-typography-700" />
+                <Icon as={Image} size="sm" className="text-typography-700" />
                 <MenuItemLabel className="ml-2">変更</MenuItemLabel>
               </MenuItem>
               <MenuItem key="reset" textValue={`${providerLabel}のアバターに戻す`} onPress={onAvatarReset}>
