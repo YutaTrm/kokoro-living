@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, TouchableOpacity } from 'react-native';
 
 import { Pencil } from 'lucide-react-native';
@@ -88,7 +88,7 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('profile');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const { counts: followCounts } = useFollow(currentUserId);
+  const { counts: followCounts, refetch: refetchFollowCounts } = useFollow(currentUserId);
 
   const [diagnoses, setDiagnoses] = useState<MedicalRecord[]>([]);
   const [medications, setMedications] = useState<MedicalRecord[]>([]);
@@ -190,6 +190,15 @@ export default function ProfileScreen() {
       loadUserReplies();
     }
   }, [activeTab]);
+
+  // 画面フォーカス時にフォロー数を更新
+  useFocusEffect(
+    useCallback(() => {
+      if (currentUserId) {
+        refetchFollowCounts();
+      }
+    }, [currentUserId, refetchFollowCounts])
+  );
 
   const loadMasterData = () => {
     try {

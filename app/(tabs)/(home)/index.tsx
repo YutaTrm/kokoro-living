@@ -1,8 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation, useRouter } from 'expo-router';
+import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { List } from 'lucide-react-native';
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { Alert, FlatList, Pressable, RefreshControl } from 'react-native';
 
 import CreateListModal from '@/components/home/CreateListModal';
@@ -145,6 +145,13 @@ export default function TabOneScreen() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // 画面にフォーカスが当たった時にタイムラインを再読み込み
+  useFocusEffect(
+    useCallback(() => {
+      loadPosts();
+    }, [selectedListId])
+  );
 
   const checkLoginStatus = async () => {
     const { data: { session } } = await supabase.auth.getSession();
