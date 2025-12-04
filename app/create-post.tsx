@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, TextInput } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Box } from '@/components/ui/box';
@@ -412,21 +412,30 @@ export default function CreatePostScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background-0" edges={['top', 'bottom']}>
-      {/* ヘッダー */}
-      <HStack className="justify-between items-center px-4 py-3 border-b border-outline-200">
-        <Button variant="link" onPress={() => router.back()}>
-          <ButtonText>キャンセル</ButtonText>
-        </Button>
-        <Button
-          onPress={handlePost}
-          disabled={loading || !content.trim()}
-          size="sm"
-        >
-          <ButtonText>{loading ? (isEditMode ? '更新中...' : '投稿中...') : (isEditMode ? '更新' : '投稿')}</ButtonText>
-        </Button>
-      </HStack>
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        {/* ヘッダー */}
+        <HStack className="justify-between items-center px-4 py-3 border-b border-outline-200">
+          <Button variant="link" onPress={() => router.back()}>
+            <ButtonText>キャンセル</ButtonText>
+          </Button>
+          <Button
+            onPress={handlePost}
+            disabled={loading || !content.trim()}
+            size="sm"
+          >
+            <ButtonText>{loading ? (isEditMode ? '更新中...' : '投稿中...') : (isEditMode ? '更新' : '投稿')}</ButtonText>
+          </Button>
+        </HStack>
 
-      <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
+        <ScrollView
+          className="flex-1"
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingBottom: 60 }}
+        >
         <VStack className="p-4" space="lg">
           {/* テキスト入力 */}
           <Box>
@@ -615,6 +624,7 @@ export default function CreatePostScreen() {
           )}
         </VStack>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
