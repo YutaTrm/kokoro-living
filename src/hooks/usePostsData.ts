@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import { supabase } from '@/src/lib/supabase';
+import { fetchPostsStats } from '@/src/utils/postStats';
 
 export interface Post {
   id: string;
@@ -17,6 +18,10 @@ export interface Post {
   diagnoses: string[];
   treatments: string[];
   medications: string[];
+  repliesCount?: number;
+  likesCount?: number;
+  isLikedByCurrentUser?: boolean;
+  hasRepliedByCurrentUser?: boolean;
 }
 
 interface TagsResult {
@@ -120,6 +125,7 @@ export const usePostsData = () => {
 
       const postIds = postsData.map((p) => p.id);
       const tagsMap = await fetchTagsForPosts(postIds);
+      const statsMap = await fetchPostsStats(postIds, user.id);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const formattedPosts: Post[] = postsData.map((post: any) => {
@@ -127,6 +133,12 @@ export const usePostsData = () => {
           diagnoses: [],
           treatments: [],
           medications: [],
+        };
+        const stats = statsMap.get(post.id) || {
+          repliesCount: 0,
+          likesCount: 0,
+          isLikedByCurrentUser: false,
+          hasRepliedByCurrentUser: false,
         };
         return {
           id: post.id,
@@ -141,6 +153,10 @@ export const usePostsData = () => {
           diagnoses: tags.diagnoses,
           treatments: tags.treatments,
           medications: tags.medications,
+          repliesCount: stats.repliesCount,
+          likesCount: stats.likesCount,
+          isLikedByCurrentUser: stats.isLikedByCurrentUser,
+          hasRepliedByCurrentUser: stats.hasRepliedByCurrentUser,
         };
       });
 
@@ -182,6 +198,7 @@ export const usePostsData = () => {
 
       const postIds = repliesData.map((p) => p.id);
       const tagsMap = await fetchTagsForPosts(postIds);
+      const statsMap = await fetchPostsStats(postIds, user.id);
 
       // 親投稿の内容を取得
       const parentPostIds = [
@@ -203,6 +220,12 @@ export const usePostsData = () => {
           treatments: [],
           medications: [],
         };
+        const stats = statsMap.get(reply.id) || {
+          repliesCount: 0,
+          likesCount: 0,
+          isLikedByCurrentUser: false,
+          hasRepliedByCurrentUser: false,
+        };
         return {
           id: reply.id,
           content: reply.content,
@@ -220,6 +243,10 @@ export const usePostsData = () => {
           diagnoses: tags.diagnoses,
           treatments: tags.treatments,
           medications: tags.medications,
+          repliesCount: stats.repliesCount,
+          likesCount: stats.likesCount,
+          isLikedByCurrentUser: stats.isLikedByCurrentUser,
+          hasRepliedByCurrentUser: stats.hasRepliedByCurrentUser,
         };
       });
 

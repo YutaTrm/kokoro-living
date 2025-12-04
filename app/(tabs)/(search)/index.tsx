@@ -29,6 +29,7 @@ import UserListItem from '@/components/UserListItem';
 import { useMasterData } from '@/src/contexts/MasterDataContext';
 import { useMedicationMasters } from '@/src/hooks/useMedicationMasters';
 import { supabase } from '@/src/lib/supabase';
+import { fetchPostsStats } from '@/src/utils/postStats';
 
 interface Post {
   id: string;
@@ -45,6 +46,10 @@ interface Post {
   treatments: string[];
   medications: string[];
   isMuted?: boolean;
+  repliesCount?: number;
+  likesCount?: number;
+  isLikedByCurrentUser?: boolean;
+  hasRepliedByCurrentUser?: boolean;
 }
 
 interface TagOption {
@@ -499,6 +504,10 @@ export default function SearchScreen() {
         (usersData || []).map((u) => [u.user_id, { display_name: u.display_name, avatar_url: u.avatar_url }])
       );
 
+      // 統計情報を取得
+      const postIds = filteredPosts.map((p) => p.id);
+      const statsMap = await fetchPostsStats(postIds, user?.id || null);
+
       // 各投稿のタグを取得
       const postsWithData = await Promise.all(
         filteredPosts.map(async (post) => {
@@ -527,6 +536,13 @@ export default function SearchScreen() {
           ).filter(Boolean) || [];
           const medications = [...new Set(medicationsWithDuplicates)];
 
+          const stats = statsMap.get(post.id) || {
+            repliesCount: 0,
+            likesCount: 0,
+            isLikedByCurrentUser: false,
+            hasRepliedByCurrentUser: false,
+          };
+
           return {
             id: post.id,
             content: post.content,
@@ -542,6 +558,10 @@ export default function SearchScreen() {
             treatments,
             medications,
             isMuted: mutedUserIds.includes(post.user_id),
+            repliesCount: stats.repliesCount,
+            likesCount: stats.likesCount,
+            isLikedByCurrentUser: stats.isLikedByCurrentUser,
+            hasRepliedByCurrentUser: stats.hasRepliedByCurrentUser,
           };
         })
       );
