@@ -37,6 +37,7 @@ interface ProfileHeaderProps {
   followCounts?: FollowCounts;
   onFollowingPress?: () => void;
   onFollowersPress?: () => void;
+  onMenuOpenChange?: (isOpen: boolean) => void;
 }
 
 export default function ProfileHeader({
@@ -48,8 +49,20 @@ export default function ProfileHeader({
   followCounts,
   onFollowingPress,
   onFollowersPress,
+  onMenuOpenChange,
 }: ProfileHeaderProps) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const handleMenuOpen = () => {
+    setIsMenuOpen(true);
+    onMenuOpenChange?.(true);
+  };
+
+  const handleMenuClose = () => {
+    setIsMenuOpen(false);
+    onMenuOpenChange?.(false);
+  };
 
   // プロバイダーに応じた表示名を取得
   const getProviderLabel = () => {
@@ -90,6 +103,9 @@ export default function ProfileHeader({
             <Menu
               placement="bottom left"
               offset={5}
+              isOpen={isMenuOpen}
+              onOpen={handleMenuOpen}
+              onClose={handleMenuClose}
               trigger={({ ...triggerProps }) => {
                 return (
                   <Button

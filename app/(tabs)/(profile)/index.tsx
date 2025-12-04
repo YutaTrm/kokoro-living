@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, FlatList, TouchableOpacity } from 'react-native';
 
 import { Pencil } from 'lucide-react-native';
@@ -89,6 +89,7 @@ export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState<TabType>('profile');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const { counts: followCounts, refetch: refetchFollowCounts } = useFollow(currentUserId);
+  const isMenuOpenRef = useRef(false);
 
   const [diagnoses, setDiagnoses] = useState<MedicalRecord[]>([]);
   const [medications, setMedications] = useState<MedicalRecord[]>([]);
@@ -191,14 +192,22 @@ export default function ProfileScreen() {
     }
   }, [activeTab]);
 
-  // 画面フォーカス時にフォロー数を更新
+  // 画面フォーカス時にフォロー数を更新（メニューが開いている時はスキップ、遅延で操作と競合を防ぐ）
   useFocusEffect(
     useCallback(() => {
-      if (currentUserId) {
-        refetchFollowCounts();
-      }
+      const timer = setTimeout(() => {
+        if (currentUserId && !isMenuOpenRef.current) {
+          refetchFollowCounts();
+        }
+      }, 500);
+      return () => clearTimeout(timer);
     }, [currentUserId, refetchFollowCounts])
   );
+
+  // メニューの開閉状態を更新
+  const handleMenuOpenChange = useCallback((isOpen: boolean) => {
+    isMenuOpenRef.current = isOpen;
+  }, []);
 
   const loadMasterData = () => {
     try {
@@ -1024,6 +1033,7 @@ export default function ProfileScreen() {
         followCounts={followCounts}
         onFollowingPress={handleFollowingPress}
         onFollowersPress={handleFollowersPress}
+        onMenuOpenChange={handleMenuOpenChange}
       />
 
       {/* タブバー */}
