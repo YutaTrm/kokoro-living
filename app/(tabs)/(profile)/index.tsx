@@ -21,6 +21,7 @@ import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
+import { VStack } from '@/components/ui/vstack';
 import { useMasterData } from '@/src/contexts/MasterDataContext';
 import { useFollow } from '@/src/hooks/useFollow';
 import { useMedicationMasters } from '@/src/hooks/useMedicationMasters';
@@ -1150,16 +1151,23 @@ export default function ProfileScreen() {
     );
   };
 
-  // ローディング中またはプロフィール未取得
-  if (loading || !profile) {
-    return (
-      <LoginPrompt>
-        <Box className="flex-1 items-center justify-center p-5">
-          <Spinner size="large" />
-        </Box>
-      </LoginPrompt>
-    );
-  }
+  console.log('Profile screen render - profile:', !!profile, 'loading:', loading);
+
+  // プロフィール読み込み中のヘッダー
+  const renderLoadingHeader = () => (
+    <>
+      <Box className="p-4">
+        <HStack className="mt-2" space="md">
+          <Box className="w-16 h-16 bg-background-200 rounded-full" />
+          <VStack className="flex-1 justify-center" space="xs">
+            <Box className="h-6 w-32 bg-background-200 rounded" />
+            <Box className="h-4 w-48 bg-background-200 rounded" />
+          </VStack>
+        </HStack>
+      </Box>
+      <ProfileTabBar activeTab={activeTab} onTabChange={setActiveTab} />
+    </>
+  );
 
   return (
     <LoginPrompt>
@@ -1168,7 +1176,7 @@ export default function ProfileScreen() {
           data={getCurrentData()}
           renderItem={({ item }) => <PostItem post={item} />}
           keyExtractor={(item) => item.id}
-          ListHeaderComponent={renderHeader}
+          ListHeaderComponent={!profile ? renderLoadingHeader : renderHeader}
           ListEmptyComponent={renderEmptyComponent}
         />
       </Box>
