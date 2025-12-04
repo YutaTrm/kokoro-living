@@ -27,6 +27,7 @@ import { useMasterData } from '@/src/contexts/MasterDataContext';
 import { useFollow } from '@/src/hooks/useFollow';
 import { useMedicationMasters } from '@/src/hooks/useMedicationMasters';
 import { usePostsData } from '@/src/hooks/usePostsData';
+import { usePurchase } from '@/src/hooks/usePurchase';
 import { supabase } from '@/src/lib/supabase';
 import { showError } from '@/src/utils/errorHandler';
 import { checkNGWords } from '@/src/utils/ngWordFilter';
@@ -95,6 +96,7 @@ export default function ProfileScreen() {
   const [ticketCount, setTicketCount] = useState(0);
   const [hasFreeQuota, setHasFreeQuota] = useState(false);
   const [loadingTicketInfo, setLoadingTicketInfo] = useState(false);
+  const { purchasing, handlePurchase } = usePurchase();
 
   const [diagnoses, setDiagnoses] = useState<MedicalRecord[]>([]);
   const [medications, setMedications] = useState<MedicalRecord[]>([]);
@@ -1160,12 +1162,23 @@ export default function ProfileScreen() {
                   </Text>
                 </Card>
                 <Button
-                  onPress={() => Alert.alert('準備中', 'アプリ内課金機能は準備中です')}
+                  onPress={async () => {
+                    await handlePurchase();
+                    await loadTicketInfo();
+                  }}
+                  isDisabled={purchasing}
                   size="lg"
                   className="w-full"
                   variant="solid"
                 >
-                  <ButtonText>2回分を100円で購入</ButtonText>
+                  {purchasing ? (
+                    <>
+                      <ButtonSpinner />
+                      <ButtonText>購入処理中...</ButtonText>
+                    </>
+                  ) : (
+                    <ButtonText>2回分を100円で購入</ButtonText>
+                  )}
                 </Button>
               </VStack>
             )}
