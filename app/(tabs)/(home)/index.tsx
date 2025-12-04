@@ -65,7 +65,7 @@ export default function TabOneScreen() {
   const [editingList, setEditingList] = useState<List | null>(null);
 
   // 気分チェックイン機能
-  const { todayCheckin, stats, submitting, submitCheckin, hasCheckedIn } = useMoodCheckin();
+  const { todayCheckin, stats, submitting, submitCheckin, hasCheckedIn, loading: moodLoading } = useMoodCheckin();
   const [isMoodModalOpen, setIsMoodModalOpen] = useState(false);
   const [isMoodCardExpanded, setIsMoodCardExpanded] = useState(false);
 
@@ -120,14 +120,14 @@ export default function TabOneScreen() {
 
   // 起動時に気分チェックインモーダルを表示（未チェックインかつログイン済みの場合）
   useEffect(() => {
-    if (!loading && isLoggedIn && !hasCheckedIn) {
+    if (!loading && !moodLoading && isLoggedIn && !hasCheckedIn) {
       // 少し遅延させてからモーダルを表示（UX改善）
       const timer = setTimeout(() => {
         setIsMoodModalOpen(true);
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [loading, isLoggedIn, hasCheckedIn]);
+  }, [loading, moodLoading, isLoggedIn, hasCheckedIn]);
 
   // チェックイン済みになったらモーダルを閉じる
   useEffect(() => {

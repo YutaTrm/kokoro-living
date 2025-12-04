@@ -25,7 +25,7 @@ import { useFollow } from '@/src/hooks/useFollow';
 import { useMedicationMasters } from '@/src/hooks/useMedicationMasters';
 import { usePostsData } from '@/src/hooks/usePostsData';
 import { supabase } from '@/src/lib/supabase';
-import { handleError, showError, showSuccess } from '@/src/utils/errorHandler';
+import { showError } from '@/src/utils/errorHandler';
 import { checkNGWords } from '@/src/utils/ngWordFilter';
 import { sortByStartDate } from '@/src/utils/sortByStartDate';
 

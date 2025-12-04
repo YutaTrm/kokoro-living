@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { History, LogOut, MessageCircleOff, Moon, ShieldBan, Sun, UserX, X } from 'lucide-react-native';
+import { CalendarDays, LogOut, MessageCircleOff, Moon, ShieldBan, Sun, UserX, X } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, Pressable } from 'react-native';
 
@@ -138,7 +138,7 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
               {/* 気分チェックイン履歴 */}
               <Pressable onPress={handleMoodHistory}>
                 <HStack space="md" className="items-center">
-                  <Icon as={History} size="md" className="text-typography-700" />
+                  <Icon as={CalendarDays} size="md" className="text-typography-700" />
                   <Text className="text-lg -ml-2">チェックイン履歴</Text>
                 </HStack>
               </Pressable>
