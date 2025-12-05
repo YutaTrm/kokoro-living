@@ -270,44 +270,79 @@ export default function TabOneScreen() {
         return;
       }
 
-      // 投稿者のユーザー情報を取得
+      // 投稿者のユーザーIDと投稿IDを取得
       const postUserIds = [...new Set(postsData.map(p => p.user_id))];
-      const { data: usersData, error: usersError } = await supabase
-        .from('users')
-        .select('user_id, display_name, avatar_url')
-        .in('user_id', postUserIds);
+      const postIds = postsData.map(p => p.id);
 
-      if (usersError) throw usersError;
+      // 全ての関連データを並列取得
+      const [
+        usersRes,
+        diagnosesRes,
+        treatmentsRes,
+        medicationsRes,
+        repliesRes,
+        likesRes,
+        myLikesRes,
+        myRepliesRes,
+      ] = await Promise.all([
+        // ユーザー情報
+        supabase
+          .from('users')
+          .select('user_id, display_name, avatar_url')
+          .in('user_id', postUserIds),
+        // 診断名タグ
+        supabase
+          .from('post_diagnoses')
+          .select('post_id, user_diagnoses(diagnoses(name))')
+          .in('post_id', postIds),
+        // 治療タグ
+        supabase
+          .from('post_treatments')
+          .select('post_id, user_treatments(treatments(name))')
+          .in('post_id', postIds),
+        // 服薬タグ
+        supabase
+          .from('post_medications')
+          .select('post_id, user_medications(ingredients(name), products(name))')
+          .in('post_id', postIds),
+        // 返信数
+        supabase
+          .from('posts')
+          .select('parent_post_id')
+          .in('parent_post_id', postIds),
+        // いいね数
+        supabase
+          .from('likes')
+          .select('post_id')
+          .in('post_id', postIds),
+        // 自分のいいね（ログイン時のみ）
+        user
+          ? supabase
+              .from('likes')
+              .select('post_id')
+              .eq('user_id', user.id)
+              .in('post_id', postIds)
+          : Promise.resolve({ data: null }),
+        // 自分の返信（ログイン時のみ）
+        user
+          ? supabase
+              .from('posts')
+              .select('parent_post_id')
+              .eq('user_id', user.id)
+              .in('parent_post_id', postIds)
+          : Promise.resolve({ data: null }),
+      ]);
+
+      if (usersRes.error) throw usersRes.error;
 
       // ユーザー情報をマップに変換
       const usersMap = new Map(
-        (usersData || []).map(u => [u.user_id, { display_name: u.display_name, avatar_url: u.avatar_url }])
+        (usersRes.data || []).map(u => [u.user_id, { display_name: u.display_name, avatar_url: u.avatar_url }])
       );
-
-      // 投稿IDを取得
-      const postIds = postsData.map(p => p.id);
-
-      // 診断名を取得
-      const { data: diagnosesData } = await supabase
-        .from('post_diagnoses')
-        .select('post_id, user_diagnoses(diagnoses(name))')
-        .in('post_id', postIds);
-
-      // 治療法を取得
-      const { data: treatmentsData } = await supabase
-        .from('post_treatments')
-        .select('post_id, user_treatments(treatments(name))')
-        .in('post_id', postIds);
-
-      // 服薬を取得
-      const { data: medicationsData } = await supabase
-        .from('post_medications')
-        .select('post_id, user_medications(ingredients(name), products(name))')
-        .in('post_id', postIds);
 
       // 投稿ごとのタグをマップに変換
       const diagnosesMap = new Map<string, string[]>();
-      diagnosesData?.forEach((d: any) => {
+      diagnosesRes.data?.forEach((d: any) => {
         const name = d.user_diagnoses?.diagnoses?.name;
         if (name) {
           if (!diagnosesMap.has(d.post_id)) {
@@ -318,7 +353,7 @@ export default function TabOneScreen() {
       });
 
       const treatmentsMap = new Map<string, string[]>();
-      treatmentsData?.forEach((t: any) => {
+      treatmentsRes.data?.forEach((t: any) => {
         const name = t.user_treatments?.treatments?.name;
         if (name) {
           if (!treatmentsMap.has(t.post_id)) {
@@ -329,71 +364,44 @@ export default function TabOneScreen() {
       });
 
       const medicationsMap = new Map<string, string[]>();
-      medicationsData?.forEach((m: any) => {
+      medicationsRes.data?.forEach((m: any) => {
         const name = m.user_medications?.ingredients?.name;
         if (name) {
           if (!medicationsMap.has(m.post_id)) {
             medicationsMap.set(m.post_id, []);
           }
           const medications = medicationsMap.get(m.post_id)!;
-          // 重複を避ける
           if (!medications.includes(name)) {
             medications.push(name);
           }
         }
       });
 
-      // 返信数を取得
-      const { data: repliesData } = await supabase
-        .from('posts')
-        .select('parent_post_id')
-        .in('parent_post_id', postIds);
-
+      // 返信数マップ
       const repliesMap = new Map<string, number>();
-      repliesData?.forEach((r: any) => {
+      repliesRes.data?.forEach((r: any) => {
         const count = repliesMap.get(r.parent_post_id) || 0;
         repliesMap.set(r.parent_post_id, count + 1);
       });
 
-      // いいね数を取得
-      const { data: likesData } = await supabase
-        .from('likes')
-        .select('post_id')
-        .in('post_id', postIds);
-
+      // いいね数マップ
       const likesMap = new Map<string, number>();
-      likesData?.forEach((l: any) => {
+      likesRes.data?.forEach((l: any) => {
         const count = likesMap.get(l.post_id) || 0;
         likesMap.set(l.post_id, count + 1);
       });
 
-      // 自分がいいね・返信しているかどうかを取得
+      // 自分のいいね・返信マップ
       const myLikesMap = new Map<string, boolean>();
       const myRepliesMap = new Map<string, boolean>();
 
-      if (user) {
-        // 自分のいいねを取得
-        const { data: myLikesData } = await supabase
-          .from('likes')
-          .select('post_id')
-          .eq('user_id', user.id)
-          .in('post_id', postIds);
+      myLikesRes.data?.forEach((l: any) => {
+        myLikesMap.set(l.post_id, true);
+      });
 
-        myLikesData?.forEach((l: any) => {
-          myLikesMap.set(l.post_id, true);
-        });
-
-        // 自分の返信を取得
-        const { data: myRepliesData } = await supabase
-          .from('posts')
-          .select('parent_post_id')
-          .eq('user_id', user.id)
-          .in('parent_post_id', postIds);
-
-        myRepliesData?.forEach((r: any) => {
-          myRepliesMap.set(r.parent_post_id, true);
-        });
-      }
+      myRepliesRes.data?.forEach((r: any) => {
+        myRepliesMap.set(r.parent_post_id, true);
+      });
 
       const formattedPosts: Post[] = postsData.map((post: any) => ({
         id: post.id,
