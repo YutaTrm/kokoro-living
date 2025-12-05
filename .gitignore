@@ -48,3 +48,4 @@ admin/config.js
 /ios
 /android
 *.md
+credentials.json

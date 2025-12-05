@@ -13,7 +13,11 @@
     "preview": {
       "distribution": "internal"
     },
-    "production": {}
+    "production": {
+      "ios": {
+        "credentialsSource": "local"
+      }
+    }
   },
   "submit": {
     "production": {}
