@@ -40,7 +40,7 @@ export default function TagFilterModal({
 }: TagFilterModalProps) {
   const [localSelectedIds, setLocalSelectedIds] = useState<string[]>(selectedIds);
 
-  // モーダルが開くたびに状態をリセット
+  // モーダルが開いたとき、または親のselectedIdsが変わったときに初期化
   useEffect(() => {
     if (isOpen) {
       setLocalSelectedIds(selectedIds);

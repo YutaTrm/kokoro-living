@@ -45,10 +45,12 @@ export default function MultiSelectModal({
 }: MultiSelectModalProps) {
   const [tempSelectedIds, setTempSelectedIds] = useState<string[]>(selectedIds);
 
-  // selectedIdsが変更されたら、tempSelectedIdsも更新
+  // モーダルが開いたとき、または親のselectedIdsが変わったときに初期化
   useEffect(() => {
-    setTempSelectedIds(selectedIds);
-  }, [selectedIds, isOpen]);
+    if (isOpen) {
+      setTempSelectedIds(selectedIds);
+    }
+  }, [isOpen, selectedIds]);
 
   const toggleSelection = (id: string) => {
     setTempSelectedIds((prev) => {

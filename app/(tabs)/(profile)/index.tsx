@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, FlatList, TouchableOpacity } from 'react-native';
 
 import { Pencil } from 'lucide-react-native';
@@ -260,9 +260,9 @@ export default function ProfileScreen() {
     }
   };
 
-  // 既存の選択済みマスターIDを取得
-  const getSelectedIds = (type: 'diagnosis' | 'medication' | 'treatment' | 'status'): string[] => {
-    switch (type) {
+  // 既存の選択済みマスターIDを取得（メモ化して参照の安定性を保つ）
+  const currentSelectedIds = useMemo(() => {
+    switch (selectModalType) {
       case 'diagnosis':
         return diagnosisMasters
           .filter(m => diagnoses.some(d => d.name === m.name))
@@ -292,7 +292,7 @@ export default function ProfileScreen() {
       default:
         return [];
     }
-  };
+  }, [selectModalType, diagnosisMasters, diagnoses, medicationMasters, medications, treatmentMasters, treatments, statusMasters, statuses]);
 
   // 日付編集モーダルを開く
   const openDateEditModal = (recordId: string, type: 'diagnosis' | 'medication' | 'treatment' | 'status') => {
@@ -396,7 +396,7 @@ export default function ProfileScreen() {
       if (!user) return;
 
       // 既に選択されているマスターIDを取得
-      const existingMasterIds = getSelectedIds(selectModalType);
+      const existingMasterIds = currentSelectedIds;
 
       // 新しく追加されたIDのみ抽出
       const newIds = selectedIds.filter(id => !existingMasterIds.includes(id));
@@ -1226,7 +1226,7 @@ export default function ProfileScreen() {
           selectModalType === 'treatment' ? treatmentMasters.map(t => ({ id: t.id, name: t.name })) :
           statusMasters.map(s => ({ id: s.id, name: s.name }))
         }
-        selectedIds={getSelectedIds(selectModalType)}
+        selectedIds={currentSelectedIds}
         onSave={handleMultiSelectSave}
         onToggle={selectModalType === 'medication' ? handleMedicationToggle : undefined}
       />
