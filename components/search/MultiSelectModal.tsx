@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
-import { Pressable, ScrollView } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Pressable, ScrollView, TextInput } from 'react-native';
 
-import { Text } from '@/components/ui/text';
 import { Button, ButtonText } from '@/components/ui/button';
 import { Checkbox, CheckboxIcon, CheckboxIndicator, CheckboxLabel } from '@/components/ui/checkbox';
 import { Heading } from '@/components/ui/heading';
-import { CheckIcon, CloseIcon, Icon } from '@/components/ui/icon';
+import { CheckIcon, CloseIcon, Icon, SearchIcon } from '@/components/ui/icon';
+import { Input, InputField, InputIcon, InputSlot } from '@/components/ui/input';
 import {
   Modal,
   ModalBackdrop,
@@ -15,6 +15,7 @@ import {
   ModalFooter,
   ModalHeader,
 } from '@/components/ui/modal';
+import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
 
 interface TagOption {
@@ -44,13 +45,29 @@ export default function MultiSelectModal({
   onToggle,
 }: MultiSelectModalProps) {
   const [tempSelectedIds, setTempSelectedIds] = useState<string[]>(selectedIds);
+  const [filterText, setFilterText] = useState('');
+  const inputRef = useRef<TextInput>(null);
 
   // モーダルが開いたとき、または親のselectedIdsが変わったときに初期化
   useEffect(() => {
     if (isOpen) {
       setTempSelectedIds(selectedIds);
+      setFilterText('');
+      inputRef.current?.clear();
     }
   }, [isOpen, selectedIds]);
+
+  // フィルタリングされたオプション
+  const filteredOptions = filterText
+    ? options.filter((option) =>
+        option.name.toLowerCase().includes(filterText.toLowerCase())
+      )
+    : options;
+
+  const handleClear = () => {
+    inputRef.current?.clear();
+    setFilterText('');
+  };
 
   const toggleSelection = (id: string) => {
     setTempSelectedIds((prev) => {
@@ -89,30 +106,51 @@ export default function MultiSelectModal({
           </ModalCloseButton>
         </ModalHeader>
         <ModalBody>
-          <ScrollView className="max-h-96">
-            <VStack space="sm">
-              {options.map((option) => (
-                <Pressable key={option.id} onPress={() => toggleSelection(option.id)}>
-                  <Checkbox
-                    value={option.id}
-                    isChecked={tempSelectedIds.includes(option.id)}
-                    onChange={() => toggleSelection(option.id)}
-                    size="md"
-                  >
-                    <CheckboxIndicator>
-                      <CheckboxIcon as={CheckIcon} />
-                    </CheckboxIndicator>
-                    <CheckboxLabel className="">{option.name}</CheckboxLabel>
-                  </Checkbox>
-                </Pressable>
-              ))}
-              {options.length === 0 && (
-                <Text className="text-sm opacity-50 text-center py-2">
-                  タグがありません
-                </Text>
-              )}
-            </VStack>
-          </ScrollView>
+          <Input size="md" className="mb-3">
+            <InputSlot className="pl-3">
+              <InputIcon as={SearchIcon} />
+            </InputSlot>
+            <InputField
+              ref={inputRef}
+              placeholder="絞り込み..."
+              defaultValue=""
+              onChangeText={setFilterText}
+            />
+            {filterText && (
+              <InputSlot className="pr-3" onPress={handleClear}>
+                <InputIcon as={CloseIcon} />
+              </InputSlot>
+            )}
+          </Input>
+          <ScrollView className="max-h-80">
+              <VStack space="sm">
+                {filteredOptions.map((option) => (
+                  <Pressable key={option.id} onPress={() => toggleSelection(option.id)}>
+                    <Checkbox
+                      value={option.id}
+                      isChecked={tempSelectedIds.includes(option.id)}
+                      onChange={() => toggleSelection(option.id)}
+                      size="md"
+                    >
+                      <CheckboxIndicator>
+                        <CheckboxIcon as={CheckIcon} />
+                      </CheckboxIndicator>
+                      <CheckboxLabel>{option.name}</CheckboxLabel>
+                    </Checkbox>
+                  </Pressable>
+                ))}
+                {options.length === 0 && (
+                  <Text className="text-sm opacity-50 text-center py-2">
+                    タグがありません
+                  </Text>
+                )}
+                {options.length > 0 && filteredOptions.length === 0 && (
+                  <Text className="text-sm opacity-50 text-center py-2">
+                    一致するタグがありません
+                  </Text>
+                )}
+              </VStack>
+            </ScrollView>
         </ModalBody>
         <ModalFooter>
           <VStack space="sm" className="w-full">
