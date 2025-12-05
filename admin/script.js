@@ -276,7 +276,6 @@ async function loadPosts() {
         let query = supabaseAdmin
             .from('posts')
             .select('*', { count: 'exact' })
-            .is('parent_post_id', null)
             .order('created_at', { ascending: false })
             .range(start, end);
 
@@ -307,8 +306,20 @@ async function loadPosts() {
 
         const usersMap = new Map(users?.map(u => [u.user_id, u]) || []);
 
+        // 親投稿の情報を取得
+        const parentPostIds = posts.map(p => p.parent_post_id).filter(Boolean);
+        let parentPostsMap = new Map();
+        if (parentPostIds.length > 0) {
+            const { data: parentPosts } = await supabaseAdmin
+                .from('posts')
+                .select('id, content')
+                .in('id', parentPostIds);
+            parentPostsMap = new Map(parentPosts?.map(p => [p.id, p]) || []);
+        }
+
         const rows = posts.map(post => {
             const user = usersMap.get(post.user_id);
+            const parentPost = post.parent_post_id ? parentPostsMap.get(post.parent_post_id) : null;
 
             return `
             <tr class="hover:bg-gray-50 ${post.is_hidden ? 'bg-red-50' : ''}">
@@ -322,6 +333,7 @@ async function loadPosts() {
                     </div>
                 </td>
                 <td class="px-6 py-4 max-w-md">
+                    ${parentPost ? `<p class="text-xs text-gray-400 mb-1 truncate">↩ ${parentPost.content}</p>` : ''}
                     <p class="text-sm text-gray-800">${post.content}</p>
                 </td>
                 <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
@@ -544,6 +556,14 @@ async function loadUsers() {
                 <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
                     ${new Date(user.created_at).toLocaleDateString('ja-JP')}
                 </td>
+                <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
+                    ${user.updated_at ? new Date(user.updated_at).toLocaleString('ja-JP', {
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    }) : '-'}
+                </td>
             </tr>
             `;
         }).join('');
@@ -558,6 +578,7 @@ async function loadUsers() {
                         <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Bio</th>
                         <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">タグ</th>
                         <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">登録日</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">更新日</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
