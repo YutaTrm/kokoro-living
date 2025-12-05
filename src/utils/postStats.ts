@@ -18,43 +18,42 @@ export const fetchPostsStats = async (
     return new Map();
   }
 
-  // 返信数を取得
-  const { data: repliesData } = await supabase
-    .from('posts')
-    .select('parent_post_id')
-    .in('parent_post_id', postIds)
-    .not('parent_post_id', 'is', null);
-
-  // いいね数を取得
-  const { data: likesData } = await supabase
-    .from('likes')
-    .select('post_id')
-    .in('post_id', postIds);
-
-  // 現在のユーザーがいいねした投稿を取得
-  let userLikedPostIds: string[] = [];
-  if (currentUserId) {
-    const { data: userLikesData } = await supabase
-      .from('likes')
-      .select('post_id')
-      .in('post_id', postIds)
-      .eq('user_id', currentUserId);
-
-    userLikedPostIds = userLikesData?.map(l => l.post_id) || [];
-  }
-
-  // 現在のユーザーが返信した投稿を取得
-  let userRepliedPostIds: string[] = [];
-  if (currentUserId) {
-    const { data: userRepliesData } = await supabase
+  // 全てのクエリを並列実行
+  const [repliesRes, likesRes, userLikesRes, userRepliesRes] = await Promise.all([
+    // 返信数を取得
+    supabase
       .from('posts')
       .select('parent_post_id')
       .in('parent_post_id', postIds)
-      .eq('user_id', currentUserId)
-      .not('parent_post_id', 'is', null);
+      .not('parent_post_id', 'is', null),
+    // いいね数を取得
+    supabase
+      .from('likes')
+      .select('post_id')
+      .in('post_id', postIds),
+    // 現在のユーザーがいいねした投稿を取得
+    currentUserId
+      ? supabase
+          .from('likes')
+          .select('post_id')
+          .in('post_id', postIds)
+          .eq('user_id', currentUserId)
+      : Promise.resolve({ data: null }),
+    // 現在のユーザーが返信した投稿を取得
+    currentUserId
+      ? supabase
+          .from('posts')
+          .select('parent_post_id')
+          .in('parent_post_id', postIds)
+          .eq('user_id', currentUserId)
+          .not('parent_post_id', 'is', null)
+      : Promise.resolve({ data: null }),
+  ]);
 
-    userRepliedPostIds = userRepliesData?.map(r => r.parent_post_id) || [];
-  }
+  const repliesData = repliesRes.data;
+  const likesData = likesRes.data;
+  const userLikedPostIds = userLikesRes.data?.map(l => l.post_id) || [];
+  const userRepliedPostIds = userRepliesRes.data?.map(r => r.parent_post_id) || [];
 
   // 統計情報をマップに格納
   const statsMap = new Map<string, PostStats>();
