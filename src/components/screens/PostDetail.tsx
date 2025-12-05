@@ -183,20 +183,20 @@ export default function PostDetailScreen() {
       let mutedUserIds: string[] = [];
 
       if (user) {
-        const { data: blocksData } = await supabase
-          .from('blocks')
-          .select('blocked_id')
-          .eq('blocker_id', user.id);
+        // blocks/mutes を並列取得
+        const [blocksRes, mutesRes] = await Promise.all([
+          supabase
+            .from('blocks')
+            .select('blocked_id')
+            .eq('blocker_id', user.id),
+          supabase
+            .from('mutes')
+            .select('muted_id')
+            .eq('muter_id', user.id),
+        ]);
 
-        blockedUserIds = blocksData?.map(b => b.blocked_id) || [];
-
-        // ミュートしているユーザーを取得
-        const { data: mutesData } = await supabase
-          .from('mutes')
-          .select('muted_id')
-          .eq('muter_id', user.id);
-
-        mutedUserIds = mutesData?.map(m => m.muted_id) || [];
+        blockedUserIds = blocksRes.data?.map(b => b.blocked_id) || [];
+        mutedUserIds = mutesRes.data?.map(m => m.muted_id) || [];
       }
 
       // 直接の返信（1階層目）を取得
@@ -323,20 +323,20 @@ export default function PostDetailScreen() {
       let mutedUserIds: string[] = [];
 
       if (user) {
-        const { data: blocksData } = await supabase
-          .from('blocks')
-          .select('blocked_id')
-          .eq('blocker_id', user.id);
+        // blocks/mutes を並列取得
+        const [blocksRes, mutesRes] = await Promise.all([
+          supabase
+            .from('blocks')
+            .select('blocked_id')
+            .eq('blocker_id', user.id),
+          supabase
+            .from('mutes')
+            .select('muted_id')
+            .eq('muter_id', user.id),
+        ]);
 
-        blockedUserIds = blocksData?.map(b => b.blocked_id) || [];
-
-        // ミュートしているユーザーを取得
-        const { data: mutesData } = await supabase
-          .from('mutes')
-          .select('muted_id')
-          .eq('muter_id', user.id);
-
-        mutedUserIds = mutesData?.map(m => m.muted_id) || [];
+        blockedUserIds = blocksRes.data?.map(b => b.blocked_id) || [];
+        mutedUserIds = mutesRes.data?.map(m => m.muted_id) || [];
       }
 
       let deeperRepliesQuery = supabase
@@ -430,29 +430,30 @@ export default function PostDetailScreen() {
 
   const loadTags = async () => {
     try {
-      const { data: diagnosesData } = await supabase
-        .from('post_diagnoses')
-        .select('user_diagnoses(diagnoses(name))')
-        .eq('post_id', id);
+      // 3つのタグクエリを並列実行
+      const [diagnosesRes, treatmentsRes, medicationsRes] = await Promise.all([
+        supabase
+          .from('post_diagnoses')
+          .select('user_diagnoses(diagnoses(name))')
+          .eq('post_id', id),
+        supabase
+          .from('post_treatments')
+          .select('user_treatments(treatments(name))')
+          .eq('post_id', id),
+        supabase
+          .from('post_medications')
+          .select('user_medications(ingredients(name), products(name))')
+          .eq('post_id', id),
+      ]);
 
       type DiagnosisRow = { user_diagnoses: { diagnoses: { name: string } } | null };
-      const diagnoses = (diagnosesData as DiagnosisRow[] | null)?.map(d => d.user_diagnoses?.diagnoses?.name).filter(Boolean) as string[] || [];
-
-      const { data: treatmentsData } = await supabase
-        .from('post_treatments')
-        .select('user_treatments(treatments(name))')
-        .eq('post_id', id);
+      const diagnoses = (diagnosesRes.data as DiagnosisRow[] | null)?.map(d => d.user_diagnoses?.diagnoses?.name).filter(Boolean) as string[] || [];
 
       type TreatmentRow = { user_treatments: { treatments: { name: string } } | null };
-      const treatments = (treatmentsData as TreatmentRow[] | null)?.map(t => t.user_treatments?.treatments?.name).filter(Boolean) as string[] || [];
-
-      const { data: medicationsData } = await supabase
-        .from('post_medications')
-        .select('user_medications(ingredients(name), products(name))')
-        .eq('post_id', id);
+      const treatments = (treatmentsRes.data as TreatmentRow[] | null)?.map(t => t.user_treatments?.treatments?.name).filter(Boolean) as string[] || [];
 
       type MedicationRow = { user_medications: { ingredients: { name: string } } | null };
-      const medicationsWithDuplicates = (medicationsData as MedicationRow[] | null)?.map(m =>
+      const medicationsWithDuplicates = (medicationsRes.data as MedicationRow[] | null)?.map(m =>
         m.user_medications?.ingredients?.name
       ).filter(Boolean) as string[] || [];
       const medications = [...new Set(medicationsWithDuplicates)];
