@@ -126,46 +126,47 @@ export default function PostDetailScreen() {
 
       if (postError) throw postError;
 
-      // ユーザー情報を取得
-      const { data: userData } = await supabase
-        .from('users')
-        .select('user_id, display_name, avatar_url')
-        .eq('user_id', postData.user_id)
-        .single();
+      // ユーザー情報と親投稿を並列取得
+      const [userRes, parentRes] = await Promise.all([
+        supabase
+          .from('users')
+          .select('user_id, display_name, avatar_url')
+          .eq('user_id', postData.user_id)
+          .single(),
+        postData.parent_post_id
+          ? supabase
+              .from('posts')
+              .select('id, content, created_at, user_id')
+              .eq('id', postData.parent_post_id)
+              .single()
+          : Promise.resolve({ data: null }),
+      ]);
 
       setPost({
         ...postData,
         user: {
-          display_name: userData?.display_name || 'Unknown',
+          display_name: userRes.data?.display_name || 'Unknown',
           user_id: postData.user_id,
-          avatar_url: userData?.avatar_url || null,
+          avatar_url: userRes.data?.avatar_url || null,
         },
       });
 
-      // 親投稿がある場合は取得（返信詳細ページの場合）
-      if (postData.parent_post_id) {
-        const { data: parentData } = await supabase
-          .from('posts')
-          .select('id, content, created_at, user_id')
-          .eq('id', postData.parent_post_id)
+      // 親投稿がある場合はユーザー情報を取得
+      if (parentRes.data) {
+        const { data: parentUserData } = await supabase
+          .from('users')
+          .select('user_id, display_name, avatar_url')
+          .eq('user_id', parentRes.data.user_id)
           .single();
 
-        if (parentData) {
-          const { data: parentUserData } = await supabase
-            .from('users')
-            .select('user_id, display_name, avatar_url')
-            .eq('user_id', parentData.user_id)
-            .single();
-
-          setParentPost({
-            ...parentData,
-            user: {
-              display_name: parentUserData?.display_name || 'Unknown',
-              user_id: parentData.user_id,
-              avatar_url: parentUserData?.avatar_url || null,
-            },
-          });
-        }
+        setParentPost({
+          ...parentRes.data,
+          user: {
+            display_name: parentUserData?.display_name || 'Unknown',
+            user_id: parentRes.data.user_id,
+            avatar_url: parentUserData?.avatar_url || null,
+          },
+        });
       }
     } catch (error) {
       console.error('投稿取得エラー:', error);
