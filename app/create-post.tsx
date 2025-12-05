@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, TextInput } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Box } from '@/components/ui/box';
@@ -89,11 +89,25 @@ export default function CreatePostScreen() {
 
       const tags: MedicalTag[] = [];
 
-      // 診断名を取得
-      const { data: diagnoses } = await supabase
-        .from('user_diagnoses')
-        .select('id, diagnoses(name)')
-        .eq('user_id', user.id);
+      // 診断名・治療法・服薬を並列取得
+      const [diagnosesRes, treatmentsRes, medicationsRes] = await Promise.all([
+        supabase
+          .from('user_diagnoses')
+          .select('id, diagnoses(name)')
+          .eq('user_id', user.id),
+        supabase
+          .from('user_treatments')
+          .select('id, treatments(name)')
+          .eq('user_id', user.id),
+        supabase
+          .from('user_medications')
+          .select('id, ingredient_id, ingredients(name), products(name)')
+          .eq('user_id', user.id),
+      ]);
+
+      const diagnoses = diagnosesRes.data;
+      const treatments = treatmentsRes.data;
+      const medications = medicationsRes.data;
 
       if (diagnoses) {
         diagnoses.forEach((d: any) => {
@@ -107,12 +121,6 @@ export default function CreatePostScreen() {
         });
       }
 
-      // 治療法を取得
-      const { data: treatments } = await supabase
-        .from('user_treatments')
-        .select('id, treatments(name)')
-        .eq('user_id', user.id);
-
       if (treatments) {
         treatments.forEach((t: any) => {
           if (t.treatments?.name) {
@@ -124,12 +132,6 @@ export default function CreatePostScreen() {
           }
         });
       }
-
-      // 服薬を取得（成分でグループ化）
-      const { data: medications } = await supabase
-        .from('user_medications')
-        .select('id, ingredient_id, ingredients(name), products(name)')
-        .eq('user_id', user.id);
 
       if (medications) {
         // 成分IDごとの製品名をマップ化（マスターデータから取得、キャッシュ利用）
@@ -223,34 +225,31 @@ export default function CreatePostScreen() {
         setIsExperiencedAtUnset(true);
       }
 
-      // 既存のタグを取得
+      // 既存のタグを並列取得
+      const [diagnosesRes, treatmentsRes, medicationsRes] = await Promise.all([
+        supabase
+          .from('post_diagnoses')
+          .select('user_diagnosis_id')
+          .eq('post_id', postId),
+        supabase
+          .from('post_treatments')
+          .select('user_treatment_id')
+          .eq('post_id', postId),
+        supabase
+          .from('post_medications')
+          .select('user_medication_id')
+          .eq('post_id', postId),
+      ]);
+
       const tagIds: string[] = [];
-
-      // 診断名タグ
-      const { data: diagnosesData } = await supabase
-        .from('post_diagnoses')
-        .select('user_diagnosis_id')
-        .eq('post_id', postId);
-      if (diagnosesData) {
-        tagIds.push(...diagnosesData.map(d => d.user_diagnosis_id));
+      if (diagnosesRes.data) {
+        tagIds.push(...diagnosesRes.data.map(d => d.user_diagnosis_id));
       }
-
-      // 治療法タグ
-      const { data: treatmentsData } = await supabase
-        .from('post_treatments')
-        .select('user_treatment_id')
-        .eq('post_id', postId);
-      if (treatmentsData) {
-        tagIds.push(...treatmentsData.map(t => t.user_treatment_id));
+      if (treatmentsRes.data) {
+        tagIds.push(...treatmentsRes.data.map(t => t.user_treatment_id));
       }
-
-      // 服薬タグ
-      const { data: medicationsData } = await supabase
-        .from('post_medications')
-        .select('user_medication_id')
-        .eq('post_id', postId);
-      if (medicationsData) {
-        tagIds.push(...medicationsData.map(m => m.user_medication_id));
+      if (medicationsRes.data) {
+        tagIds.push(...medicationsRes.data.map(m => m.user_medication_id));
       }
 
       setSelectedTags(tagIds);
@@ -412,21 +411,30 @@ export default function CreatePostScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background-0" edges={['top', 'bottom']}>
-      {/* ヘッダー */}
-      <HStack className="justify-between items-center px-4 py-3 border-b border-outline-200">
-        <Button variant="link" onPress={() => router.back()}>
-          <ButtonText>キャンセル</ButtonText>
-        </Button>
-        <Button
-          onPress={handlePost}
-          disabled={loading || !content.trim()}
-          size="sm"
-        >
-          <ButtonText>{loading ? (isEditMode ? '更新中...' : '投稿中...') : (isEditMode ? '更新' : '投稿')}</ButtonText>
-        </Button>
-      </HStack>
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        {/* ヘッダー */}
+        <HStack className="justify-between items-center px-4 py-3 border-b border-outline-200">
+          <Button variant="link" onPress={() => router.back()}>
+            <ButtonText>キャンセル</ButtonText>
+          </Button>
+          <Button
+            onPress={handlePost}
+            disabled={loading || !content.trim()}
+            size="sm"
+          >
+            <ButtonText>{loading ? (isEditMode ? '更新中...' : '投稿中...') : (isEditMode ? '更新' : '投稿')}</ButtonText>
+          </Button>
+        </HStack>
 
-      <ScrollView className="flex-1" keyboardShouldPersistTaps="handled">
+        <ScrollView
+          className="flex-1"
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingBottom: 60 }}
+        >
         <VStack className="p-4" space="lg">
           {/* テキスト入力 */}
           <Box>
@@ -615,6 +623,7 @@ export default function CreatePostScreen() {
           )}
         </VStack>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

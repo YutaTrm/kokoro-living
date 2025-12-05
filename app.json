@@ -2,7 +2,7 @@
   "expo": {
     "name": "こころのリビング",
     "slug": "kokoro-living",
-    "version": "1.1.1",
+    "version": "1.2.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "kokoroliving",
@@ -16,20 +16,19 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.kokoroliving.app",
-      "buildNumber": "15",
+      "buildNumber": "23",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "CFBundleDevelopmentRegion": "ja",
         "CFBundleLocalizations": ["ja", "en"]
       }
     },
-    "primaryLanguage": "ja",
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "versionCode": 15,
+      "versionCode": 23,
       "permissions": [
         "android.permission.INTERNET"
       ],

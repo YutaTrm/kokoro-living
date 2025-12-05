@@ -276,7 +276,6 @@ async function loadPosts() {
         let query = supabaseAdmin
             .from('posts')
             .select('*', { count: 'exact' })
-            .is('parent_post_id', null)
             .order('created_at', { ascending: false })
             .range(start, end);
 
@@ -307,8 +306,20 @@ async function loadPosts() {
 
         const usersMap = new Map(users?.map(u => [u.user_id, u]) || []);
 
+        // 親投稿の情報を取得
+        const parentPostIds = posts.map(p => p.parent_post_id).filter(Boolean);
+        let parentPostsMap = new Map();
+        if (parentPostIds.length > 0) {
+            const { data: parentPosts } = await supabaseAdmin
+                .from('posts')
+                .select('id, content')
+                .in('id', parentPostIds);
+            parentPostsMap = new Map(parentPosts?.map(p => [p.id, p]) || []);
+        }
+
         const rows = posts.map(post => {
             const user = usersMap.get(post.user_id);
+            const parentPost = post.parent_post_id ? parentPostsMap.get(post.parent_post_id) : null;
 
             return `
             <tr class="hover:bg-gray-50 ${post.is_hidden ? 'bg-red-50' : ''}">
@@ -322,6 +333,7 @@ async function loadPosts() {
                     </div>
                 </td>
                 <td class="px-6 py-4 max-w-md">
+                    ${parentPost ? `<p class="text-xs text-gray-400 mb-1 truncate">↩ ${parentPost.content}</p>` : ''}
                     <p class="text-sm text-gray-800">${post.content}</p>
                 </td>
                 <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
@@ -403,36 +415,154 @@ async function loadUsers() {
         const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers();
         const authUsersMap = new Map(authUsers?.users?.map(u => [u.id, u]) || []);
 
+        // ユーザーIDリスト
+        const userIds = users.map(u => u.user_id);
+
+        // 各ユーザーの診断名・服薬・治療・ステータス・フォロー情報を並列取得
+        const [diagnosesData, medicationsData, treatmentsData, statusesData, followingData, followersData] = await Promise.all([
+            supabaseAdmin
+                .from('user_diagnoses')
+                .select('user_id, diagnoses(name)')
+                .in('user_id', userIds),
+            supabaseAdmin
+                .from('user_medications')
+                .select('user_id, ingredients(name)')
+                .in('user_id', userIds),
+            supabaseAdmin
+                .from('user_treatments')
+                .select('user_id, treatments(name)')
+                .in('user_id', userIds),
+            supabaseAdmin
+                .from('user_statuses')
+                .select('user_id, statuses(name)')
+                .in('user_id', userIds),
+            supabaseAdmin
+                .from('follows')
+                .select('follower_id')
+                .in('follower_id', userIds),
+            supabaseAdmin
+                .from('follows')
+                .select('following_id')
+                .in('following_id', userIds)
+        ]);
+
+        // フォロー数・フォロワー数をカウント
+        const followingCountMap = new Map();
+        const followersCountMap = new Map();
+        userIds.forEach(userId => {
+            followingCountMap.set(userId, 0);
+            followersCountMap.set(userId, 0);
+        });
+        followingData.data?.forEach(f => {
+            followingCountMap.set(f.follower_id, (followingCountMap.get(f.follower_id) || 0) + 1);
+        });
+        followersData.data?.forEach(f => {
+            followersCountMap.set(f.following_id, (followersCountMap.get(f.following_id) || 0) + 1);
+        });
+
+        // ユーザーIDごとにタグをグループ化
+        const userTagsMap = new Map();
+        userIds.forEach(userId => {
+            userTagsMap.set(userId, {
+                diagnoses: [],
+                medications: [],
+                treatments: [],
+                statuses: []
+            });
+        });
+
+        // 診断名
+        diagnosesData.data?.forEach(d => {
+            if (d.diagnoses?.name) {
+                userTagsMap.get(d.user_id).diagnoses.push(d.diagnoses.name);
+            }
+        });
+
+        // 服薬（成分名で重複削除）
+        const medicationsByUser = new Map();
+        medicationsData.data?.forEach(m => {
+            if (m.ingredients?.name) {
+                if (!medicationsByUser.has(m.user_id)) {
+                    medicationsByUser.set(m.user_id, new Set());
+                }
+                medicationsByUser.get(m.user_id).add(m.ingredients.name);
+            }
+        });
+        medicationsByUser.forEach((names, userId) => {
+            userTagsMap.get(userId).medications = Array.from(names);
+        });
+
+        // 治療
+        treatmentsData.data?.forEach(t => {
+            if (t.treatments?.name) {
+                userTagsMap.get(t.user_id).treatments.push(t.treatments.name);
+            }
+        });
+
+        // ステータス
+        statusesData.data?.forEach(s => {
+            if (s.statuses?.name) {
+                userTagsMap.get(s.user_id).statuses.push(s.statuses.name);
+            }
+        });
+
         const rows = users.map(user => {
             const authUser = authUsersMap.get(user.user_id);
             const provider = authUser?.app_metadata?.provider || authUser?.identities?.[0]?.provider || '不明';
             const authDisplayName = authUser?.user_metadata?.full_name || authUser?.user_metadata?.name || '';
+            const tags = userTagsMap.get(user.user_id) || { diagnoses: [], medications: [], treatments: [], statuses: [] };
+            const followingCount = followingCountMap.get(user.user_id) || 0;
+            const followersCount = followersCountMap.get(user.user_id) || 0;
+
+            // タグHTML生成
+            const tagsHtml = [
+                ...tags.diagnoses.map(name => `<span class="px-2 py-1 text-xs font-semibold rounded bg-blue-100 text-blue-800">${name}</span>`),
+                ...tags.medications.map(name => `<span class="px-2 py-1 text-xs font-semibold rounded bg-purple-100 text-purple-800">${name}</span>`),
+                ...tags.treatments.map(name => `<span class="px-2 py-1 text-xs font-semibold rounded bg-green-100 text-green-800">${name}</span>`),
+                ...tags.statuses.map(name => `<span class="px-2 py-1 text-xs font-semibold rounded bg-orange-100 text-orange-800">${name}</span>`)
+            ].join(' ');
 
             return `
             <tr class="hover:bg-gray-50">
                 <td class="px-6 py-4">
-                    ${user.avatar_url ?
-                        `<img src="${user.avatar_url}" class="w-12 h-12 rounded-full">` :
-                        '<div class="w-12 h-12 rounded-full bg-gray-300"></div>'
-                    }
-                </td>
-                <td class="px-6 py-4">
-                    <div class="flex items-center gap-2">
-                        <span class="font-semibold text-gray-800">${user.display_name}</span>
-                        ${user.is_admin ? '<span class="px-2 py-1 text-xs font-semibold rounded bg-blue-100 text-blue-800">管理者</span>' : ''}
+                    <div class="flex flex-col items-center gap-1">
+                        ${user.avatar_url ?
+                            `<img src="${user.avatar_url}" class="w-12 h-12 rounded-full">` :
+                            '<div class="w-12 h-12 rounded-full bg-gray-300"></div>'
+                        }
+                        <span class="px-2 py-1 bg-gray-100 rounded text-xs text-gray-600">${provider}</span>
                     </div>
                 </td>
-                <td class="px-6 py-4 text-sm text-gray-600">
-                    ${authDisplayName || '-'}
+                <td class="px-6 py-4">
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="font-semibold text-gray-800">${user.display_name}</span>
+                            ${user.is_admin ? '<span class="px-2 py-1 text-xs font-semibold rounded bg-blue-100 text-blue-800">管理者</span>' : ''}
+                        </div>
+                        ${authDisplayName ? `<span class="text-xs text-gray-500">Auth: ${authDisplayName}</span>` : ''}
+                    </div>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
+                    [${followingCount},${followersCount}]
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">
+                    ${user.bio || '-'}
+                </td>
+                <td class="px-6 py-4 max-w-md">
+                    <div class="flex flex-wrap gap-1">
+                        ${tagsHtml || '<span class="text-gray-400 text-xs">なし</span>'}
+                    </div>
                 </td>
                 <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
                     ${new Date(user.created_at).toLocaleDateString('ja-JP')}
                 </td>
-                <td class="px-6 py-4">
-                    <span class="px-2 py-1 bg-gray-100 rounded text-xs text-gray-600">${provider}</span>
-                </td>
-                <td class="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">
-                    ${user.bio || '-'}
+                <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
+                    ${user.updated_at ? new Date(user.updated_at).toLocaleString('ja-JP', {
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    }) : '-'}
                 </td>
             </tr>
             `;
@@ -444,10 +574,11 @@ async function loadUsers() {
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">アバター</th>
                         <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ユーザー名</th>
-                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Auth名</th>
-                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">登録日</th>
-                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">プロバイダー</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">FF</th>
                         <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Bio</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">タグ</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">登録日</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">更新日</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">

@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react';
-import { ScrollView } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ScrollView, TextInput } from 'react-native';
 
-import { Text } from '@/components/ui/text';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonText } from '@/components/ui/button';
 import { Checkbox, CheckboxIcon, CheckboxIndicator, CheckboxLabel } from '@/components/ui/checkbox';
 import { Heading } from '@/components/ui/heading';
-import { CheckIcon } from '@/components/ui/icon';
+import { CheckIcon, CloseIcon, SearchIcon } from '@/components/ui/icon';
+import { Input, InputField, InputIcon, InputSlot } from '@/components/ui/input';
 import {
   Modal,
   ModalBackdrop,
@@ -15,6 +15,7 @@ import {
   ModalFooter,
   ModalHeader,
 } from '@/components/ui/modal';
+import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
 
 interface TagOption {
@@ -39,11 +40,15 @@ export default function TagFilterModal({
   selectedIds,
 }: TagFilterModalProps) {
   const [localSelectedIds, setLocalSelectedIds] = useState<string[]>(selectedIds);
+  const [filterText, setFilterText] = useState('');
+  const inputRef = useRef<TextInput>(null);
 
-  // モーダルが開くたびに状態をリセット
+  // モーダルが開いたとき、または親のselectedIdsが変わったときに初期化
   useEffect(() => {
     if (isOpen) {
       setLocalSelectedIds(selectedIds);
+      setFilterText('');
+      inputRef.current?.clear();
     }
   }, [isOpen, selectedIds]);
 
@@ -58,8 +63,17 @@ export default function TagFilterModal({
     onClose();
   };
 
+  const handleClear = () => {
+    inputRef.current?.clear();
+    setFilterText('');
+  };
+
   const getTagsByType = (type: 'diagnosis' | 'ingredient' | 'treatment' | 'status') => {
-    return tags.filter((t) => t.type === type);
+    const typeTags = tags.filter((t) => t.type === type);
+    if (!filterText) return typeTags;
+    return typeTags.filter((t) =>
+      t.name.toLowerCase().includes(filterText.toLowerCase())
+    );
   };
 
   const renderSection = (
@@ -101,6 +115,22 @@ export default function TagFilterModal({
           <Heading size="lg">タグで絞り込み</Heading>
         </ModalHeader>
         <ModalBody>
+          <Input size="md" className="mb-3">
+            <InputSlot className="pl-3">
+              <InputIcon as={SearchIcon} />
+            </InputSlot>
+            <InputField
+              ref={inputRef}
+              placeholder="絞り込み..."
+              defaultValue=""
+              onChangeText={setFilterText}
+            />
+            {filterText && (
+              <InputSlot className="pr-3" onPress={handleClear}>
+                <InputIcon as={CloseIcon} />
+              </InputSlot>
+            )}
+          </Input>
           <ScrollView className="flex-1">
             {renderSection('診断名', 'diagnosis')}
             {renderSection('服薬', 'ingredient')}

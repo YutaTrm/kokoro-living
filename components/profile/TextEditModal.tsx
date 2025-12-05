@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { TextInput } from 'react-native';
+import { KeyboardAvoidingView, Platform, TextInput } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { Button, ButtonText } from '@/components/ui/button';
@@ -61,43 +61,48 @@ export default function TextEditModal({
     <Modal isOpen={isOpen} onClose={onClose} size="md">
       <ModalBackdrop />
       <ModalContent>
-        <ModalHeader>
-          <Heading size="lg">{title}</Heading>
-        </ModalHeader>
-        <ModalBody>
-          {multiline ? (
-            <Textarea size="md" className="min-h-32">
-              <TextareaInput
-                ref={inputRef}
-                placeholder={placeholder}
-                defaultValue={initialValue}
-                onChangeText={handleChangeText}
-                maxLength={maxLength}
-              />
-            </Textarea>
-          ) : (
-            <Input size="md">
-              <InputField
-                ref={inputRef}
-                placeholder={placeholder}
-                defaultValue={initialValue}
-                onChangeText={handleChangeText}
-                maxLength={maxLength}
-              />
-            </Input>
-          )}
-          <Text className="text-xs text-typography-500 mt-1 text-right">
-            {charCount}/{maxLength}
-          </Text>
-        </ModalBody>
-        <ModalFooter>
-          <Button variant="outline" onPress={onClose} className="mr-2">
-            <ButtonText>キャンセル</ButtonText>
-          </Button>
-          <Button onPress={handleSave}>
-            <ButtonText>保存</ButtonText>
-          </Button>
-        </ModalFooter>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        >
+          <ModalHeader>
+            <Heading size="lg">{title}</Heading>
+          </ModalHeader>
+          <ModalBody>
+            {multiline ? (
+              <Textarea size="md" className="min-h-32">
+                <TextareaInput
+                  ref={inputRef}
+                  placeholder={placeholder}
+                  defaultValue={initialValue}
+                  onChangeText={handleChangeText}
+                  maxLength={maxLength}
+                />
+              </Textarea>
+            ) : (
+              <Input size="md">
+                <InputField
+                  ref={inputRef}
+                  placeholder={placeholder}
+                  defaultValue={initialValue}
+                  onChangeText={handleChangeText}
+                  maxLength={maxLength}
+                />
+              </Input>
+            )}
+            <Text className="text-xs text-typography-500 mt-1 text-right">
+              {charCount}/{maxLength}
+            </Text>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="outline" onPress={onClose} className="mr-2">
+              <ButtonText>キャンセル</ButtonText>
+            </Button>
+            <Button onPress={handleSave}>
+              <ButtonText>保存</ButtonText>
+            </Button>
+          </ModalFooter>
+        </KeyboardAvoidingView>
       </ModalContent>
     </Modal>
   );

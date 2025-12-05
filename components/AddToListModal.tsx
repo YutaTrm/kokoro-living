@@ -114,26 +114,33 @@ export default function AddToListModal({ isOpen, onClose, userId }: AddToListMod
       // 削除するリスト
       const toRemove = currentListIds.filter((id) => !selectedListIds.includes(id));
 
-      // 追加
+      // 追加と削除を並列実行
+      const promises: Promise<{ error: Error | null }>[] = [];
+
       if (toAdd.length > 0) {
-        const { error: addError } = await supabase.from('list_members').insert(
-          toAdd.map((listId) => ({
-            list_id: listId,
-            user_id: userId,
-          }))
+        promises.push(
+          supabase.from('list_members').insert(
+            toAdd.map((listId) => ({
+              list_id: listId,
+              user_id: userId,
+            }))
+          )
         );
-        if (addError) throw addError;
       }
 
-      // 削除
       if (toRemove.length > 0) {
         const idsToDelete = (currentMembers || [])
           .filter((m) => toRemove.includes(m.list_id))
           .map((m) => m.id);
 
-        const { error: removeError } = await supabase.from('list_members').delete().in('id', idsToDelete);
-        if (removeError) throw removeError;
+        promises.push(
+          supabase.from('list_members').delete().in('id', idsToDelete)
+        );
       }
+
+      const results = await Promise.all(promises);
+      const error = results.find((r) => r.error)?.error;
+      if (error) throw error;
 
       onClose();
     } catch (error) {

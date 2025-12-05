@@ -126,46 +126,47 @@ export default function PostDetailScreen() {
 
       if (postError) throw postError;
 
-      // ユーザー情報を取得
-      const { data: userData } = await supabase
-        .from('users')
-        .select('user_id, display_name, avatar_url')
-        .eq('user_id', postData.user_id)
-        .single();
+      // ユーザー情報と親投稿を並列取得
+      const [userRes, parentRes] = await Promise.all([
+        supabase
+          .from('users')
+          .select('user_id, display_name, avatar_url')
+          .eq('user_id', postData.user_id)
+          .single(),
+        postData.parent_post_id
+          ? supabase
+              .from('posts')
+              .select('id, content, created_at, user_id')
+              .eq('id', postData.parent_post_id)
+              .single()
+          : Promise.resolve({ data: null }),
+      ]);
 
       setPost({
         ...postData,
         user: {
-          display_name: userData?.display_name || 'Unknown',
+          display_name: userRes.data?.display_name || 'Unknown',
           user_id: postData.user_id,
-          avatar_url: userData?.avatar_url || null,
+          avatar_url: userRes.data?.avatar_url || null,
         },
       });
 
-      // 親投稿がある場合は取得（返信詳細ページの場合）
-      if (postData.parent_post_id) {
-        const { data: parentData } = await supabase
-          .from('posts')
-          .select('id, content, created_at, user_id')
-          .eq('id', postData.parent_post_id)
+      // 親投稿がある場合はユーザー情報を取得
+      if (parentRes.data) {
+        const { data: parentUserData } = await supabase
+          .from('users')
+          .select('user_id, display_name, avatar_url')
+          .eq('user_id', parentRes.data.user_id)
           .single();
 
-        if (parentData) {
-          const { data: parentUserData } = await supabase
-            .from('users')
-            .select('user_id, display_name, avatar_url')
-            .eq('user_id', parentData.user_id)
-            .single();
-
-          setParentPost({
-            ...parentData,
-            user: {
-              display_name: parentUserData?.display_name || 'Unknown',
-              user_id: parentData.user_id,
-              avatar_url: parentUserData?.avatar_url || null,
-            },
-          });
-        }
+        setParentPost({
+          ...parentRes.data,
+          user: {
+            display_name: parentUserData?.display_name || 'Unknown',
+            user_id: parentRes.data.user_id,
+            avatar_url: parentUserData?.avatar_url || null,
+          },
+        });
       }
     } catch (error) {
       console.error('投稿取得エラー:', error);
@@ -183,20 +184,20 @@ export default function PostDetailScreen() {
       let mutedUserIds: string[] = [];
 
       if (user) {
-        const { data: blocksData } = await supabase
-          .from('blocks')
-          .select('blocked_id')
-          .eq('blocker_id', user.id);
+        // blocks/mutes を並列取得
+        const [blocksRes, mutesRes] = await Promise.all([
+          supabase
+            .from('blocks')
+            .select('blocked_id')
+            .eq('blocker_id', user.id),
+          supabase
+            .from('mutes')
+            .select('muted_id')
+            .eq('muter_id', user.id),
+        ]);
 
-        blockedUserIds = blocksData?.map(b => b.blocked_id) || [];
-
-        // ミュートしているユーザーを取得
-        const { data: mutesData } = await supabase
-          .from('mutes')
-          .select('muted_id')
-          .eq('muter_id', user.id);
-
-        mutedUserIds = mutesData?.map(m => m.muted_id) || [];
+        blockedUserIds = blocksRes.data?.map(b => b.blocked_id) || [];
+        mutedUserIds = mutesRes.data?.map(m => m.muted_id) || [];
       }
 
       // 直接の返信（1階層目）を取得
@@ -323,20 +324,20 @@ export default function PostDetailScreen() {
       let mutedUserIds: string[] = [];
 
       if (user) {
-        const { data: blocksData } = await supabase
-          .from('blocks')
-          .select('blocked_id')
-          .eq('blocker_id', user.id);
+        // blocks/mutes を並列取得
+        const [blocksRes, mutesRes] = await Promise.all([
+          supabase
+            .from('blocks')
+            .select('blocked_id')
+            .eq('blocker_id', user.id),
+          supabase
+            .from('mutes')
+            .select('muted_id')
+            .eq('muter_id', user.id),
+        ]);
 
-        blockedUserIds = blocksData?.map(b => b.blocked_id) || [];
-
-        // ミュートしているユーザーを取得
-        const { data: mutesData } = await supabase
-          .from('mutes')
-          .select('muted_id')
-          .eq('muter_id', user.id);
-
-        mutedUserIds = mutesData?.map(m => m.muted_id) || [];
+        blockedUserIds = blocksRes.data?.map(b => b.blocked_id) || [];
+        mutedUserIds = mutesRes.data?.map(m => m.muted_id) || [];
       }
 
       let deeperRepliesQuery = supabase
@@ -430,29 +431,30 @@ export default function PostDetailScreen() {
 
   const loadTags = async () => {
     try {
-      const { data: diagnosesData } = await supabase
-        .from('post_diagnoses')
-        .select('user_diagnoses(diagnoses(name))')
-        .eq('post_id', id);
+      // 3つのタグクエリを並列実行
+      const [diagnosesRes, treatmentsRes, medicationsRes] = await Promise.all([
+        supabase
+          .from('post_diagnoses')
+          .select('user_diagnoses(diagnoses(name))')
+          .eq('post_id', id),
+        supabase
+          .from('post_treatments')
+          .select('user_treatments(treatments(name))')
+          .eq('post_id', id),
+        supabase
+          .from('post_medications')
+          .select('user_medications(ingredients(name), products(name))')
+          .eq('post_id', id),
+      ]);
 
       type DiagnosisRow = { user_diagnoses: { diagnoses: { name: string } } | null };
-      const diagnoses = (diagnosesData as DiagnosisRow[] | null)?.map(d => d.user_diagnoses?.diagnoses?.name).filter(Boolean) as string[] || [];
-
-      const { data: treatmentsData } = await supabase
-        .from('post_treatments')
-        .select('user_treatments(treatments(name))')
-        .eq('post_id', id);
+      const diagnoses = (diagnosesRes.data as DiagnosisRow[] | null)?.map(d => d.user_diagnoses?.diagnoses?.name).filter(Boolean) as string[] || [];
 
       type TreatmentRow = { user_treatments: { treatments: { name: string } } | null };
-      const treatments = (treatmentsData as TreatmentRow[] | null)?.map(t => t.user_treatments?.treatments?.name).filter(Boolean) as string[] || [];
-
-      const { data: medicationsData } = await supabase
-        .from('post_medications')
-        .select('user_medications(ingredients(name), products(name))')
-        .eq('post_id', id);
+      const treatments = (treatmentsRes.data as TreatmentRow[] | null)?.map(t => t.user_treatments?.treatments?.name).filter(Boolean) as string[] || [];
 
       type MedicationRow = { user_medications: { ingredients: { name: string } } | null };
-      const medicationsWithDuplicates = (medicationsData as MedicationRow[] | null)?.map(m =>
+      const medicationsWithDuplicates = (medicationsRes.data as MedicationRow[] | null)?.map(m =>
         m.user_medications?.ingredients?.name
       ).filter(Boolean) as string[] || [];
       const medications = [...new Set(medicationsWithDuplicates)];

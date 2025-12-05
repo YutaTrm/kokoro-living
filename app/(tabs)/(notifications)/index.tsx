@@ -60,28 +60,25 @@ export default function NotificationsScreen() {
     if (!userId) return;
 
     try {
-      // ブロックしているユーザーとブロックされているユーザーを取得
-      const { data: blocksData } = await supabase
-        .from('blocks')
-        .select('blocked_id')
-        .eq('blocker_id', userId);
+      // ブロックしているユーザー、ブロックされているユーザー、ミュートしているユーザーを並列取得
+      const [blocksRes, blockedByRes, mutesRes] = await Promise.all([
+        supabase
+          .from('blocks')
+          .select('blocked_id')
+          .eq('blocker_id', userId),
+        supabase
+          .from('blocks')
+          .select('blocker_id')
+          .eq('blocked_id', userId),
+        supabase
+          .from('mutes')
+          .select('muted_id')
+          .eq('muter_id', userId),
+      ]);
 
-      const blockedIds = blocksData?.map((b) => b.blocked_id) || [];
-
-      const { data: blockedByData } = await supabase
-        .from('blocks')
-        .select('blocker_id')
-        .eq('blocked_id', userId);
-
-      const blockedByIds = blockedByData?.map((b) => b.blocker_id) || [];
-
-      // ミュートしているユーザーを取得
-      const { data: mutesData } = await supabase
-        .from('mutes')
-        .select('muted_id')
-        .eq('muter_id', userId);
-
-      const mutedIds = mutesData?.map((m) => m.muted_id) || [];
+      const blockedIds = blocksRes.data?.map((b) => b.blocked_id) || [];
+      const blockedByIds = blockedByRes.data?.map((b) => b.blocker_id) || [];
+      const mutedIds = mutesRes.data?.map((m) => m.muted_id) || [];
 
       const allBlockedIds = [...blockedIds, ...blockedByIds, ...mutedIds];
 

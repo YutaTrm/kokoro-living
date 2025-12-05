@@ -29,6 +29,7 @@ import UserListItem from '@/components/UserListItem';
 import { useMasterData } from '@/src/contexts/MasterDataContext';
 import { useMedicationMasters } from '@/src/hooks/useMedicationMasters';
 import { supabase } from '@/src/lib/supabase';
+import { fetchPostsStats } from '@/src/utils/postStats';
 
 interface Post {
   id: string;
@@ -45,6 +46,10 @@ interface Post {
   treatments: string[];
   medications: string[];
   isMuted?: boolean;
+  repliesCount?: number;
+  likesCount?: number;
+  isLikedByCurrentUser?: boolean;
+  hasRepliedByCurrentUser?: boolean;
 }
 
 interface TagOption {
@@ -217,20 +222,20 @@ export default function SearchScreen() {
       let allBlockedUserIds: string[] = [];
 
       if (user) {
-        const { data: blocksData } = await supabase
-          .from('blocks')
-          .select('blocked_id')
-          .eq('blocker_id', user.id);
+        // blocks/blockedBy を並列取得
+        const [blocksRes, blockedByRes] = await Promise.all([
+          supabase
+            .from('blocks')
+            .select('blocked_id')
+            .eq('blocker_id', user.id),
+          supabase
+            .from('blocks')
+            .select('blocker_id')
+            .eq('blocked_id', user.id),
+        ]);
 
-        const blockedUserIds = blocksData?.map(b => b.blocked_id) || [];
-
-        // ブロックされているユーザーも取得
-        const { data: blockedByData } = await supabase
-          .from('blocks')
-          .select('blocker_id')
-          .eq('blocked_id', user.id);
-
-        const blockedByUserIds = blockedByData?.map(b => b.blocker_id) || [];
+        const blockedUserIds = blocksRes.data?.map(b => b.blocked_id) || [];
+        const blockedByUserIds = blockedByRes.data?.map(b => b.blocker_id) || [];
 
         // 両方を結合
         allBlockedUserIds = [...blockedUserIds, ...blockedByUserIds];
@@ -414,31 +419,26 @@ export default function SearchScreen() {
       let mutedUserIds: string[] = [];
 
       if (user) {
-        const { data: blocksData } = await supabase
-          .from('blocks')
-          .select('blocked_id')
-          .eq('blocker_id', user.id);
+        // blocks/blockedBy/mutes を並列取得
+        const [blocksRes, blockedByRes, mutesRes] = await Promise.all([
+          supabase
+            .from('blocks')
+            .select('blocked_id')
+            .eq('blocker_id', user.id),
+          supabase
+            .from('blocks')
+            .select('blocker_id')
+            .eq('blocked_id', user.id),
+          supabase
+            .from('mutes')
+            .select('muted_id')
+            .eq('muter_id', user.id),
+        ]);
 
-        const blockedUserIds = blocksData?.map(b => b.blocked_id) || [];
-
-        // ブロックされているユーザーも取得
-        const { data: blockedByData } = await supabase
-          .from('blocks')
-          .select('blocker_id')
-          .eq('blocked_id', user.id);
-
-        const blockedByUserIds = blockedByData?.map(b => b.blocker_id) || [];
-
-        // 両方を結合
+        const blockedUserIds = blocksRes.data?.map(b => b.blocked_id) || [];
+        const blockedByUserIds = blockedByRes.data?.map(b => b.blocker_id) || [];
         allBlockedUserIds = [...blockedUserIds, ...blockedByUserIds];
-
-        // ミュートしているユーザーを取得
-        const { data: mutesData } = await supabase
-          .from('mutes')
-          .select('muted_id')
-          .eq('muter_id', user.id);
-
-        mutedUserIds = mutesData?.map(m => m.muted_id) || [];
+        mutedUserIds = mutesRes.data?.map(m => m.muted_id) || [];
       }
 
       // 基本クエリ（非表示投稿を除外）
@@ -499,52 +499,94 @@ export default function SearchScreen() {
         (usersData || []).map((u) => [u.user_id, { display_name: u.display_name, avatar_url: u.avatar_url }])
       );
 
-      // 各投稿のタグを取得
-      const postsWithData = await Promise.all(
-        filteredPosts.map(async (post) => {
-          const [diagnosesData, treatmentsData, medicationsData] = await Promise.all([
-            supabase
-              .from('post_diagnoses')
-              .select('user_diagnoses(diagnoses(name))')
-              .eq('post_id', post.id),
-            supabase
-              .from('post_treatments')
-              .select('user_treatments(treatments(name))')
-              .eq('post_id', post.id),
-            supabase
-              .from('post_medications')
-              .select('user_medications(ingredients(name), products(name))')
-              .eq('post_id', post.id),
-          ]);
+      // 統計情報とタグを一括取得（N+1問題を解消）
+      const postIds = filteredPosts.map((p) => p.id);
+      const [statsMap, diagnosesRes, treatmentsRes, medicationsRes] = await Promise.all([
+        fetchPostsStats(postIds, user?.id || null),
+        supabase
+          .from('post_diagnoses')
+          .select('post_id, user_diagnoses(diagnoses(name))')
+          .in('post_id', postIds),
+        supabase
+          .from('post_treatments')
+          .select('post_id, user_treatments(treatments(name))')
+          .in('post_id', postIds),
+        supabase
+          .from('post_medications')
+          .select('post_id, user_medications(ingredients(name), products(name))')
+          .in('post_id', postIds),
+      ]);
 
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const diagnoses = diagnosesData.data?.map((d: any) => d.user_diagnoses?.diagnoses?.name).filter(Boolean) || [];
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const treatments = treatmentsData.data?.map((t: any) => t.user_treatments?.treatments?.name).filter(Boolean) || [];
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const medicationsWithDuplicates = medicationsData.data?.map((m: any) =>
-            m.user_medications?.ingredients?.name
-          ).filter(Boolean) || [];
-          const medications = [...new Set(medicationsWithDuplicates)];
+      // タグをマップに変換
+      const diagnosesMap = new Map<string, string[]>();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      diagnosesRes.data?.forEach((d: any) => {
+        const name = d.user_diagnoses?.diagnoses?.name;
+        if (name) {
+          if (!diagnosesMap.has(d.post_id)) {
+            diagnosesMap.set(d.post_id, []);
+          }
+          diagnosesMap.get(d.post_id)?.push(name);
+        }
+      });
 
-          return {
-            id: post.id,
-            content: post.content,
-            created_at: post.created_at,
-            parent_post_id: post.parent_post_id,
-            is_hidden: false, // 検索画面では非表示投稿は除外されている
-            user: {
-              display_name: usersMap.get(post.user_id)?.display_name || 'Unknown',
-              user_id: post.user_id,
-              avatar_url: usersMap.get(post.user_id)?.avatar_url || null,
-            },
-            diagnoses,
-            treatments,
-            medications,
-            isMuted: mutedUserIds.includes(post.user_id),
-          };
-        })
-      );
+      const treatmentsMap = new Map<string, string[]>();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      treatmentsRes.data?.forEach((t: any) => {
+        const name = t.user_treatments?.treatments?.name;
+        if (name) {
+          if (!treatmentsMap.has(t.post_id)) {
+            treatmentsMap.set(t.post_id, []);
+          }
+          treatmentsMap.get(t.post_id)?.push(name);
+        }
+      });
+
+      const medicationsMap = new Map<string, string[]>();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      medicationsRes.data?.forEach((m: any) => {
+        const name = m.user_medications?.ingredients?.name;
+        if (name) {
+          if (!medicationsMap.has(m.post_id)) {
+            medicationsMap.set(m.post_id, []);
+          }
+          const medications = medicationsMap.get(m.post_id)!;
+          if (!medications.includes(name)) {
+            medications.push(name);
+          }
+        }
+      });
+
+      // 投稿データを組み立て
+      const postsWithData = filteredPosts.map((post) => {
+        const stats = statsMap.get(post.id) || {
+          repliesCount: 0,
+          likesCount: 0,
+          isLikedByCurrentUser: false,
+          hasRepliedByCurrentUser: false,
+        };
+
+        return {
+          id: post.id,
+          content: post.content,
+          created_at: post.created_at,
+          parent_post_id: post.parent_post_id,
+          is_hidden: false,
+          user: {
+            display_name: usersMap.get(post.user_id)?.display_name || 'Unknown',
+            user_id: post.user_id,
+            avatar_url: usersMap.get(post.user_id)?.avatar_url || null,
+          },
+          diagnoses: diagnosesMap.get(post.id) || [],
+          treatments: treatmentsMap.get(post.id) || [],
+          medications: medicationsMap.get(post.id) || [],
+          isMuted: mutedUserIds.includes(post.user_id),
+          repliesCount: stats.repliesCount,
+          likesCount: stats.likesCount,
+          isLikedByCurrentUser: stats.isLikedByCurrentUser,
+          hasRepliedByCurrentUser: stats.hasRepliedByCurrentUser,
+        };
+      });
 
       if (reset) {
         setPosts(postsWithData);

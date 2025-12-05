@@ -35,21 +35,20 @@ export default function PostLikesScreen() {
     if (!currentUserId) return;
 
     try {
-      // ブロックしているユーザーとブロックされているユーザーを取得
-      const { data: blocksData } = await supabase
-        .from('blocks')
-        .select('blocked_id')
-        .eq('blocker_id', currentUserId);
+      // ブロックしているユーザーとブロックされているユーザーを並列取得
+      const [blocksRes, blockedByRes] = await Promise.all([
+        supabase
+          .from('blocks')
+          .select('blocked_id')
+          .eq('blocker_id', currentUserId),
+        supabase
+          .from('blocks')
+          .select('blocker_id')
+          .eq('blocked_id', currentUserId),
+      ]);
 
-      const blockedIds = blocksData?.map((b) => b.blocked_id) || [];
-
-      const { data: blockedByData } = await supabase
-        .from('blocks')
-        .select('blocker_id')
-        .eq('blocked_id', currentUserId);
-
-      const blockedByIds = blockedByData?.map((b) => b.blocker_id) || [];
-
+      const blockedIds = blocksRes.data?.map((b) => b.blocked_id) || [];
+      const blockedByIds = blockedByRes.data?.map((b) => b.blocker_id) || [];
       const allBlockedIds = [...blockedIds, ...blockedByIds];
 
       // 投稿の作成者を確認
