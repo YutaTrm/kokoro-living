@@ -23,7 +23,6 @@
         "CFBundleLocalizations": ["ja", "en"]
       }
     },
-    "primaryLanguage": "ja",
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
