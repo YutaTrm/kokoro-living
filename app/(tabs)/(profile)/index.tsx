@@ -30,7 +30,7 @@ import { useMasterData } from '@/src/contexts/MasterDataContext';
 import { useFollow } from '@/src/hooks/useFollow';
 import { useMedicationMasters } from '@/src/hooks/useMedicationMasters';
 import { usePostsData } from '@/src/hooks/usePostsData';
-import { usePurchase } from '@/src/hooks/usePurchase';
+// import { usePurchase } from '@/src/hooks/usePurchase'; // 課金機能は一時的に無効化
 import { supabase } from '@/src/lib/supabase';
 import { showError } from '@/src/utils/errorHandler';
 import { pickAndCompressImage } from '@/src/utils/imageCompression';
@@ -147,9 +147,10 @@ export default function ProfileScreen() {
   const [generating, setGenerating] = useState(false);
   const [ticketCount, setTicketCount] = useState(0);
   const [hasFreeQuota, setHasFreeQuota] = useState(false);
+  const [freeQuotaRemaining, setFreeQuotaRemaining] = useState(2);
   const [loadingTicketInfo, setLoadingTicketInfo] = useState(false);
   const [showGenerateConfirmModal, setShowGenerateConfirmModal] = useState(false);
-  const { purchasing, handlePurchase } = usePurchase();
+  // const { purchasing, handlePurchase } = usePurchase(); // 課金機能は一時的に無効化
 
   const [diagnoses, setDiagnoses] = useState<MedicalRecord[]>([]);
   const [medications, setMedications] = useState<MedicalRecord[]>([]);
@@ -293,17 +294,25 @@ export default function ProfileScreen() {
 
       setTicketCount(userData?.ai_reflection_tickets || 0);
 
-      // 無料枠をチェック
-      const { data: hasFreeQuotaData, error: quotaError } = await supabase.rpc(
-        'check_free_reflection_quota',
-        { p_user_id: user.id }
-      );
+      // 今月の無料使用回数を取得
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
 
-      if (quotaError) {
-        console.error('無料枠チェックエラー:', JSON.stringify(quotaError, null, 2));
+      const { count: usedCount, error: countError } = await supabase
+        .from('ai_reflections')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('is_free', true)
+        .gte('created_at', startOfMonth.toISOString());
+
+      if (countError) {
+        console.error('無料枠カウントエラー:', JSON.stringify(countError, null, 2));
       }
 
-      setHasFreeQuota(hasFreeQuotaData || false);
+      const remaining = Math.max(0, 2 - (usedCount || 0));
+      setFreeQuotaRemaining(remaining);
+      setHasFreeQuota(remaining > 0);
       ticketInfoLoadedRef.current = true;
     } catch (error) {
       console.error('チケット情報取得エラー:', error);
@@ -457,9 +466,7 @@ export default function ProfileScreen() {
   };
 
   // 確認モーダルのメッセージ
-  const generateConfirmMessage = hasFreeQuota
-    ? '今月の無料枠（1回）を使用します。\nよろしいですか？'
-    : `チケットを1回分消費します。\n（残り${ticketCount}回）\nよろしいですか？`;
+  const generateConfirmMessage = '今月の無料枠を使用します。\nよろしいですか？';
 
   const generateConfirmNote = '・生成には約15秒〜1分程度かかります。画面を切り替えても生成は継続され、完了するとウィンドウでお知らせします。\n・AIによる分析のため、生成結果が正確でない場合があります。';
 
@@ -1432,67 +1439,41 @@ export default function ProfileScreen() {
               </Box>
             ) : (
               <Card className="bg-background-10">
-                <VStack space="sm">
-                  <Heading size="sm">利用可能回数</Heading>
-                  <HStack space="md" className="items-center">
-                    <VStack space="xs" className="flex-1">
-                      <Text className="text-xs text-typography-500">今月の無料枠</Text>
-                      <Text className="text-lg font-semibold">
-                        {hasFreeQuota ? '残り1回' : '使用済み'}
-                      </Text>
-                    </VStack>
-                    <VStack space="xs" className="flex-1">
-                      <Text className="text-xs text-typography-500">チケット残数</Text>
-                      <Text className="text-lg font-semibold">
-                        {ticketCount}回
-                      </Text>
-                    </VStack>
-                  </HStack>
-                </VStack>
+                <HStack className="justify-between items-center">
+                  <Heading size="sm">今月の無料枠</Heading>
+                  <Text className="text-base">
+                    残り {freeQuotaRemaining} 回 / 2回
+                  </Text>
+                </HStack>
               </Card>
             )}
 
-            {/* 生成ボタン or 購入ボタン */}
-            {loadingTicketInfo ? null : hasFreeQuota || ticketCount > 0 ? (
-              <Button
-                onPress={handleGenerateReflection}
-                isDisabled={generating}
-                size="lg"
-                className="w-full"
-              >
-                {generating ? (
-                  <>
-                    <ButtonSpinner />
-                    <ButtonText>生成中...</ButtonText>
-                  </>
-                ) : (
-                  <>
-                    <ButtonIcon as={Sparkles} />
-                    <ButtonText>AI振り返りを生成</ButtonText>
-                  </>
-                )}
-              </Button>
-            ) : (
-              <VStack space="md">
+            {/* 生成ボタン */}
+            {!loadingTicketInfo && (
+              <VStack space="sm">
                 <Button
-                  onPress={async () => {
-                    await handlePurchase();
-                    await loadTicketInfo();
-                  }}
-                  isDisabled={purchasing}
+                  onPress={handleGenerateReflection}
+                  isDisabled={generating || !hasFreeQuota}
                   size="lg"
                   className="w-full"
-                  variant="solid"
                 >
-                  {purchasing ? (
+                  {generating ? (
                     <>
                       <ButtonSpinner />
-                      <ButtonText>購入処理中...</ButtonText>
+                      <ButtonText>生成中...</ButtonText>
                     </>
                   ) : (
-                    <ButtonText>2回分を100円で購入</ButtonText>
+                    <>
+                      <ButtonIcon as={Sparkles} />
+                      <ButtonText>AI振り返りを生成</ButtonText>
+                    </>
                   )}
                 </Button>
+                {!hasFreeQuota && (
+                  <Text className="text-center text-typography-400 text-sm">
+                    来月分の無料枠をお待ち下さい
+                  </Text>
+                )}
               </VStack>
             )}
 
