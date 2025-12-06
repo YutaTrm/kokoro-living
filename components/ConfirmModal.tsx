@@ -1,4 +1,5 @@
 import { Text } from '@/components/ui/text';
+import { Box } from '@/components/ui/box';
 import { Button, ButtonText } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
 import {
@@ -19,6 +20,8 @@ interface ConfirmModalProps {
   message: string;
   confirmText: string;
   isLoading?: boolean;
+  confirmAction?: 'negative' | 'primary';
+  note?: string;
 }
 
 export default function ConfirmModal({
@@ -29,6 +32,8 @@ export default function ConfirmModal({
   message,
   confirmText,
   isLoading = false,
+  confirmAction = 'negative',
+  note,
 }: ConfirmModalProps) {
   return (
     <Modal isOpen={isOpen} onClose={() => !isLoading && onClose()} size="sm">
@@ -39,12 +44,17 @@ export default function ConfirmModal({
         </ModalHeader>
         <ModalBody>
           <Text>{message}</Text>
+          {note && (
+            <Box className="mt-3 p-3 bg-background-100 rounded-lg border border-outline-200">
+              <Text className="text-xs text-typography-500">{note}</Text>
+            </Box>
+          )}
         </ModalBody>
         <ModalFooter>
           <Button variant="outline" onPress={onClose} isDisabled={isLoading} className="mr-2">
             <ButtonText>キャンセル</ButtonText>
           </Button>
-          <Button action="negative" onPress={onConfirm} isDisabled={isLoading}>
+          <Button action={confirmAction} onPress={onConfirm} isDisabled={isLoading}>
             {isLoading ? <Spinner size="small" /> : <ButtonText>{confirmText}</ButtonText>}
           </Button>
         </ModalFooter>

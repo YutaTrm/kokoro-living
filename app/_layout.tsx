@@ -6,7 +6,11 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
+import { LogBox } from 'react-native';
 import 'react-native-reanimated';
+
+// ライブラリ内部の非推奨警告を抑制（gluestack-ui等が原因）
+LogBox.ignoreLogs(['SafeAreaView has been deprecated']);
 
 import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
 import { MasterDataProvider } from '@/src/contexts/MasterDataContext';

@@ -2,13 +2,12 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   initConnection,
   endConnection,
-  getProducts,
+  fetchProducts,
   requestPurchase,
-  Purchase,
   purchaseUpdatedListener,
   finishTransaction,
-  PurchaseError,
-  Product,
+  type Purchase,
+  type Product,
 } from 'react-native-iap';
 import { Alert, Platform } from 'react-native';
 import { supabase } from '@/src/lib/supabase';
@@ -27,7 +26,7 @@ export const usePurchase = () => {
 
   // IAPの初期化と商品情報取得
   useEffect(() => {
-    let purchaseUpdateSubscription: any;
+    let purchaseUpdateSubscription: { remove: () => void } | undefined;
 
     const initialize = async () => {
       try {
@@ -43,15 +42,17 @@ export const usePurchase = () => {
         console.log('IAP接続成功');
 
         // 商品情報を取得
-        const availableProducts = await getProducts(PRODUCT_IDS);
+        const availableProducts = await fetchProducts({ skus: PRODUCT_IDS });
         console.log('商品情報取得成功:', availableProducts);
-        setProducts(availableProducts);
+        if (availableProducts) {
+          setProducts(availableProducts as Product[]);
+        }
 
         // 購入リスナーを設定
         purchaseUpdateSubscription = purchaseUpdatedListener(
           async (purchase: Purchase) => {
             console.log('購入イベント受信:', purchase);
-            const receipt = purchase.transactionReceipt || purchase.transactionId;
+            const receipt = purchase.transactionId;
 
             if (receipt) {
               try {
@@ -90,7 +91,7 @@ export const usePurchase = () => {
     if (!user) throw new Error('ユーザーが見つかりません');
 
     const platform = Platform.OS === 'ios' ? 'ios' : 'android';
-    const receipt = purchase.transactionReceipt || purchase.transactionId || '';
+    const receipt = purchase.transactionId || '';
 
     // Edge Functionを呼び出し
     const { data, error } = await supabase.functions.invoke('verify-purchase', {
@@ -118,16 +119,22 @@ export const usePurchase = () => {
 
     setPurchasing(true);
     try {
-      // 購入リクエスト
-      await requestPurchase({ sku: PRODUCT_IDS[0], andDangerouslyFinishTransactionAutomaticallyIOS: false });
+      // 購入リクエスト（プラットフォーム別）
+      const purchaseArgs = Platform.OS === 'ios'
+        ? { request: { sku: PRODUCT_IDS[0] }, type: 'in-app' as const }
+        : { request: { skus: PRODUCT_IDS }, type: 'in-app' as const };
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await requestPurchase(purchaseArgs as any);
 
       // 購入完了後の処理はpurchaseUpdatedListenerで行われる
       Alert.alert('成功', 'チケットを2回分追加しました！');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('購入エラー:', error);
 
-      if ((error as PurchaseError).code === 'E_USER_CANCELLED') {
-        // ユーザーがキャンセルした場合は何もしない
+      // ユーザーキャンセルのチェック
+      const errorMessage = error instanceof Error ? error.message : '';
+      if (errorMessage.includes('cancel') || errorMessage.includes('Cancel')) {
         console.log('購入がキャンセルされました');
       } else {
         Alert.alert('エラー', '購入に失敗しました');

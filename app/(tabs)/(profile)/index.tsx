@@ -1,10 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { Bot, Pencil, Sparkles } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, FlatList, Pressable, TouchableOpacity } from 'react-native';
-import { Pencil, Sparkles } from 'lucide-react-native';
 
+import ConfirmModal from '@/components/ConfirmModal';
 import LoginPrompt from '@/components/LoginPrompt';
 import PostItem from '@/components/PostItem';
 import DatePickerModal from '@/components/profile/DatePickerModal';
@@ -91,12 +92,16 @@ export default function ProfileScreen() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const { counts: followCounts, refetch: refetchFollowCounts } = useFollow(currentUserId);
   const isMenuOpenRef = useRef(false);
+  const ticketInfoLoadedRef = useRef(false);
+  const reflectionsLoadedRef = useRef(false);
+  const initialLoadCompleteRef = useRef(false);
   const [aiReflections, setAiReflections] = useState<any[]>([]);
   const [loadingReflections, setLoadingReflections] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [ticketCount, setTicketCount] = useState(0);
   const [hasFreeQuota, setHasFreeQuota] = useState(false);
   const [loadingTicketInfo, setLoadingTicketInfo] = useState(false);
+  const [showGenerateConfirmModal, setShowGenerateConfirmModal] = useState(false);
   const { purchasing, handlePurchase } = usePurchase();
 
   const [diagnoses, setDiagnoses] = useState<MedicalRecord[]>([]);
@@ -195,7 +200,10 @@ export default function ProfileScreen() {
   }, [activeTab]);
 
   const loadAiReflections = useCallback(async () => {
-    setLoadingReflections(true);
+    // 初回のみスピナーを表示（2回目以降はバックグラウンド更新）
+    if (!reflectionsLoadedRef.current) {
+      setLoadingReflections(true);
+    }
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -209,6 +217,7 @@ export default function ProfileScreen() {
       if (error) throw error;
 
       setAiReflections(data || []);
+      reflectionsLoadedRef.current = true;
     } catch (error) {
       console.error('振り返り取得エラー:', error);
     } finally {
@@ -218,7 +227,10 @@ export default function ProfileScreen() {
 
   // チケット情報を取得
   const loadTicketInfo = useCallback(async () => {
-    setLoadingTicketInfo(true);
+    // 初回のみスピナーを表示（2回目以降はバックグラウンド更新）
+    if (!ticketInfoLoadedRef.current) {
+      setLoadingTicketInfo(true);
+    }
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -241,10 +253,11 @@ export default function ProfileScreen() {
       );
 
       if (quotaError) {
-        console.error('無料枠チェックエラー:', quotaError);
+        console.error('無料枠チェックエラー:', JSON.stringify(quotaError, null, 2));
       }
 
       setHasFreeQuota(hasFreeQuotaData || false);
+      ticketInfoLoadedRef.current = true;
     } catch (error) {
       console.error('チケット情報取得エラー:', error);
     } finally {
@@ -252,9 +265,12 @@ export default function ProfileScreen() {
     }
   }, []);
 
-  // 画面フォーカス時にフォロー数を更新（メニューが開いている時はスキップ、遅延で操作と競合を防ぐ）
+  // 画面フォーカス時にフォロー数を更新（初回ロード完了後、メニューが閉じている時のみ）
   useFocusEffect(
     useCallback(() => {
+      // 初回ロードが完了していない場合はスキップ
+      if (!initialLoadCompleteRef.current) return;
+
       const timer = setTimeout(() => {
         if (currentUserId && !isMenuOpenRef.current) {
           refetchFollowCounts();
@@ -279,8 +295,8 @@ export default function ProfileScreen() {
     isMenuOpenRef.current = isOpen;
   }, []);
 
-  // AI振り返りを生成
-  const handleGenerateReflection = async () => {
+  // AI振り返りを生成（実際の処理）
+  const executeGenerateReflection = async () => {
     setGenerating(true);
     try {
       const {
@@ -291,53 +307,99 @@ export default function ProfileScreen() {
         return;
       }
 
+      // 生成前の最新の振り返りIDを取得
+      const { data: beforeReflections } = await supabase
+        .from('ai_reflections')
+        .select('id')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      const beforeLatestId = beforeReflections?.[0]?.id;
+
       // Supabase Functionを呼び出し
       const { data, error } = await supabase.functions.invoke('generate-ai-reflection', {
         body: { userId: user.id },
       });
 
-      if (error) {
-        console.error('Function error:', error);
+      console.log('Function response:', { data, error });
 
-        // エラーメッセージを抽出
-        let errorMessage = '生成に失敗しました';
-
-        try {
-          // error.context は Response オブジェクト
-          if (error.context && typeof error.context.json === 'function') {
-            const errorData = await error.context.json();
-            console.log('Error data:', errorData);
-            errorMessage = errorData.error || errorMessage;
-          } else if (data?.error) {
-            errorMessage = data.error;
-          } else if (error.message) {
-            errorMessage = error.message;
-          }
-        } catch (e) {
-          console.error('Error parsing response:', e);
-          // デフォルトメッセージを使用
-        }
-
-        Alert.alert('エラー', errorMessage);
+      // 成功チェックを先に行う（errorがあってもdataに成功データが含まれる場合がある）
+      if (data?.success) {
+        // refをリセットして次回スピナー表示
+        reflectionsLoadedRef.current = false;
+        ticketInfoLoadedRef.current = false;
+        await loadAiReflections();
+        await loadTicketInfo();
+        Alert.alert('成功', 'AI振り返りが生成されました！');
         return;
       }
 
+      // データにエラーがある場合（明確なビジネスロジックエラー）
       if (data?.error) {
         Alert.alert('エラー', data.error);
         return;
       }
 
-      // 成功
-      await loadAiReflections();
-      await loadTicketInfo();
-      Alert.alert('成功', 'AI振り返りが生成されました！');
-    } catch (error: any) {
+      // ネットワークエラー等の場合、実際に生成されたかを確認
+      if (error) {
+        console.log('Function returned error, checking if reflection was created...', error);
+
+        // 少し待ってから最新の振り返りを確認
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        const { data: afterReflections } = await supabase
+          .from('ai_reflections')
+          .select('id')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        const afterLatestId = afterReflections?.[0]?.id;
+
+        // 新しい振り返りが作成されていれば成功
+        if (afterLatestId && afterLatestId !== beforeLatestId) {
+          console.log('New reflection was created despite error');
+          reflectionsLoadedRef.current = false;
+          ticketInfoLoadedRef.current = false;
+          await loadAiReflections();
+          await loadTicketInfo();
+          Alert.alert('成功', 'AI振り返りが生成されました！');
+          return;
+        }
+
+        // 本当にエラーの場合
+        console.error('Function error:', error);
+        Alert.alert('エラー', error.message || '生成に失敗しました');
+        return;
+      }
+
+      // 予期しないレスポンス
+      Alert.alert('エラー', '予期しないエラーが発生しました');
+    } catch (error: unknown) {
       console.error('生成エラー:', error);
-      Alert.alert('エラー', error.message || '生成に失敗しました');
+      const errorMessage = error instanceof Error ? error.message : '生成に失敗しました';
+      Alert.alert('エラー', errorMessage);
     } finally {
       setGenerating(false);
     }
   };
+
+  // AI振り返りを生成（確認ダイアログ付き）
+  const handleGenerateReflection = () => {
+    setShowGenerateConfirmModal(true);
+  };
+
+  // 確認モーダルで「生成する」を押した時
+  const handleConfirmGenerate = () => {
+    setShowGenerateConfirmModal(false);
+    executeGenerateReflection();
+  };
+
+  // 確認モーダルのメッセージ
+  const generateConfirmMessage = hasFreeQuota
+    ? '今月の無料枠（1回）を使用します。\nよろしいですか？'
+    : `チケットを1回分消費します。\n（残り${ticketCount}回）\nよろしいですか？`;
+
+  const generateConfirmNote = '・生成には約15秒〜1分程度かかります。画面を切り替えても生成は継続され、完了するとウィンドウでお知らせします。\n・AIによる分析のため、生成結果が正確でない場合があります。';
 
   const loadMasterData = () => {
     try {
@@ -931,6 +993,7 @@ export default function ProfileScreen() {
       console.error('プロフィール読み込みエラー:', error);
     } finally {
       setLoading(false);
+      initialLoadCompleteRef.current = true;
     }
   };
 
@@ -1276,33 +1339,33 @@ export default function ProfileScreen() {
       {/* AI振り返りタブの内容 */}
       {activeTab === 'ai-reflection' && (
         <Box className="p-4">
-          <VStack space="xl">
+          <VStack space="sm">
             {/* 説明 */}
-            <Card className="p-4 bg-info-50">
-              <VStack space="sm">
-                <Heading size="md">AI振り返りについて</Heading>
-                <Text className="text-sm text-typography-600">
-                  投稿、返信、チェックイン等を元にAIが振り返りを生成します。
-                </Text>
-                <Text className="text-sm text-typography-600 font-semibold">
-                  前回の生成から3日以上経過し、新しいデータが十分に溜まっている必要があります。
-                </Text>
-                <Text className="text-xs text-typography-500 mt-2">
-                  ※ 生成には15秒〜1分程度かかります。画面を切り替えても生成は継続されます。
-                </Text>
-                <Text className="text-xs text-typography-500">
-                  ※ AIによる分析のため、生成結果が正確でない場合があります。
-                </Text>
-              </VStack>
-            </Card>
+            <HStack space="md" className="items-start">
+              <Card className="flex-1 bg-background-0">
+                <HStack>
+                  <Box className="w-12 h-12 rounded-full bg-secondary-400 items-center justify-center flex-shrink-0">
+                    <Icon as={Bot} size="xl" className="text-white" />
+                  </Box>
+                  <VStack space="sm" className="ml-3 flex-1 flex-shrink gap-1">
+                    <Text className="text-sm text-typography-600">
+                      あなたのアプリ内のアクション(投稿/返信/チェックイン等)を元にAIが振り返りを生成します。
+                    </Text>
+                    <Text className="text-sm text-typography-600 font-semibold">
+                      前回の生成から3日以上経過し、新しいデータが十分に溜まっている必要があります。
+                    </Text>
+                  </VStack>
+                </HStack>
+              </Card>
+            </HStack>
 
             {/* チケット情報 */}
             {loadingTicketInfo ? (
-              <Box className="py-4 items-center">
+              <Box className="p-4 items-center">
                 <Spinner />
               </Box>
             ) : (
-              <Card className="p-4 bg-background-50">
+              <Card className="bg-background-10">
                 <VStack space="sm">
                   <Heading size="sm">利用可能回数</Heading>
                   <HStack space="md" className="items-center">
@@ -1324,7 +1387,7 @@ export default function ProfileScreen() {
             )}
 
             {/* 生成ボタン or 購入ボタン */}
-            {hasFreeQuota || ticketCount > 0 ? (
+            {loadingTicketInfo ? null : hasFreeQuota || ticketCount > 0 ? (
               <Button
                 onPress={handleGenerateReflection}
                 isDisabled={generating}
@@ -1345,12 +1408,6 @@ export default function ProfileScreen() {
               </Button>
             ) : (
               <VStack space="md">
-                <Card className="p-4 bg-warning-50">
-                  <Text className="text-sm text-center text-typography-700">
-                    今月の無料枠とチケットを使い切りました。{'\n'}
-                    チケットを購入すると振り返りを生成できます。
-                  </Text>
-                </Card>
                 <Button
                   onPress={async () => {
                     await handlePurchase();
@@ -1379,46 +1436,41 @@ export default function ProfileScreen() {
                 <Spinner size="large" />
               </Box>
             ) : aiReflections.length > 0 ? (
-              <>
-                <VStack space="md">
-                  <Heading size="md">生成された振り返り</Heading>
-                  <Card key={aiReflections[0].id} className="p-4">
-                    <VStack space="sm">
-                      <Text className="text-xs text-typography-500">
-                        {new Date(aiReflections[0].created_at).toLocaleString('ja-JP')}
-                      </Text>
-                      <Text className="text-base leading-6">{aiReflections[0].content}</Text>
-                    </VStack>
-                  </Card>
-                </VStack>
-
-                {/* 過去の振り返り */}
-                {aiReflections.length > 1 && (
-                  <VStack space="md">
-                    <Heading size="md">過去の振り返り</Heading>
-                    {aiReflections.slice(1).map((reflection) => (
-                      <Pressable
-                        key={reflection.id}
-                        onPress={() => router.push(`/(tabs)/(profile)/ai-reflection/${reflection.id}`)}
-                      >
-                        <Card className="p-4">
-                          <VStack space="sm">
-                            <Text className="text-xs text-typography-500">
-                              {new Date(reflection.created_at).toLocaleString('ja-JP')}
-                            </Text>
-                            <Text className="text-sm text-typography-600 line-clamp-2">
-                              {reflection.content}
-                            </Text>
-                            <Text className="text-xs text-primary-500">
-                              タップして詳細を見る →
-                            </Text>
-                          </VStack>
-                        </Card>
-                      </Pressable>
-                    ))}
-                  </VStack>
-                )}
-              </>
+              <VStack space="md" className="mt-4">
+                <Heading size="md">生成された振り返り</Heading>
+                {aiReflections.map((reflection) => (
+                  <Pressable
+                    key={reflection.id}
+                    onPress={() => router.push(`/(tabs)/(profile)/ai-reflection/${reflection.id}`)}
+                  >
+                    <Card className="p-4">
+                      <VStack space="sm">
+                        <Text className="text-base text-semibold text-typography-600">
+                          {new Date(reflection.created_at).toLocaleString('ja-JP')}
+                        </Text>
+                        <Text className="text-sm text-typography-600 line-clamp-3">
+                          {reflection.content}
+                        </Text>
+                      </VStack>
+                    </Card>
+                  </Pressable>
+                  <Pressable
+                    key={reflection.id}
+                    onPress={() => router.push(`/(tabs)/(profile)/ai-reflection/${reflection.id}`)}
+                  >
+                    <Card className="p-4">
+                      <VStack space="sm">
+                        <Text className="text-base text-semibold text-typography-600">
+                          {new Date(reflection.created_at).toLocaleString('ja-JP')}
+                        </Text>
+                        <Text className="text-sm text-typography-600 line-clamp-3">
+                          {reflection.content}
+                        </Text>
+                      </VStack>
+                    </Card>
+                  </Pressable>
+                ))}
+              </VStack>
             ) : (
               <Card className="p-8">
                 <VStack space="sm" className="items-center">
@@ -1476,7 +1528,6 @@ export default function ProfileScreen() {
     );
   };
 
-  console.log('Profile screen render - profile:', !!profile, 'loading:', loading);
 
   // プロフィール読み込み中のヘッダー
   const renderLoadingHeader = () => (
@@ -1565,6 +1616,18 @@ export default function ProfileScreen() {
         initialValue={bio}
         maxLength={500}
         multiline
+      />
+
+      {/* AI振り返り生成確認モーダル */}
+      <ConfirmModal
+        isOpen={showGenerateConfirmModal}
+        onClose={() => setShowGenerateConfirmModal(false)}
+        onConfirm={handleConfirmGenerate}
+        title="AI振り返りを生成"
+        message={generateConfirmMessage}
+        confirmText="生成する"
+        confirmAction="primary"
+        note={generateConfirmNote}
       />
     </LoginPrompt>
   );

@@ -183,18 +183,22 @@ serve(async (req) => {
       .eq('user_id', userId);
 
     // 3. プロンプトを組み立て
+    // JST（日本標準時）でフォーマット
+    const jstOptions = { timeZone: 'Asia/Tokyo' };
     const postsText = posts && posts.length > 0
       ? posts.map((post, index) => {
-          const createdDate = new Date(post.created_at).toLocaleDateString('ja-JP');
+          const createdAt = new Date(post.created_at);
+          const createdDate = createdAt.toLocaleDateString('ja-JP', jstOptions);
+          const createdTime = createdAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', ...jstOptions });
           const type = post.parent_post_id ? '返信' : '投稿';
 
           // experienced_atがある場合は過去の出来事として表示
           if (post.experienced_at) {
-            const experiencedDate = new Date(post.experienced_at).toLocaleDateString('ja-JP');
-            return `${index + 1}. [${type}] "${post.content}" (${experiencedDate}の出来事について ${createdDate}に投稿)`;
+            const experiencedDate = new Date(post.experienced_at).toLocaleDateString('ja-JP', jstOptions);
+            return `${index + 1}. [${type}] "${post.content}" (${experiencedDate}の出来事について ${createdDate} ${createdTime}に投稿)`;
           }
 
-          return `${index + 1}. [${type}] "${post.content}" (${createdDate})`;
+          return `${index + 1}. [${type}] "${post.content}" (${createdDate} ${createdTime})`;
         }).join('\n')
       : 'なし';
 
@@ -203,10 +207,12 @@ serve(async (req) => {
     const MOOD_LABELS = { 1: 'とても良くない', 2: '良くない', 3: '普通', 4: '良い', 5: 'とても良い' };
     const checkinsText = checkins && checkins.length > 0
       ? checkins.map((checkin, index) => {
-          const date = new Date(checkin.created_at).toLocaleDateString('ja-JP');
+          const createdAt = new Date(checkin.created_at);
+          const date = createdAt.toLocaleDateString('ja-JP', jstOptions);
+          const time = createdAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', ...jstOptions });
           const emoji = MOOD_EMOJIS[checkin.mood as keyof typeof MOOD_EMOJIS];
           const label = MOOD_LABELS[checkin.mood as keyof typeof MOOD_LABELS];
-          return `${index + 1}. ${emoji} ${label} (${date})`;
+          return `${index + 1}. ${emoji} ${label} (${date} ${time})`;
         }).join('\n')
       : 'なし';
 
@@ -226,7 +232,7 @@ serve(async (req) => {
     // 期間の計算
     const endDate = now;
     const startDate = dataStartDate;
-    const dateRangeText = `${startDate.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' })}〜${endDate.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' })}`;
+    const dateRangeText = `${startDate.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', ...jstOptions })}〜${endDate.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', ...jstOptions })}`;
 
     const userPrompt = `以下は、ユーザーの最近の行動データと医療情報です。
 
@@ -262,13 +268,13 @@ ${checkinsText}
 いいね: ${likesCount || 0}回
 フォロー: ${followsCount || 0}人`;
 
-    const systemPrompt = `あなたはメンタルヘルスケアに寄り添うAIアシスタントです。
+    const systemPrompt = `あなたはメンタルヘルスケアSNSの優しいAIアシスタントです。
 
 ユーザーの最近の行動を分析し、前向きで共感的な振り返りを生成してください。
 
 【分析対象】
 - ユーザーの医療情報（診断名、服薬、治療）
-- 投稿・返信の内容（テキスト）
+- 投稿・返信の内容（テキスト）と投稿時間
 - 気分チェックインの記録と変化
 - いいね数、返信数、フォロー数
 
@@ -281,7 +287,19 @@ ${checkinsText}
 - アドバイスや指示はしない
 - 800文字程度で生成
 
+【投稿時間への言及】
+- 深夜（0時〜4時頃）の投稿が多い場合：眠れない夜があったのかな、と優しく気にかける。責めたり批判したりせず、そういう夜もあるよね、と共感する
+- 早朝（5時〜7時頃）の投稿がある場合：早起きできたことを素直に褒める
+- 時間帯への言及は、該当する場合のみ自然に触れる程度でOK
+
+【気分チェックインへの言及】
+- チェックインの時間帯が毎日同じような時間（例：毎朝、毎晩など）で規則的な場合：習慣化できていることを褒める
+- チェックインと過去の出来事（投稿の「〇〇の出来事について」の部分）は関連付けない。チェックインはあくまでその日の気分を記録したもの
+
 【トーン】
+- 友達のように親しみやすく、でも馴れ馴れしすぎない
+- 「大切な仲間へ」「あなたへ」のような大げさな書き出しは避ける
+- 自然な語り口で、読んでいて心地よい文章
 - 温かく、共感的に
 - 押し付けがましくない
 - ユーザーの感情を尊重する
@@ -290,7 +308,8 @@ ${checkinsText}
 【禁止事項】
 - 次の行動を指示しない
 - アドバイスをしない
-- 批判的な表現を使わない`;
+- 批判的な表現を使わない
+- 「大切な仲間へ」「親愛なる〜」のような硬い・大げさな書き出し`;
 
     // 4. Claude APIを呼び出し
     const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
