@@ -383,13 +383,28 @@ export default function ProfileScreen() {
 
       // データにエラーがある場合（明確なビジネスロジックエラー）
       if (data?.error) {
-        Alert.alert('エラー', data.error);
+        Alert.alert('生成できません', data.error);
         return;
       }
 
       // ネットワークエラー等の場合、実際に生成されたかを確認
       if (error) {
         console.log('Function returned error, checking if reflection was created...', error);
+
+        // エラーオブジェクトからメッセージを抽出（Edge Functionが400を返した場合）
+        // @ts-ignore - error.contextはSupabase Functions特有のプロパティ
+        const errorContext = error.context;
+        if (errorContext) {
+          try {
+            const errorBody = await errorContext.json();
+            if (errorBody?.error) {
+              Alert.alert('生成できません', errorBody.error);
+              return;
+            }
+          } catch {
+            // JSONパースに失敗した場合は続行
+          }
+        }
 
         // 少し待ってから最新の振り返りを確認
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -415,7 +430,7 @@ export default function ProfileScreen() {
 
         // 本当にエラーの場合
         console.error('Function error:', error);
-        Alert.alert('エラー', error.message || '生成に失敗しました');
+        Alert.alert('エラー', '生成に失敗しました。しばらく経ってから再度お試しください。');
         return;
       }
 
