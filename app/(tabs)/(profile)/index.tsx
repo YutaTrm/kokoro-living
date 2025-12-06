@@ -1493,7 +1493,7 @@ export default function ProfileScreen() {
                 ))}
               </VStack>
             ) : (
-              <Card className="p-8">
+              <Card className="p-8 bg-background-50">
                 <VStack space="sm" className="items-center">
                   <Text className="text-center text-typography-500">
                     まだ振り返りがありません
