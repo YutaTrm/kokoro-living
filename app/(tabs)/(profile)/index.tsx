@@ -1451,7 +1451,7 @@ export default function ProfileScreen() {
                       <HStack space="sm">
                         <Image
                           source={AI_AVATAR}
-                          className="w-10 h-10 rounded-full flex-shrink-0 border-2 border-secondary-400"
+                          className="w-12 h-12 rounded-full flex-shrink-0 border-2 border-secondary-400"
                         />
                         <VStack className="flex-1 flex-shrink">
                           <HStack className="items-center" space="xs">
