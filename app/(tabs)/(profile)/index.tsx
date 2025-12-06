@@ -2,8 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Pencil, Sparkles } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, FlatList, Image, Pressable, TouchableOpacity } from 'react-native';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, FlatList, Image, Pressable, ScrollView, TouchableOpacity } from 'react-native';
 
 // AIアバター画像
 const AI_AVATAR = require('@/assets/images/living-ai.png');
@@ -85,6 +85,50 @@ interface MasterData {
   name: string;
   ingredientId?: string; // 服薬マスター用: 成分ID
 }
+
+interface AIReflection {
+  id: string;
+  content: string;
+  created_at: string;
+}
+
+// AI振り返りカードコンポーネント（メモ化で点滅防止）
+const AIReflectionCard = memo(
+  function AIReflectionCard({ reflection }: { reflection: AIReflection }) {
+    const router = useRouter();
+
+    const handlePress = useCallback(() => {
+      router.push(`/(tabs)/(profile)/ai-reflection/${reflection.id}`);
+    }, [router, reflection.id]);
+
+    return (
+      <Pressable onPress={handlePress}>
+        <Card className="p-3">
+          <HStack space="sm">
+            <Image
+              source={AI_AVATAR}
+              className="w-12 h-12 rounded-full border-2 border-secondary-400"
+            />
+            <VStack className="flex-1 flex-shrink">
+              <HStack className="items-center" space="xs">
+                <Text className="text-sm font-semibold text-typography-900">
+                  『こころのリビング』AI リビくん
+                </Text>
+                <Text className="text-xs text-typography-500">
+                  {new Date(reflection.created_at).toLocaleDateString('ja-JP')}
+                </Text>
+              </HStack>
+              <Text className="text-sm text-typography-700 line-clamp-3 mt-1">
+                {reflection.content}
+              </Text>
+            </VStack>
+          </HStack>
+        </Card>
+      </Pressable>
+    );
+  },
+  (prevProps, nextProps) => prevProps.reflection.id === nextProps.reflection.id
+);
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -1446,32 +1490,10 @@ export default function ProfileScreen() {
               <VStack space="md" className="mt-4">
                 <Heading size="md">生成された振り返り</Heading>
                 {aiReflections.map((reflection) => (
-                  <Pressable
+                  <AIReflectionCard
                     key={reflection.id}
-                    onPress={() => router.push(`/(tabs)/(profile)/ai-reflection/${reflection.id}`)}
-                  >
-                    <Card className="p-3">
-                      <HStack space="sm">
-                        <Image
-                          source={AI_AVATAR}
-                          className="w-12 h-12 rounded-full flex-shrink-0 border-2 border-secondary-400"
-                        />
-                        <VStack className="flex-1 flex-shrink">
-                          <HStack className="items-center" space="xs">
-                            <Text className="text-sm font-semibold text-typography-900">
-                              『こころのリビング』AI リビくん
-                            </Text>
-                            <Text className="text-xs text-typography-500">
-                              {new Date(reflection.created_at).toLocaleDateString('ja-JP')}
-                            </Text>
-                          </HStack>
-                          <Text className="text-sm text-typography-700 line-clamp-3 mt-1">
-                            {reflection.content}
-                          </Text>
-                        </VStack>
-                      </HStack>
-                    </Card>
-                  </Pressable>
+                    reflection={reflection}
+                  />
                 ))}
               </VStack>
             ) : (
@@ -1551,13 +1573,20 @@ export default function ProfileScreen() {
   return (
     <LoginPrompt>
       <Box className="flex-1">
-        <FlatList
-          data={getCurrentData()}
-          renderItem={({ item }) => <PostItem post={item} />}
-          keyExtractor={(item) => item.id}
-          ListHeaderComponent={!profile ? renderLoadingHeader : renderHeader}
-          ListEmptyComponent={renderEmptyComponent}
-        />
+        {activeTab === 'ai-reflection' ? (
+          <ScrollView>
+            {!profile ? renderLoadingHeader() : renderHeader()}
+          </ScrollView>
+        ) : (
+          <FlatList
+            data={getCurrentData()}
+            renderItem={({ item }) => <PostItem post={item} />}
+            keyExtractor={(item) => item.id}
+            ListHeaderComponent={!profile ? renderLoadingHeader : renderHeader}
+            ListEmptyComponent={renderEmptyComponent}
+            removeClippedSubviews={false}
+          />
+        )}
       </Box>
 
       {/* 複数選択モーダル */}
