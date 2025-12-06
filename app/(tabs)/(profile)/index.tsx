@@ -1347,10 +1347,13 @@ export default function ProfileScreen() {
             <HStack space="md" className="items-start">
               <Card className="flex-1 bg-background-0">
                 <HStack>
-                  <Image
-                    source={AI_AVATAR}
-                    className="w-12 h-12 rounded-full flex-shrink-0 border-2 border-secondary-400"
-                  />
+                  <VStack className="items-center flex-shrink-0">
+                    <Image
+                      source={AI_AVATAR}
+                      className="w-12 h-12 rounded-full border-2 border-secondary-400"
+                    />
+                    <Text className="text-xs font-semibold text-typography-500 mt-1">AIのリビくん</Text>
+                  </VStack>
                   <VStack space="sm" className="ml-3 flex-1 flex-shrink gap-1">
                     <Text className="text-sm text-typography-600">
                       あなたのアプリ内のアクション(投稿/返信/チェックイン等)を元にAIが振り返りを生成します。
@@ -1456,7 +1459,7 @@ export default function ProfileScreen() {
                         <VStack className="flex-1 flex-shrink">
                           <HStack className="items-center" space="xs">
                             <Text className="text-sm font-semibold text-typography-900">
-                              リビングAI
+                              『こころのリビング』AI リビくん
                             </Text>
                             <Text className="text-xs text-typography-500">
                               {new Date(reflection.created_at).toLocaleDateString('ja-JP')}

@@ -100,7 +100,7 @@ export default function AIReflectionDetailScreen() {
                 />
                 <VStack>
                   <Text className="text-base font-semibold text-typography-900">
-                    リビングAI
+                    『こころのリビング』AI リビくん
                   </Text>
                   <Text className="text-xs text-typography-500">
                     {new Date(reflection.created_at).toLocaleString('ja-JP', {
