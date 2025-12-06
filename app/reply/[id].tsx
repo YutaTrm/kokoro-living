@@ -112,8 +112,8 @@ export default function ReplyScreen() {
         throw postError;
       }
 
-      // 投稿詳細ページに戻る（リロードされる）
-      router.replace(`/post/${parentPostId}`);
+      // 投稿詳細ページに戻る（useFocusEffectでリロードされる）
+      router.back();
     } catch (error) {
       console.error('返信エラー:', error);
       Alert.alert('エラー', '返信に失敗しました');
