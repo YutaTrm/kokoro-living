@@ -96,7 +96,7 @@ export default function AIReflectionDetailScreen() {
               <HStack space="sm" className="items-center">
                 <Image
                   source={AI_AVATAR}
-                  className="w-12 h-12 rounded-full border-2 border-secondary-400"
+                  className="w-16 h-16 rounded-full border-2 border-secondary-400"
                 />
                 <VStack>
                   <Text className="text-base font-semibold text-typography-900">
