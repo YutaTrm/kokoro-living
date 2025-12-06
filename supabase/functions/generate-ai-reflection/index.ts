@@ -163,6 +163,14 @@ serve(async (req) => {
       useFree = false;
     }
 
+    // ユーザーの表示名を取得
+    const { data: userProfile } = await supabase
+      .from('users')
+      .select('display_name')
+      .eq('user_id', userId)
+      .single();
+    const userName = userProfile?.display_name || 'あなた';
+
     // ユーザーの医療情報を取得
     // 診断名
     const { data: userDiagnoses } = await supabase
@@ -234,7 +242,10 @@ serve(async (req) => {
     const startDate = dataStartDate;
     const dateRangeText = `${startDate.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', ...jstOptions })}〜${endDate.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', ...jstOptions })}`;
 
-    const userPrompt = `以下は、ユーザーの最近の行動データと医療情報です。
+    const userPrompt = `以下は、${userName}さんの最近の行動データと医療情報です。
+
+【ユーザー名】
+${userName}さん
 
 【ユーザーの医療情報】
 - 診断名: ${diagnosesText}
@@ -298,7 +309,7 @@ ${checkinsText}
 
 【トーン】
 - 友達のように親しみやすく、でも馴れ馴れしすぎない
-- 「大切な仲間へ」「あなたへ」のような大げさな書き出しは避ける
+- 文頭は「◯◯さんは、」「◯◯さんの」のようにユーザー名から始める
 - 自然な語り口で、読んでいて心地よい文章
 - 温かく、共感的に
 - 押し付けがましくない
