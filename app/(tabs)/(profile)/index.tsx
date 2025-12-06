@@ -1,9 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Bot, Pencil, Sparkles } from 'lucide-react-native';
+import { Pencil, Sparkles } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, FlatList, Pressable, TouchableOpacity } from 'react-native';
+import { Alert, FlatList, Image, Pressable, TouchableOpacity } from 'react-native';
+
+// AIアバター画像
+const AI_AVATAR = require('@/assets/images/living-ai.png');
 
 import ConfirmModal from '@/components/ConfirmModal';
 import LoginPrompt from '@/components/LoginPrompt';
@@ -1344,9 +1347,10 @@ export default function ProfileScreen() {
             <HStack space="md" className="items-start">
               <Card className="flex-1 bg-background-0">
                 <HStack>
-                  <Box className="w-12 h-12 rounded-full bg-secondary-400 items-center justify-center flex-shrink-0">
-                    <Icon as={Bot} size="xl" className="text-white" />
-                  </Box>
+                  <Image
+                    source={AI_AVATAR}
+                    className="w-12 h-12 rounded-full flex-shrink-0 border-2 border-secondary-400"
+                  />
                   <VStack space="sm" className="ml-3 flex-1 flex-shrink gap-1">
                     <Text className="text-sm text-typography-600">
                       あなたのアプリ内のアクション(投稿/返信/チェックイン等)を元にAIが振り返りを生成します。
@@ -1443,30 +1447,26 @@ export default function ProfileScreen() {
                     key={reflection.id}
                     onPress={() => router.push(`/(tabs)/(profile)/ai-reflection/${reflection.id}`)}
                   >
-                    <Card className="p-4">
-                      <VStack space="sm">
-                        <Text className="text-base text-semibold text-typography-600">
-                          {new Date(reflection.created_at).toLocaleString('ja-JP')}
-                        </Text>
-                        <Text className="text-sm text-typography-600 line-clamp-3">
-                          {reflection.content}
-                        </Text>
-                      </VStack>
-                    </Card>
-                  </Pressable>
-                  <Pressable
-                    key={reflection.id}
-                    onPress={() => router.push(`/(tabs)/(profile)/ai-reflection/${reflection.id}`)}
-                  >
-                    <Card className="p-4">
-                      <VStack space="sm">
-                        <Text className="text-base text-semibold text-typography-600">
-                          {new Date(reflection.created_at).toLocaleString('ja-JP')}
-                        </Text>
-                        <Text className="text-sm text-typography-600 line-clamp-3">
-                          {reflection.content}
-                        </Text>
-                      </VStack>
+                    <Card className="p-3">
+                      <HStack space="sm">
+                        <Image
+                          source={AI_AVATAR}
+                          className="w-10 h-10 rounded-full flex-shrink-0 border-2 border-secondary-400"
+                        />
+                        <VStack className="flex-1 flex-shrink">
+                          <HStack className="items-center" space="xs">
+                            <Text className="text-sm font-semibold text-typography-900">
+                              リビングAI
+                            </Text>
+                            <Text className="text-xs text-typography-500">
+                              {new Date(reflection.created_at).toLocaleDateString('ja-JP')}
+                            </Text>
+                          </HStack>
+                          <Text className="text-sm text-typography-700 line-clamp-3 mt-1">
+                            {reflection.content}
+                          </Text>
+                        </VStack>
+                      </HStack>
                     </Card>
                   </Pressable>
                 ))}

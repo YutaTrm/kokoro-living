@@ -1,14 +1,18 @@
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { useLayoutEffect, useState } from 'react';
-import { ScrollView } from 'react-native';
+import { Image, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Box } from '@/components/ui/box';
 import { Card } from '@/components/ui/card';
+import { HStack } from '@/components/ui/hstack';
 import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
 import { supabase } from '@/src/lib/supabase';
+
+// AIアバター画像
+const AI_AVATAR = require('@/assets/images/living-ai.png');
 
 interface Reflection {
   id: string;
@@ -86,31 +90,37 @@ export default function AIReflectionDetailScreen() {
     <SafeAreaView className="flex-1 bg-background-0" edges={['bottom']}>
       <ScrollView className="flex-1 p-4">
         <VStack space="md">
-          {/* 日時 */}
-          <Card className="p-4 bg-background-50">
-            <VStack space="sm">
-              <Text className="text-xs text-typography-500">生成日時</Text>
-              <Text className="text-sm font-semibold">
-                {new Date(reflection.created_at).toLocaleString('ja-JP', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </Text>
-            </VStack>
-          </Card>
-
-          {/* 振り返り内容 */}
+          {/* AIヘッダー */}
           <Card className="p-4">
             <VStack space="md">
+              <HStack space="sm" className="items-center">
+                <Image
+                  source={AI_AVATAR}
+                  className="w-12 h-12 rounded-full border-2 border-secondary-400"
+                />
+                <VStack>
+                  <Text className="text-base font-semibold text-typography-900">
+                    リビングAI
+                  </Text>
+                  <Text className="text-xs text-typography-500">
+                    {new Date(reflection.created_at).toLocaleString('ja-JP', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </Text>
+                </VStack>
+              </HStack>
+
+              {/* 振り返り内容 */}
               <Text className="text-base leading-6">{reflection.content}</Text>
             </VStack>
           </Card>
 
           {/* 注意書き */}
-          <Card className="p-4 bg-background-50">
+          <Card className="p-3 bg-background-50">
             <Text className="text-xs text-typography-400">
               ※ AIによる分析のため、生成結果が正確でない場合があります。
             </Text>
