@@ -17,6 +17,7 @@ interface User {
   bio: string | null;
   isFollowing: boolean;
   isFollowedBy: boolean;
+  followStatusLoaded: boolean;
 }
 
 const LIMIT = 20;
@@ -153,6 +154,7 @@ export default function FollowersListScreen() {
             ...user,
             isFollowing: followingSet.has(userId),
             isFollowedBy: followedBySet.has(userId),
+            followStatusLoaded: true,
           };
         })
         .filter((u): u is User => u !== undefined);
@@ -248,6 +250,17 @@ export default function FollowersListScreen() {
     );
   };
 
+  if (loading) {
+    return (
+      <>
+        <Stack.Screen options={{ title: 'フォロワー' }} />
+        <Box className="flex-1 bg-background-0 items-center justify-center">
+          <Spinner size="large" />
+        </Box>
+      </>
+    );
+  }
+
   return (
     <>
       <Stack.Screen options={{ title: 'フォロワー' }} />
@@ -277,7 +290,11 @@ export default function FollowersListScreen() {
               )}
             </HStack>
           )}
-          ListEmptyComponent={renderEmpty}
+          ListEmptyComponent={
+            <Box className="flex-1 items-center justify-center py-8">
+              <Text className="text-base text-typography-400">フォロワーはいません</Text>
+            </Box>
+          }
           ListFooterComponent={
             loadingMore ? (
               <Box className="py-4 items-center">
