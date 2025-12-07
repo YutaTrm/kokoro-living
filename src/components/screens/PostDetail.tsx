@@ -70,9 +70,10 @@ export default function PostDetailScreen() {
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [tags, setTags] = useState<{ diagnoses: string[]; treatments: string[]; medications: string[] }>({
+  const [tags, setTags] = useState<{ diagnoses: string[]; treatments: string[]; medications: string[]; statuses: string[] }>({
     diagnoses: [],
     treatments: [],
+    statuses: [],
     medications: [],
   });
   const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set());
@@ -431,8 +432,8 @@ export default function PostDetailScreen() {
 
   const loadTags = async () => {
     try {
-      // 3つのタグクエリを並列実行
-      const [diagnosesRes, treatmentsRes, medicationsRes] = await Promise.all([
+      // 4つのタグクエリを並列実行
+      const [diagnosesRes, treatmentsRes, medicationsRes, statusesRes] = await Promise.all([
         supabase
           .from('post_diagnoses')
           .select('user_diagnoses(diagnoses(name))')
@@ -444,6 +445,10 @@ export default function PostDetailScreen() {
         supabase
           .from('post_medications')
           .select('user_medications(ingredients(name), products(name))')
+          .eq('post_id', id),
+        supabase
+          .from('post_statuses')
+          .select('user_statuses(statuses(name))')
           .eq('post_id', id),
       ]);
 
@@ -459,7 +464,10 @@ export default function PostDetailScreen() {
       ).filter(Boolean) as string[] || [];
       const medications = [...new Set(medicationsWithDuplicates)];
 
-      setTags({ diagnoses, treatments, medications });
+      type StatusRow = { user_statuses: { statuses: { name: string } } | null };
+      const statuses = (statusesRes.data as StatusRow[] | null)?.map(s => s.user_statuses?.statuses?.name).filter(Boolean) as string[] || [];
+
+      setTags({ diagnoses, treatments, medications, statuses });
     } catch (error) {
       console.error('タグ取得エラー:', error);
     }
@@ -854,7 +862,7 @@ export default function PostDetailScreen() {
           )}
 
           {/* タグ表示（返信でない場合のみ） */}
-          {!isReply && (tags.diagnoses.length > 0 || tags.treatments.length > 0 || tags.medications.length > 0) && (
+          {!isReply && (tags.diagnoses.length > 0 || tags.treatments.length > 0 || tags.medications.length > 0 || tags.statuses.length > 0) && (
             <Box className="mb-2 flex-row flex-wrap gap-2">
               {tags.diagnoses.map((tag, index) => (
                 <Tag key={`d-${index}`} name={tag} color="fuchsia-400" size="xs" />
@@ -864,6 +872,9 @@ export default function PostDetailScreen() {
               ))}
               {tags.medications.map((tag, index) => (
                 <Tag key={`m-${index}`} name={tag} color="cyan-400" size="xs" />
+              ))}
+              {tags.statuses.map((tag, index) => (
+                <Tag key={`s-${index}`} name={tag} color="orange-400" size="xs" />
               ))}
             </Box>
           )}
