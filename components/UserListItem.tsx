@@ -1,4 +1,4 @@
-import { useRouter, useSegments } from 'expo-router';
+import { Href, useRouter, useSegments } from 'expo-router';
 import { Pressable } from 'react-native';
 
 import DefaultAvatar from '@/components/icons/DefaultAvatar';
@@ -21,7 +21,7 @@ export default function UserListItem({ userId, displayName, avatarUrl, bio }: Us
 
   const handlePress = () => {
     const currentTab = getCurrentTab(segments);
-    router.push(`/(tabs)/${currentTab}/user/${userId}`);
+    router.push(`/(tabs)/${currentTab}/user/${userId}` as Href);
   };
 
   return (

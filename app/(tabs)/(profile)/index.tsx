@@ -29,7 +29,7 @@ import { VStack } from '@/components/ui/vstack';
 import { useMasterData } from '@/src/contexts/MasterDataContext';
 import { useFollow } from '@/src/hooks/useFollow';
 import { useMedicationMasters } from '@/src/hooks/useMedicationMasters';
-import { usePostsData } from '@/src/hooks/usePostsData';
+import { Post, usePostsData } from '@/src/hooks/usePostsData';
 // import { usePurchase } from '@/src/hooks/usePurchase'; // 課金機能は一時的に無効化
 import { supabase } from '@/src/lib/supabase';
 import { showError } from '@/src/utils/errorHandler';
@@ -105,7 +105,7 @@ const AIReflectionCard = memo(
 
     return (
       <Pressable onPress={handlePress}>
-        <Card className="p-3">
+        <Card className="p-3 border-b border-outline-200 rounded-none">
           <HStack space="sm">
             <Image
               source={AI_AVATAR}

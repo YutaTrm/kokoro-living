@@ -1,4 +1,4 @@
-import { useRouter, useSegments } from 'expo-router';
+import { Href, useRouter, useSegments } from 'expo-router';
 import { Clock, Flag, Heart, MessageCircle } from 'lucide-react-native';
 import { Pressable, ScrollView } from 'react-native';
 
@@ -49,7 +49,7 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
 
   const handlePress = () => {
     const currentTab = getCurrentTab(segments);
-    router.push(`/(tabs)/${currentTab}/post/${post.id}`);
+    router.push(`/(tabs)/${currentTab}/post/${post.id}` as Href);
   };
 
   const handleAvatarPress = (e: { stopPropagation: () => void }) => {
@@ -57,13 +57,13 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
     e.stopPropagation();
     // 現在のタブ内のユーザー詳細に遷移（自分でも他人でも同じ）
     const currentTab = getCurrentTab(segments);
-    router.push(`/(tabs)/${currentTab}/user/${post.user.user_id}`);
+    router.push(`/(tabs)/${currentTab}/user/${post.user.user_id}` as Href);
   };
 
   const handleParentPress = () => {
     if (post.parent_post_id) {
       const currentTab = getCurrentTab(segments);
-      router.push(`/(tabs)/${currentTab}/post/${post.parent_post_id}`);
+      router.push(`/(tabs)/${currentTab}/post/${post.parent_post_id}` as Href);
     }
   };
 

@@ -1,4 +1,4 @@
-import { useRouter, useSegments } from 'expo-router';
+import { Href, useRouter, useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
 
@@ -112,19 +112,19 @@ export default function ReplyItem({
 
   const handlePress = () => {
     const currentTab = getCurrentTab(segments);
-    router.push(`/(tabs)/${currentTab}/post/${reply.id}`);
+    router.push(`/(tabs)/${currentTab}/post/${reply.id}` as Href);
   };
 
   const handleAvatarPress = () => {
     // 現在のタブ内のユーザー詳細に遷移（自分でも他人でも同じ）
     const currentTab = getCurrentTab(segments);
-    router.push(`/(tabs)/${currentTab}/user/${reply.user.user_id}`);
+    router.push(`/(tabs)/${currentTab}/user/${reply.user.user_id}` as Href);
   };
 
   const handleParentPress = () => {
     if (reply.parent_post_id) {
       const currentTab = getCurrentTab(segments);
-      router.push(`/(tabs)/${currentTab}/post/${reply.parent_post_id}`);
+      router.push(`/(tabs)/${currentTab}/post/${reply.parent_post_id}` as Href);
     }
   };
 

@@ -1,5 +1,5 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { Stack, useLocalSearchParams, useRouter, useSegments } from 'expo-router';
+import { Href, Stack, useLocalSearchParams, useRouter, useSegments } from 'expo-router';
 import { ChevronDown, Clock, Edit, Flag, MoreVertical, Trash2 } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView as RNScrollView } from 'react-native';
@@ -670,13 +670,13 @@ export default function PostDetailScreen() {
   const handleUserPress = (userId: string) => {
     // 現在のタブ内のユーザー詳細に遷移（自分でも他人でも同じ）
     const currentTab = getCurrentTab(segments);
-    router.push(`/(tabs)/${currentTab}/user/${userId}`);
+    router.push(`/(tabs)/${currentTab}/user/${userId}` as Href);
   };
 
   const handleParentPress = () => {
     if (post?.parent_post_id) {
       const currentTab = getCurrentTab(segments);
-      router.push(`/(tabs)/${currentTab}/post/${post.parent_post_id}`);
+      router.push(`/(tabs)/${currentTab}/post/${post.parent_post_id}` as Href);
     }
   };
 
@@ -878,7 +878,7 @@ export default function PostDetailScreen() {
             onBookmark={handleBookmark}
             onLikesCountPress={() => {
               const currentTab = getCurrentTab(segments);
-              router.push(`/(tabs)/${currentTab}/post/${id}/likes`);
+              router.push(`/(tabs)/${currentTab}/post/${id}/likes` as Href);
             }}
             size="md"
           />
