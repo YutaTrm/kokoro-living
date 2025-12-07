@@ -52,16 +52,9 @@ export default function ProfileHeader({
   onMenuOpenChange,
 }: ProfileHeaderProps) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  const handleMenuOpen = () => {
-    setIsMenuOpen(true);
-    onMenuOpenChange?.(true);
-  };
-
-  const handleMenuClose = () => {
-    setIsMenuOpen(false);
-    onMenuOpenChange?.(false);
+  const handleOpenChange = (isOpen: boolean) => {
+    onMenuOpenChange?.(isOpen);
   };
 
   // プロバイダーに応じた表示名を取得
@@ -103,9 +96,8 @@ export default function ProfileHeader({
             <Menu
               placement="bottom left"
               offset={5}
-              isOpen={isMenuOpen}
-              onOpen={handleMenuOpen}
-              onClose={handleMenuClose}
+              onOpen={() => handleOpenChange(true)}
+              onClose={() => handleOpenChange(false)}
               trigger={({ ...triggerProps }) => {
                 return (
                   <Button

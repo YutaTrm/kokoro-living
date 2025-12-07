@@ -364,17 +364,22 @@ export default function ProfileScreen() {
         }
       }, 500);
       return () => clearTimeout(timer);
-    }, [currentUserId, refetchFollowCounts])
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentUserId])
   );
 
-  // AI振り返りタブにフォーカスが当たった時にリロード
+  // 画面フォーカス時にAI振り返りタブならリロード
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+
   useFocusEffect(
     useCallback(() => {
-      if (activeTab === 'ai-reflection') {
+      if (activeTabRef.current === 'ai-reflection') {
         loadAiReflections(true);
         loadTicketInfo();
       }
-    }, [activeTab, loadAiReflections, loadTicketInfo])
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
   );
 
   // メニューの開閉状態を更新
@@ -1588,12 +1593,12 @@ export default function ProfileScreen() {
     </>
   );
 
-  const renderItem = ({ item }: { item: Post | AIReflection }) => {
+  const renderItem = useCallback(({ item }: { item: Post | AIReflection }) => {
     if (activeTab === 'ai-reflection') {
       return <AIReflectionCard reflection={item as AIReflection} />;
     }
     return <PostItem post={item as Post} />;
-  };
+  }, [activeTab]);
 
   const handleLoadMore = () => {
     if (activeTab === 'ai-reflection') {
