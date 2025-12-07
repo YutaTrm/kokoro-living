@@ -1,5 +1,54 @@
 import { supabase } from '@/src/lib/supabase';
 
+export interface ParentPostInfo {
+  content: string;
+  avatarUrl: string | null;
+}
+
+/**
+ * 親投稿の内容とアバターを取得
+ */
+export async function fetchParentPostInfo(
+  parentPostIds: string[]
+): Promise<Map<string, ParentPostInfo>> {
+  if (parentPostIds.length === 0) {
+    return new Map();
+  }
+
+  // 親投稿を取得
+  const { data: parentPostsData } = await supabase
+    .from('posts')
+    .select('id, content, user_id')
+    .in('id', parentPostIds);
+
+  if (!parentPostsData || parentPostsData.length === 0) {
+    return new Map();
+  }
+
+  // 親投稿の投稿者のアバターを取得
+  const parentUserIds = [...new Set(parentPostsData.map((p) => p.user_id))];
+  const { data: parentUsersData } = await supabase
+    .from('users')
+    .select('user_id, avatar_url')
+    .in('user_id', parentUserIds);
+
+  const userAvatarMap = new Map<string, string | null>();
+  (parentUsersData || []).forEach((u) => {
+    userAvatarMap.set(u.user_id, u.avatar_url);
+  });
+
+  // 親投稿IDごとにコンテンツとアバターをマッピング
+  const parentInfoMap = new Map<string, ParentPostInfo>();
+  parentPostsData.forEach((p) => {
+    parentInfoMap.set(p.id, {
+      content: p.content,
+      avatarUrl: userAvatarMap.get(p.user_id) || null,
+    });
+  });
+
+  return parentInfoMap;
+}
+
 export interface PostMetadata {
   repliesCount: number;
   likesCount: number;

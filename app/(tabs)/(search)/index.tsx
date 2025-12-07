@@ -30,13 +30,15 @@ import { useMasterData } from '@/src/contexts/MasterDataContext';
 import { useMedicationMasters } from '@/src/hooks/useMedicationMasters';
 import { supabase } from '@/src/lib/supabase';
 import { fetchPostsStats } from '@/src/utils/postStats';
-import { fetchPostTags } from '@/src/utils/postUtils';
+import { fetchParentPostInfo, fetchPostTags } from '@/src/utils/postUtils';
 
 interface Post {
   id: string;
   content: string;
   created_at: string;
   parent_post_id: string | null;
+  parentContent?: string;
+  parentAvatarUrl?: string | null;
   is_hidden?: boolean;
   user: {
     display_name: string;
@@ -500,11 +502,16 @@ export default function SearchScreen() {
         (usersData || []).map((u) => [u.user_id, { display_name: u.display_name, avatar_url: u.avatar_url }])
       );
 
-      // 統計情報とタグを一括取得（N+1問題を解消）
+      // 統計情報・タグ・親投稿情報を一括取得
       const postIds = filteredPosts.map((p) => p.id);
-      const [statsMap, tagsResult] = await Promise.all([
+      const parentPostIds = [...new Set(
+        filteredPosts.map((p) => p.parent_post_id).filter((id): id is string => id !== null)
+      )];
+
+      const [statsMap, tagsResult, parentInfoMap] = await Promise.all([
         fetchPostsStats(postIds, user?.id || null),
         fetchPostTags(postIds),
+        fetchParentPostInfo(parentPostIds),
       ]);
 
       const { diagnosesMap, treatmentsMap, medicationsMap } = tagsResult;
@@ -517,12 +524,15 @@ export default function SearchScreen() {
           isLikedByCurrentUser: false,
           hasRepliedByCurrentUser: false,
         };
+        const parentInfo = post.parent_post_id ? parentInfoMap.get(post.parent_post_id) : undefined;
 
         return {
           id: post.id,
           content: post.content,
           created_at: post.created_at,
           parent_post_id: post.parent_post_id,
+          parentContent: parentInfo?.content,
+          parentAvatarUrl: parentInfo?.avatarUrl,
           is_hidden: false,
           user: {
             display_name: usersMap.get(post.user_id)?.display_name || 'Unknown',

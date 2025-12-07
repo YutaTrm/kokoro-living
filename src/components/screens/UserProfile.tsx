@@ -23,7 +23,7 @@ import { useBlock } from '@/src/hooks/useBlock';
 import { useFollow } from '@/src/hooks/useFollow';
 import { useMute } from '@/src/hooks/useMute';
 import { supabase } from '@/src/lib/supabase';
-import { fetchPostMetadata, fetchPostTags } from '@/src/utils/postUtils';
+import { fetchParentPostInfo, fetchPostMetadata, fetchPostTags } from '@/src/utils/postUtils';
 import { sortByStartDate } from '@/src/utils/sortByStartDate';
 import { ListPlus, MessageCircleOff, MoreVertical, ShieldBan } from 'lucide-react-native';
 
@@ -336,68 +336,46 @@ export default function UserDetailScreen() {
       }
 
       const replyIds = repliesData.map((r) => r.id);
-      const parentPostIds = [...new Set(repliesData.map((r) => r.parent_post_id).filter(Boolean))] as string[];
+      const parentPostIds = [...new Set(repliesData.map((r) => r.parent_post_id).filter((id): id is string => id !== null))];
 
-      // ユーザー情報・親投稿・メタデータを並列取得
-      const [userRes, parentPostsRes, metadataResult] = await Promise.all([
+      // ユーザー情報・親投稿情報・メタデータを並列取得
+      const [userRes, parentInfoMap, metadataResult] = await Promise.all([
         supabase
           .from('users')
           .select('user_id, display_name, avatar_url')
           .eq('user_id', id)
           .single(),
-        supabase
-          .from('posts')
-          .select('id, content, user_id')
-          .in('id', parentPostIds),
+        fetchParentPostInfo(parentPostIds),
         fetchPostMetadata(replyIds, currentUserId),
       ]);
 
       const userData = userRes.data;
       const { repliesMap, likesMap, myLikesMap, myRepliesMap } = metadataResult;
 
-      // 親投稿の投稿者IDを取得してアバターを取得
-      const parentUserIds = [...new Set(parentPostsRes.data?.map((p) => p.user_id) || [])];
-      const { data: parentUsersData } = parentUserIds.length > 0
-        ? await supabase
-            .from('users')
-            .select('user_id, avatar_url')
-            .in('user_id', parentUserIds)
-        : { data: [] };
-
-      const parentUserAvatarMap = new Map<string, string | null>();
-      parentUsersData?.forEach((u) => {
-        parentUserAvatarMap.set(u.user_id, u.avatar_url);
+      const formattedReplies: Post[] = repliesData.map((reply) => {
+        const parentInfo = reply.parent_post_id ? parentInfoMap.get(reply.parent_post_id) : undefined;
+        return {
+          id: reply.id,
+          content: reply.content,
+          created_at: reply.created_at,
+          is_hidden: false,
+          parent_post_id: reply.parent_post_id,
+          parentContent: parentInfo?.content,
+          parentAvatarUrl: parentInfo?.avatarUrl,
+          user: {
+            display_name: userData?.display_name || 'Unknown',
+            user_id: reply.user_id,
+            avatar_url: userData?.avatar_url || null,
+          },
+          diagnoses: [],
+          treatments: [],
+          medications: [],
+          repliesCount: repliesMap.get(reply.id) || 0,
+          likesCount: likesMap.get(reply.id) || 0,
+          isLikedByCurrentUser: myLikesMap.get(reply.id) || false,
+          hasRepliedByCurrentUser: myRepliesMap.get(reply.id) || false,
+        };
       });
-
-      // 親投稿のコンテンツ・アバターマップ
-      const parentContentMap = new Map<string, string>();
-      const parentAvatarMap = new Map<string, string | null>();
-      parentPostsRes.data?.forEach((p) => {
-        parentContentMap.set(p.id, p.content);
-        parentAvatarMap.set(p.id, parentUserAvatarMap.get(p.user_id) || null);
-      });
-
-      const formattedReplies: Post[] = repliesData.map((reply) => ({
-        id: reply.id,
-        content: reply.content,
-        created_at: reply.created_at,
-        is_hidden: false,
-        parent_post_id: reply.parent_post_id,
-        parentContent: parentContentMap.get(reply.parent_post_id!) || undefined,
-        parentAvatarUrl: parentAvatarMap.get(reply.parent_post_id!) || null,
-        user: {
-          display_name: userData?.display_name || 'Unknown',
-          user_id: reply.user_id,
-          avatar_url: userData?.avatar_url || null,
-        },
-        diagnoses: [],
-        treatments: [],
-        medications: [],
-        repliesCount: repliesMap.get(reply.id) || 0,
-        likesCount: likesMap.get(reply.id) || 0,
-        isLikedByCurrentUser: myLikesMap.get(reply.id) || false,
-        hasRepliedByCurrentUser: myRepliesMap.get(reply.id) || false,
-      }));
 
       setReplies(formattedReplies);
     } catch (error) {

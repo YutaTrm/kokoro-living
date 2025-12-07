@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { supabase } from '@/src/lib/supabase';
 import { fetchPostsStats } from '@/src/utils/postStats';
+import { fetchParentPostInfo } from '@/src/utils/postUtils';
 
 export interface Post {
   id: string;
@@ -201,35 +202,11 @@ export const usePostsData = () => {
       const tagsMap = await fetchTagsForPosts(postIds);
       const statsMap = await fetchPostsStats(postIds, user.id);
 
-      // 親投稿の内容とユーザーを取得
+      // 親投稿の内容とアバターを取得
       const parentPostIds = [
-        ...new Set(repliesData.map((r) => r.parent_post_id).filter((id) => id !== null)),
+        ...new Set(repliesData.map((r) => r.parent_post_id).filter((id): id is string => id !== null)),
       ];
-      const { data: parentPostsData } = await supabase
-        .from('posts')
-        .select('id, content, user_id')
-        .in('id', parentPostIds);
-
-      // 親投稿の投稿者のアバターを取得
-      const parentUserIds = [...new Set((parentPostsData || []).map((p) => p.user_id))];
-      const { data: parentUsersData } = parentUserIds.length > 0
-        ? await supabase
-            .from('users')
-            .select('user_id, avatar_url')
-            .in('user_id', parentUserIds)
-        : { data: [] };
-
-      const parentUserAvatarMap = new Map<string, string | null>();
-      (parentUsersData || []).forEach((u) => {
-        parentUserAvatarMap.set(u.user_id, u.avatar_url);
-      });
-
-      const parentContentMap = new Map<string, string>();
-      const parentAvatarMap = new Map<string, string | null>();
-      (parentPostsData || []).forEach((p) => {
-        parentContentMap.set(p.id, p.content);
-        parentAvatarMap.set(p.id, parentUserAvatarMap.get(p.user_id) || null);
-      });
+      const parentInfoMap = await fetchParentPostInfo(parentPostIds);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const formattedReplies: Post[] = repliesData.map((reply: any) => {
@@ -244,18 +221,15 @@ export const usePostsData = () => {
           isLikedByCurrentUser: false,
           hasRepliedByCurrentUser: false,
         };
+        const parentInfo = reply.parent_post_id ? parentInfoMap.get(reply.parent_post_id) : undefined;
         return {
           id: reply.id,
           content: reply.content,
           created_at: reply.created_at,
           is_hidden: reply.is_hidden || false,
           parent_post_id: reply.parent_post_id,
-          parentContent: reply.parent_post_id
-            ? parentContentMap.get(reply.parent_post_id)
-            : undefined,
-          parentAvatarUrl: reply.parent_post_id
-            ? parentAvatarMap.get(reply.parent_post_id)
-            : null,
+          parentContent: parentInfo?.content,
+          parentAvatarUrl: parentInfo?.avatarUrl,
           user: {
             display_name: userData?.display_name || 'Unknown',
             user_id: reply.user_id,
