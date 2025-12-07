@@ -9,6 +9,7 @@ interface FollowCounts {
 
 export function useFollow(targetUserId: string | null) {
   const [isFollowing, setIsFollowing] = useState(false);
+  const [isFollowedBy, setIsFollowedBy] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [counts, setCounts] = useState<FollowCounts>({ followingCount: 0, followersCount: 0 });
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -22,20 +23,33 @@ export function useFollow(targetUserId: string | null) {
   const loadFollowStatus = useCallback(async () => {
     if (!targetUserId || !currentUserId) {
       setIsFollowing(false);
+      setIsFollowedBy(false);
       return;
     }
 
     try {
-      const { data } = await supabase
+      // 自分が相手をフォローしているか
+      const { data: followingData } = await supabase
         .from('follows')
         .select('id')
         .eq('follower_id', currentUserId)
         .eq('following_id', targetUserId)
         .single();
 
-      setIsFollowing(!!data);
+      setIsFollowing(!!followingData);
+
+      // 相手が自分をフォローしているか
+      const { data: followedByData } = await supabase
+        .from('follows')
+        .select('id')
+        .eq('follower_id', targetUserId)
+        .eq('following_id', currentUserId)
+        .single();
+
+      setIsFollowedBy(!!followedByData);
     } catch {
       setIsFollowing(false);
+      setIsFollowedBy(false);
     }
   }, [targetUserId, currentUserId]);
 
@@ -109,6 +123,7 @@ export function useFollow(targetUserId: string | null) {
 
   return {
     isFollowing,
+    isFollowedBy,
     isLoading,
     toggleFollow,
     counts,

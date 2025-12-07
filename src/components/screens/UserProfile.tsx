@@ -69,7 +69,7 @@ export default function UserDetailScreen() {
   const router = useRouter();
   const segments = useSegments();
   const { data: masterData } = useMasterData();
-  const { isFollowing, isLoading: followLoading, toggleFollow, counts, isOwnProfile, currentUserId } = useFollow(id ?? null);
+  const { isFollowing, isFollowedBy, isLoading: followLoading, toggleFollow, counts, isOwnProfile, currentUserId } = useFollow(id ?? null);
   const { isBlocked, isLoading: blockLoading, toggleBlock } = useBlock(id ?? null);
   const { isMuted, isLoading: muteLoading, toggleMute } = useMute(id ?? null);
   const [loading, setLoading] = useState(true);
@@ -516,6 +516,7 @@ export default function UserDetailScreen() {
                 {!isOwnProfile && currentUserId && (
                   <FollowButton
                     isFollowing={isFollowing}
+                    isFollowedBy={isFollowedBy}
                     isLoading={followLoading}
                     onToggle={toggleFollow}
                     isLoggedIn={!!currentUserId}

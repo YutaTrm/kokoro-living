@@ -4,6 +4,7 @@ import { Button, ButtonSpinner, ButtonText } from '@/components/ui/button';
 
 interface FollowButtonProps {
   isFollowing: boolean;
+  isFollowedBy: boolean;
   isLoading: boolean;
   onToggle: () => Promise<boolean>;
   isLoggedIn: boolean;
@@ -11,6 +12,7 @@ interface FollowButtonProps {
 
 export default function FollowButton({
   isFollowing,
+  isFollowedBy,
   isLoading,
   onToggle,
   isLoggedIn,
@@ -21,6 +23,13 @@ export default function FollowButton({
       return;
     }
     await onToggle();
+  };
+
+  // ボタンのラベルを決定
+  const getButtonLabel = () => {
+    if (isFollowing) return 'フォロー中';
+    if (isFollowedBy) return 'フォローバック';
+    return 'フォロー';
   };
 
   return (
@@ -35,7 +44,7 @@ export default function FollowButton({
         <ButtonSpinner />
       ) : (
         <ButtonText className={isFollowing ? 'text-typography-700' : ''}>
-          {isFollowing ? 'フォロー中' : 'フォロー'}
+          {getButtonLabel()}
         </ButtonText>
       )}
     </Button>

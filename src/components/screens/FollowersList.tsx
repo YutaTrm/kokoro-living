@@ -1,11 +1,13 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { FlatList } from 'react-native';
+import { Alert, FlatList } from 'react-native';
 
-import { Text } from '@/components/ui/text';
+import FollowButton from '@/components/FollowButton';
 import UserListItem from '@/components/UserListItem';
 import { Box } from '@/components/ui/box';
+import { HStack } from '@/components/ui/hstack';
 import { Spinner } from '@/components/ui/spinner';
+import { Text } from '@/components/ui/text';
 import { supabase } from '@/src/lib/supabase';
 
 interface User {
@@ -13,6 +15,8 @@ interface User {
   display_name: string;
   avatar_url: string | null;
   bio: string | null;
+  isFollowing: boolean;
+  isFollowedBy: boolean;
 }
 
 const LIMIT = 20;
@@ -25,6 +29,7 @@ export default function FollowersListScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [allBlockedIds, setAllBlockedIds] = useState<string[]>([]);
+  const [followLoadingIds, setFollowLoadingIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -114,10 +119,42 @@ export default function FollowersListScreen() {
 
       if (usersError) throw usersError;
 
+      // 現在のユーザーとの相互フォロー関係を取得
+      let followingSet = new Set<string>();
+      let followedBySet = new Set<string>();
+
+      if (currentUserId) {
+        const [followingRes, followedByRes] = await Promise.all([
+          // 自分がフォローしているユーザー
+          supabase
+            .from('follows')
+            .select('following_id')
+            .eq('follower_id', currentUserId)
+            .in('following_id', userIds),
+          // 自分をフォローしているユーザー
+          supabase
+            .from('follows')
+            .select('follower_id')
+            .eq('following_id', currentUserId)
+            .in('follower_id', userIds),
+        ]);
+
+        followingSet = new Set(followingRes.data?.map((f) => f.following_id) || []);
+        followedBySet = new Set(followedByRes.data?.map((f) => f.follower_id) || []);
+      }
+
       // フォローの順序を保持
       const usersMap = new Map(usersData?.map((u) => [u.user_id, u]) || []);
       const orderedUsers = userIds
-        .map((userId) => usersMap.get(userId))
+        .map((userId) => {
+          const user = usersMap.get(userId);
+          if (!user) return undefined;
+          return {
+            ...user,
+            isFollowing: followingSet.has(userId),
+            isFollowedBy: followedBySet.has(userId),
+          };
+        })
         .filter((u): u is User => u !== undefined);
 
       if (reset) {
@@ -144,6 +181,58 @@ export default function FollowersListScreen() {
     }
   };
 
+  const toggleFollow = async (targetUserId: string): Promise<boolean> => {
+    if (!currentUserId) {
+      Alert.alert('エラー', 'ログインしてください');
+      return false;
+    }
+
+    setFollowLoadingIds((prev) => new Set(prev).add(targetUserId));
+
+    try {
+      const user = users.find((u) => u.user_id === targetUserId);
+      if (!user) return false;
+
+      if (user.isFollowing) {
+        const { error } = await supabase
+          .from('follows')
+          .delete()
+          .eq('follower_id', currentUserId)
+          .eq('following_id', targetUserId);
+
+        if (error) throw error;
+
+        setUsers((prev) =>
+          prev.map((u) =>
+            u.user_id === targetUserId ? { ...u, isFollowing: false } : u
+          )
+        );
+      } else {
+        const { error } = await supabase
+          .from('follows')
+          .insert({ follower_id: currentUserId, following_id: targetUserId });
+
+        if (error) throw error;
+
+        setUsers((prev) =>
+          prev.map((u) =>
+            u.user_id === targetUserId ? { ...u, isFollowing: true } : u
+          )
+        );
+      }
+      return true;
+    } catch (error) {
+      console.error('フォロー操作エラー:', error);
+      return false;
+    } finally {
+      setFollowLoadingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(targetUserId);
+        return next;
+      });
+    }
+  };
+
   const renderEmpty = () => {
     if (loading) {
       return (
@@ -167,12 +256,26 @@ export default function FollowersListScreen() {
           data={users}
           keyExtractor={(item) => item.user_id}
           renderItem={({ item }) => (
-            <UserListItem
-              userId={item.user_id}
-              displayName={item.display_name}
-              avatarUrl={item.avatar_url}
-              bio={item.bio}
-            />
+            <HStack className="items-center pr-4 border-b border-outline-200">
+              <Box className="flex-1">
+                <UserListItem
+                  userId={item.user_id}
+                  displayName={item.display_name}
+                  avatarUrl={item.avatar_url}
+                  bio={item.bio}
+                  hideBorder
+                />
+              </Box>
+              {currentUserId && item.user_id !== currentUserId && (
+                <FollowButton
+                  isFollowing={item.isFollowing}
+                  isFollowedBy={item.isFollowedBy}
+                  isLoading={followLoadingIds.has(item.user_id)}
+                  onToggle={() => toggleFollow(item.user_id)}
+                  isLoggedIn={!!currentUserId}
+                />
+              )}
+            </HStack>
           )}
           ListEmptyComponent={renderEmpty}
           ListFooterComponent={

@@ -13,9 +13,10 @@ interface UserListItemProps {
   displayName: string;
   avatarUrl: string | null;
   bio?: string | null;
+  hideBorder?: boolean;
 }
 
-export default function UserListItem({ userId, displayName, avatarUrl, bio }: UserListItemProps) {
+export default function UserListItem({ userId, displayName, avatarUrl, bio, hideBorder = false }: UserListItemProps) {
   const router = useRouter();
   const segments = useSegments();
 
@@ -26,7 +27,7 @@ export default function UserListItem({ userId, displayName, avatarUrl, bio }: Us
 
   return (
     <Pressable onPress={handlePress}>
-      <HStack className="p-4 border-b border-outline-200" space="md">
+      <HStack className={`p-4 ${hideBorder ? '' : 'border-b border-outline-200'}`} space="md">
         <Avatar size="md">
           {avatarUrl ? (
             <AvatarImage source={{ uri: avatarUrl }} />
