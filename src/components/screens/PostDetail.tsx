@@ -732,7 +732,6 @@ export default function PostDetailScreen() {
         <Box key={deepReply.id}>
           <ReplyItem
             reply={deepReply}
-            parentPostContent={parentContent}
             showVerticalLine={!isLastInGroup || hasChildren}
             depth={depth}
             onReplyCreated={loadReplies}
@@ -775,7 +774,11 @@ export default function PostDetailScreen() {
           {/* 返信インジケーター（返信詳細ページの場合） */}
           {isReply && parentPost && (
             <Box className="mb-3">
-              <ReplyIndicator parentContent={parentPost.content} onPress={handleParentPress} />
+              <ReplyIndicator
+                parentContent={parentPost.content}
+                parentAvatarUrl={parentPost.user.avatar_url}
+                onPress={handleParentPress}
+              />
             </Box>
           )}
 
@@ -888,7 +891,6 @@ export default function PostDetailScreen() {
               <ReplyItem
                 key={reply.id}
                 reply={reply}
-                parentPostContent={post.content}
                 showVerticalLine={false}
                 depth={0}
                 onReplyCreated={loadReplies}

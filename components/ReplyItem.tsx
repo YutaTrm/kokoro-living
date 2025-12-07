@@ -29,6 +29,7 @@ interface ReplyItemProps {
     isMuted?: boolean;
   };
   parentPostContent?: string;
+  parentAvatarUrl?: string | null;
   showVerticalLine?: boolean;
   depth?: number;
   onReplyCreated?: () => void;
@@ -37,6 +38,7 @@ interface ReplyItemProps {
 export default function ReplyItem({
   reply,
   parentPostContent,
+  parentAvatarUrl,
   showVerticalLine = false,
   depth = 0,
   onReplyCreated,
@@ -251,7 +253,11 @@ export default function ReplyItem({
 
             {/* 返信インジケーター（親投稿へのリンク） */}
             {parentPostContent && reply.parent_post_id && (
-              <ReplyIndicator parentContent={parentPostContent} onPress={handleParentPress} />
+              <ReplyIndicator
+                parentContent={parentPostContent}
+                parentAvatarUrl={parentAvatarUrl}
+                onPress={handleParentPress}
+              />
             )}
 
             {/* 返信テキスト */}

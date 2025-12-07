@@ -10,6 +10,7 @@ export interface Post {
   is_hidden?: boolean;
   parent_post_id?: string | null;
   parentContent?: string;
+  parentAvatarUrl?: string | null;
   user: {
     display_name: string;
     user_id: string;
@@ -200,18 +201,35 @@ export const usePostsData = () => {
       const tagsMap = await fetchTagsForPosts(postIds);
       const statsMap = await fetchPostsStats(postIds, user.id);
 
-      // 親投稿の内容を取得
+      // 親投稿の内容とユーザーを取得
       const parentPostIds = [
         ...new Set(repliesData.map((r) => r.parent_post_id).filter((id) => id !== null)),
       ];
       const { data: parentPostsData } = await supabase
         .from('posts')
-        .select('id, content')
+        .select('id, content, user_id')
         .in('id', parentPostIds);
 
-      const parentContentMap = new Map(
-        (parentPostsData || []).map((p) => [p.id, p.content])
-      );
+      // 親投稿の投稿者のアバターを取得
+      const parentUserIds = [...new Set((parentPostsData || []).map((p) => p.user_id))];
+      const { data: parentUsersData } = parentUserIds.length > 0
+        ? await supabase
+            .from('users')
+            .select('user_id, avatar_url')
+            .in('user_id', parentUserIds)
+        : { data: [] };
+
+      const parentUserAvatarMap = new Map<string, string | null>();
+      (parentUsersData || []).forEach((u) => {
+        parentUserAvatarMap.set(u.user_id, u.avatar_url);
+      });
+
+      const parentContentMap = new Map<string, string>();
+      const parentAvatarMap = new Map<string, string | null>();
+      (parentPostsData || []).forEach((p) => {
+        parentContentMap.set(p.id, p.content);
+        parentAvatarMap.set(p.id, parentUserAvatarMap.get(p.user_id) || null);
+      });
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const formattedReplies: Post[] = repliesData.map((reply: any) => {
@@ -235,6 +253,9 @@ export const usePostsData = () => {
           parentContent: reply.parent_post_id
             ? parentContentMap.get(reply.parent_post_id)
             : undefined,
+          parentAvatarUrl: reply.parent_post_id
+            ? parentAvatarMap.get(reply.parent_post_id)
+            : null,
           user: {
             display_name: userData?.display_name || 'Unknown',
             user_id: reply.user_id,

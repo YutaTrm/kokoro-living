@@ -31,6 +31,7 @@ interface Notification {
   post_content?: string | null;
   parent_post_content?: string | null; // 返信通知の場合、親投稿の内容
   parent_post_id?: string | null; // 返信通知の場合、親投稿のID
+  parent_post_avatar_url?: string | null; // 返信通知の場合、親投稿者のアバター
 }
 
 export default function NotificationsScreen() {
@@ -112,6 +113,7 @@ export default function NotificationsScreen() {
       let postAuthorsMap = new Map<string, string>();
       let parentPostsContentMap = new Map<string, string>(); // 返信の場合の親投稿内容
       let parentPostsIdMap = new Map<string, string>(); // 返信の場合の親投稿ID
+      let parentPostsAvatarMap = new Map<string, string | null>(); // 返信の場合の親投稿者アバター
 
       if (postIds.length > 0) {
         // いいね通知の場合は元の投稿、返信通知の場合は返信自体の親投稿を取得
@@ -128,6 +130,7 @@ export default function NotificationsScreen() {
 
           let parentPostsMap = new Map<string, string>();
           let parentAuthorsMap = new Map<string, string>();
+          let parentAvatarsMap = new Map<string, string | null>();
           if (parentPostIds.length > 0) {
             const { data: parentPostsData } = await supabase
               .from('posts')
@@ -139,6 +142,24 @@ export default function NotificationsScreen() {
                 parentPostsMap.set(p.id, p.content);
                 parentAuthorsMap.set(p.id, p.user_id);
               });
+
+              // 親投稿の投稿者のアバターを取得
+              const parentUserIds = [...new Set(parentPostsData.map((p) => p.user_id))];
+              if (parentUserIds.length > 0) {
+                const { data: parentUsersData } = await supabase
+                  .from('users')
+                  .select('user_id, avatar_url')
+                  .in('user_id', parentUserIds);
+
+                const userAvatarMap = new Map<string, string | null>();
+                parentUsersData?.forEach((u) => {
+                  userAvatarMap.set(u.user_id, u.avatar_url);
+                });
+
+                parentPostsData.forEach((p) => {
+                  parentAvatarsMap.set(p.id, userAvatarMap.get(p.user_id) || null);
+                });
+              }
             }
           }
 
@@ -146,10 +167,11 @@ export default function NotificationsScreen() {
             // 投稿内容は常に自身の内容を表示（返信の場合も返信自体の内容を表示）
             postsMap.set(p.id, p.content);
 
-            // 返信の場合、親投稿の内容とIDを保存
+            // 返信の場合、親投稿の内容・ID・アバターを保存
             if (p.parent_post_id && parentPostsMap.has(p.parent_post_id)) {
               parentPostsContentMap.set(p.id, parentPostsMap.get(p.parent_post_id)!);
               parentPostsIdMap.set(p.id, p.parent_post_id);
+              parentPostsAvatarMap.set(p.id, parentAvatarsMap.get(p.parent_post_id) || null);
               postAuthorsMap.set(p.id, parentAuthorsMap.get(p.parent_post_id)!);
             } else {
               postAuthorsMap.set(p.id, p.user_id);
@@ -182,6 +204,7 @@ export default function NotificationsScreen() {
           post_content: n.post_id ? postsMap.get(n.post_id) || null : null,
           parent_post_content: n.post_id ? parentPostsContentMap.get(n.post_id) || null : null,
           parent_post_id: n.post_id ? parentPostsIdMap.get(n.post_id) || null : null,
+          parent_post_avatar_url: n.post_id ? parentPostsAvatarMap.get(n.post_id) || null : null,
         }));
 
       setNotifications(formatted);
@@ -281,6 +304,7 @@ export default function NotificationsScreen() {
             <VStack space="xs">
               <ReplyIndicator
                 parentContent={item.parent_post_content}
+                parentAvatarUrl={item.parent_post_avatar_url}
                 onPress={() => handleParentPress(item.parent_post_id!)}
               />
               {item.post_content && (

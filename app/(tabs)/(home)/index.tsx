@@ -19,6 +19,7 @@ import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
 import { MOOD_EMOJIS, MOOD_LABELS, useMoodCheckin } from '@/src/hooks/useMoodCheckin';
 import { supabase } from '@/src/lib/supabase';
+import { fetchPostMetadata, fetchPostTags } from '@/src/utils/postUtils';
 
 const SELECTED_LIST_KEY = 'selected_list_id';
 
@@ -274,63 +275,14 @@ export default function TabOneScreen() {
       const postUserIds = [...new Set(postsData.map(p => p.user_id))];
       const postIds = postsData.map(p => p.id);
 
-      // 全ての関連データを並列取得
-      const [
-        usersRes,
-        diagnosesRes,
-        treatmentsRes,
-        medicationsRes,
-        repliesRes,
-        likesRes,
-        myLikesRes,
-        myRepliesRes,
-      ] = await Promise.all([
-        // ユーザー情報
+      // ユーザー情報・タグ・メタデータを並列取得
+      const [usersRes, tagsResult, metadataResult] = await Promise.all([
         supabase
           .from('users')
           .select('user_id, display_name, avatar_url')
           .in('user_id', postUserIds),
-        // 診断名タグ
-        supabase
-          .from('post_diagnoses')
-          .select('post_id, user_diagnoses(diagnoses(name))')
-          .in('post_id', postIds),
-        // 治療タグ
-        supabase
-          .from('post_treatments')
-          .select('post_id, user_treatments(treatments(name))')
-          .in('post_id', postIds),
-        // 服薬タグ
-        supabase
-          .from('post_medications')
-          .select('post_id, user_medications(ingredients(name), products(name))')
-          .in('post_id', postIds),
-        // 返信数
-        supabase
-          .from('posts')
-          .select('parent_post_id')
-          .in('parent_post_id', postIds),
-        // いいね数
-        supabase
-          .from('likes')
-          .select('post_id')
-          .in('post_id', postIds),
-        // 自分のいいね（ログイン時のみ）
-        user
-          ? supabase
-              .from('likes')
-              .select('post_id')
-              .eq('user_id', user.id)
-              .in('post_id', postIds)
-          : Promise.resolve({ data: null }),
-        // 自分の返信（ログイン時のみ）
-        user
-          ? supabase
-              .from('posts')
-              .select('parent_post_id')
-              .eq('user_id', user.id)
-              .in('parent_post_id', postIds)
-          : Promise.resolve({ data: null }),
+        fetchPostTags(postIds),
+        fetchPostMetadata(postIds, user?.id || null),
       ]);
 
       if (usersRes.error) throw usersRes.error;
@@ -340,68 +292,8 @@ export default function TabOneScreen() {
         (usersRes.data || []).map(u => [u.user_id, { display_name: u.display_name, avatar_url: u.avatar_url }])
       );
 
-      // 投稿ごとのタグをマップに変換
-      const diagnosesMap = new Map<string, string[]>();
-      diagnosesRes.data?.forEach((d: any) => {
-        const name = d.user_diagnoses?.diagnoses?.name;
-        if (name) {
-          if (!diagnosesMap.has(d.post_id)) {
-            diagnosesMap.set(d.post_id, []);
-          }
-          diagnosesMap.get(d.post_id)?.push(name);
-        }
-      });
-
-      const treatmentsMap = new Map<string, string[]>();
-      treatmentsRes.data?.forEach((t: any) => {
-        const name = t.user_treatments?.treatments?.name;
-        if (name) {
-          if (!treatmentsMap.has(t.post_id)) {
-            treatmentsMap.set(t.post_id, []);
-          }
-          treatmentsMap.get(t.post_id)?.push(name);
-        }
-      });
-
-      const medicationsMap = new Map<string, string[]>();
-      medicationsRes.data?.forEach((m: any) => {
-        const name = m.user_medications?.ingredients?.name;
-        if (name) {
-          if (!medicationsMap.has(m.post_id)) {
-            medicationsMap.set(m.post_id, []);
-          }
-          const medications = medicationsMap.get(m.post_id)!;
-          if (!medications.includes(name)) {
-            medications.push(name);
-          }
-        }
-      });
-
-      // 返信数マップ
-      const repliesMap = new Map<string, number>();
-      repliesRes.data?.forEach((r: any) => {
-        const count = repliesMap.get(r.parent_post_id) || 0;
-        repliesMap.set(r.parent_post_id, count + 1);
-      });
-
-      // いいね数マップ
-      const likesMap = new Map<string, number>();
-      likesRes.data?.forEach((l: any) => {
-        const count = likesMap.get(l.post_id) || 0;
-        likesMap.set(l.post_id, count + 1);
-      });
-
-      // 自分のいいね・返信マップ
-      const myLikesMap = new Map<string, boolean>();
-      const myRepliesMap = new Map<string, boolean>();
-
-      myLikesRes.data?.forEach((l: any) => {
-        myLikesMap.set(l.post_id, true);
-      });
-
-      myRepliesRes.data?.forEach((r: any) => {
-        myRepliesMap.set(r.parent_post_id, true);
-      });
+      const { diagnosesMap, treatmentsMap, medicationsMap } = tagsResult;
+      const { repliesMap, likesMap, myLikesMap, myRepliesMap } = metadataResult;
 
       const formattedPosts: Post[] = postsData.map((post: any) => ({
         id: post.id,

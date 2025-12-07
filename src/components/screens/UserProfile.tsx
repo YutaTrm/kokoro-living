@@ -23,6 +23,7 @@ import { useBlock } from '@/src/hooks/useBlock';
 import { useFollow } from '@/src/hooks/useFollow';
 import { useMute } from '@/src/hooks/useMute';
 import { supabase } from '@/src/lib/supabase';
+import { fetchPostMetadata, fetchPostTags } from '@/src/utils/postUtils';
 import { sortByStartDate } from '@/src/utils/sortByStartDate';
 import { ListPlus, MessageCircleOff, MoreVertical, ShieldBan } from 'lucide-react-native';
 
@@ -46,6 +47,9 @@ interface Post {
   content: string;
   created_at: string;
   is_hidden?: boolean;
+  parent_post_id?: string | null;
+  parentContent?: string;
+  parentAvatarUrl?: string | null;
   user: {
     display_name: string;
     user_id: string;
@@ -267,134 +271,29 @@ export default function UserDetailScreen() {
         return;
       }
 
-      // ユーザー情報を取得
-      const { data: userData } = await supabase
-        .from('users')
-        .select('user_id, display_name, avatar_url')
-        .eq('user_id', id)
-        .single();
-
-      // タグを取得
       const postIds = postsData.map((p) => p.id);
 
-      const { data: diagnosesData } = await supabase
-        .from('post_diagnoses')
-        .select('post_id, user_diagnoses(diagnoses(name))')
-        .in('post_id', postIds);
-
-      const { data: treatmentsData } = await supabase
-        .from('post_treatments')
-        .select('post_id, user_treatments(treatments(name))')
-        .in('post_id', postIds);
-
-      const { data: medicationsData } = await supabase
-        .from('post_medications')
-        .select('post_id, user_medications(ingredients(name), products(name))')
-        .in('post_id', postIds);
-
-      // 返信数・いいね数・現在ユーザーの状態を並列取得
-      const [repliesRes, likesRes, myLikesRes, myRepliesRes] = await Promise.all([
-        // 返信数
+      // ユーザー情報・タグ・メタデータを並列取得
+      const [userRes, tagsResult, metadataResult] = await Promise.all([
         supabase
-          .from('posts')
-          .select('parent_post_id')
-          .in('parent_post_id', postIds),
-        // いいね数
-        supabase
-          .from('likes')
-          .select('post_id')
-          .in('post_id', postIds),
-        // 現在ユーザーのいいね
-        currentUserId
-          ? supabase
-              .from('likes')
-              .select('post_id')
-              .eq('user_id', currentUserId)
-              .in('post_id', postIds)
-          : Promise.resolve({ data: [] }),
-        // 現在ユーザーの返信
-        currentUserId
-          ? supabase
-              .from('posts')
-              .select('parent_post_id')
-              .eq('user_id', currentUserId)
-              .in('parent_post_id', postIds)
-          : Promise.resolve({ data: [] }),
+          .from('users')
+          .select('user_id, display_name, avatar_url')
+          .eq('user_id', id)
+          .single(),
+        fetchPostTags(postIds),
+        fetchPostMetadata(postIds, currentUserId),
       ]);
 
-      // 返信数マップ
-      const repliesMap = new Map<string, number>();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      repliesRes.data?.forEach((r: any) => {
-        const count = repliesMap.get(r.parent_post_id) || 0;
-        repliesMap.set(r.parent_post_id, count + 1);
-      });
-
-      // いいね数マップ
-      const likesMap = new Map<string, number>();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      likesRes.data?.forEach((l: any) => {
-        const count = likesMap.get(l.post_id) || 0;
-        likesMap.set(l.post_id, count + 1);
-      });
-
-      // 自分のいいね・返信マップ
-      const myLikesMap = new Map<string, boolean>();
-      const myRepliesMap = new Map<string, boolean>();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      myLikesRes.data?.forEach((l: any) => {
-        myLikesMap.set(l.post_id, true);
-      });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      myRepliesRes.data?.forEach((r: any) => {
-        myRepliesMap.set(r.parent_post_id, true);
-      });
-
-      const diagnosesMap = new Map<string, string[]>();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      diagnosesData?.forEach((d: any) => {
-        const name = d.user_diagnoses?.diagnoses?.name;
-        if (name) {
-          if (!diagnosesMap.has(d.post_id)) {
-            diagnosesMap.set(d.post_id, []);
-          }
-          diagnosesMap.get(d.post_id)?.push(name);
-        }
-      });
-
-      const treatmentsMap = new Map<string, string[]>();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      treatmentsData?.forEach((t: any) => {
-        const name = t.user_treatments?.treatments?.name;
-        if (name) {
-          if (!treatmentsMap.has(t.post_id)) {
-            treatmentsMap.set(t.post_id, []);
-          }
-          treatmentsMap.get(t.post_id)?.push(name);
-        }
-      });
-
-      const medicationsMap = new Map<string, string[]>();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      medicationsData?.forEach((m: any) => {
-        const name = m.user_medications?.ingredients?.name;
-        if (name) {
-          if (!medicationsMap.has(m.post_id)) {
-            medicationsMap.set(m.post_id, []);
-          }
-          const meds = medicationsMap.get(m.post_id)!;
-          if (!meds.includes(name)) {
-            meds.push(name);
-          }
-        }
-      });
+      const userData = userRes.data;
+      const { diagnosesMap, treatmentsMap, medicationsMap } = tagsResult;
+      const { repliesMap, likesMap, myLikesMap, myRepliesMap } = metadataResult;
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const formattedPosts: Post[] = postsData.map((post: any) => ({
         id: post.id,
         content: post.content,
         created_at: post.created_at,
-        is_hidden: false, // ユーザープロフィールでは非表示投稿は除外されている
+        is_hidden: false,
         user: {
           display_name: userData?.display_name || 'Unknown',
           user_id: post.user_id,
@@ -422,7 +321,7 @@ export default function UserDetailScreen() {
     try {
       const { data: repliesData, error: repliesError } = await supabase
         .from('posts')
-        .select('id, content, created_at, user_id')
+        .select('id, content, created_at, user_id, parent_post_id')
         .eq('user_id', id)
         .not('parent_post_id', 'is', null)
         .eq('is_hidden', false)
@@ -436,71 +335,46 @@ export default function UserDetailScreen() {
         return;
       }
 
-      // ユーザー情報を取得
-      const { data: userData } = await supabase
-        .from('users')
-        .select('user_id, display_name, avatar_url')
-        .eq('user_id', id)
-        .single();
-
       const replyIds = repliesData.map((r) => r.id);
+      const parentPostIds = [...new Set(repliesData.map((r) => r.parent_post_id).filter(Boolean))] as string[];
 
-      // 返信数・いいね数・現在ユーザーの状態を並列取得
-      const [childRepliesRes, likesRes, myLikesRes, myRepliesRes] = await Promise.all([
-        // 返信への返信数
+      // ユーザー情報・親投稿・メタデータを並列取得
+      const [userRes, parentPostsRes, metadataResult] = await Promise.all([
+        supabase
+          .from('users')
+          .select('user_id, display_name, avatar_url')
+          .eq('user_id', id)
+          .single(),
         supabase
           .from('posts')
-          .select('parent_post_id')
-          .in('parent_post_id', replyIds),
-        // いいね数
-        supabase
-          .from('likes')
-          .select('post_id')
-          .in('post_id', replyIds),
-        // 現在ユーザーのいいね
-        currentUserId
-          ? supabase
-              .from('likes')
-              .select('post_id')
-              .eq('user_id', currentUserId)
-              .in('post_id', replyIds)
-          : Promise.resolve({ data: [] }),
-        // 現在ユーザーの返信
-        currentUserId
-          ? supabase
-              .from('posts')
-              .select('parent_post_id')
-              .eq('user_id', currentUserId)
-              .in('parent_post_id', replyIds)
-          : Promise.resolve({ data: [] }),
+          .select('id, content, user_id')
+          .in('id', parentPostIds),
+        fetchPostMetadata(replyIds, currentUserId),
       ]);
 
-      // 返信数マップ
-      const repliesMap = new Map<string, number>();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      childRepliesRes.data?.forEach((r: any) => {
-        const count = repliesMap.get(r.parent_post_id) || 0;
-        repliesMap.set(r.parent_post_id, count + 1);
+      const userData = userRes.data;
+      const { repliesMap, likesMap, myLikesMap, myRepliesMap } = metadataResult;
+
+      // 親投稿の投稿者IDを取得してアバターを取得
+      const parentUserIds = [...new Set(parentPostsRes.data?.map((p) => p.user_id) || [])];
+      const { data: parentUsersData } = parentUserIds.length > 0
+        ? await supabase
+            .from('users')
+            .select('user_id, avatar_url')
+            .in('user_id', parentUserIds)
+        : { data: [] };
+
+      const parentUserAvatarMap = new Map<string, string | null>();
+      parentUsersData?.forEach((u) => {
+        parentUserAvatarMap.set(u.user_id, u.avatar_url);
       });
 
-      // いいね数マップ
-      const likesMap = new Map<string, number>();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      likesRes.data?.forEach((l: any) => {
-        const count = likesMap.get(l.post_id) || 0;
-        likesMap.set(l.post_id, count + 1);
-      });
-
-      // 自分のいいね・返信マップ
-      const myLikesMap = new Map<string, boolean>();
-      const myRepliesMap = new Map<string, boolean>();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      myLikesRes.data?.forEach((l: any) => {
-        myLikesMap.set(l.post_id, true);
-      });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      myRepliesRes.data?.forEach((r: any) => {
-        myRepliesMap.set(r.parent_post_id, true);
+      // 親投稿のコンテンツ・アバターマップ
+      const parentContentMap = new Map<string, string>();
+      const parentAvatarMap = new Map<string, string | null>();
+      parentPostsRes.data?.forEach((p) => {
+        parentContentMap.set(p.id, p.content);
+        parentAvatarMap.set(p.id, parentUserAvatarMap.get(p.user_id) || null);
       });
 
       const formattedReplies: Post[] = repliesData.map((reply) => ({
@@ -508,6 +382,9 @@ export default function UserDetailScreen() {
         content: reply.content,
         created_at: reply.created_at,
         is_hidden: false,
+        parent_post_id: reply.parent_post_id,
+        parentContent: parentContentMap.get(reply.parent_post_id!) || undefined,
+        parentAvatarUrl: parentAvatarMap.get(reply.parent_post_id!) || null,
         user: {
           display_name: userData?.display_name || 'Unknown',
           user_id: reply.user_id,

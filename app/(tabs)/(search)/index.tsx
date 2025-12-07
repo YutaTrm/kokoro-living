@@ -30,6 +30,7 @@ import { useMasterData } from '@/src/contexts/MasterDataContext';
 import { useMedicationMasters } from '@/src/hooks/useMedicationMasters';
 import { supabase } from '@/src/lib/supabase';
 import { fetchPostsStats } from '@/src/utils/postStats';
+import { fetchPostTags } from '@/src/utils/postUtils';
 
 interface Post {
   id: string;
@@ -501,61 +502,12 @@ export default function SearchScreen() {
 
       // 統計情報とタグを一括取得（N+1問題を解消）
       const postIds = filteredPosts.map((p) => p.id);
-      const [statsMap, diagnosesRes, treatmentsRes, medicationsRes] = await Promise.all([
+      const [statsMap, tagsResult] = await Promise.all([
         fetchPostsStats(postIds, user?.id || null),
-        supabase
-          .from('post_diagnoses')
-          .select('post_id, user_diagnoses(diagnoses(name))')
-          .in('post_id', postIds),
-        supabase
-          .from('post_treatments')
-          .select('post_id, user_treatments(treatments(name))')
-          .in('post_id', postIds),
-        supabase
-          .from('post_medications')
-          .select('post_id, user_medications(ingredients(name), products(name))')
-          .in('post_id', postIds),
+        fetchPostTags(postIds),
       ]);
 
-      // タグをマップに変換
-      const diagnosesMap = new Map<string, string[]>();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      diagnosesRes.data?.forEach((d: any) => {
-        const name = d.user_diagnoses?.diagnoses?.name;
-        if (name) {
-          if (!diagnosesMap.has(d.post_id)) {
-            diagnosesMap.set(d.post_id, []);
-          }
-          diagnosesMap.get(d.post_id)?.push(name);
-        }
-      });
-
-      const treatmentsMap = new Map<string, string[]>();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      treatmentsRes.data?.forEach((t: any) => {
-        const name = t.user_treatments?.treatments?.name;
-        if (name) {
-          if (!treatmentsMap.has(t.post_id)) {
-            treatmentsMap.set(t.post_id, []);
-          }
-          treatmentsMap.get(t.post_id)?.push(name);
-        }
-      });
-
-      const medicationsMap = new Map<string, string[]>();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      medicationsRes.data?.forEach((m: any) => {
-        const name = m.user_medications?.ingredients?.name;
-        if (name) {
-          if (!medicationsMap.has(m.post_id)) {
-            medicationsMap.set(m.post_id, []);
-          }
-          const medications = medicationsMap.get(m.post_id)!;
-          if (!medications.includes(name)) {
-            medications.push(name);
-          }
-        }
-      });
+      const { diagnosesMap, treatmentsMap, medicationsMap } = tagsResult;
 
       // 投稿データを組み立て
       const postsWithData = filteredPosts.map((post) => {

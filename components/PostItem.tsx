@@ -23,6 +23,7 @@ interface PostItemProps {
     experienced_at?: string | null;
     parent_post_id?: string | null;
     parentContent?: string;
+    parentAvatarUrl?: string | null;
     is_hidden?: boolean;
     user: {
       display_name: string;
@@ -101,7 +102,11 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
             {/* 返信インジケーター */}
             {post.parent_post_id && post.parentContent && (
               <Box className="mb-1">
-                <ReplyIndicator parentContent={post.parentContent} onPress={handleParentPress} />
+                <ReplyIndicator
+                  parentContent={post.parentContent}
+                  parentAvatarUrl={post.parentAvatarUrl}
+                  onPress={handleParentPress}
+                />
               </Box>
             )}
 
