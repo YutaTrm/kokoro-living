@@ -279,7 +279,6 @@ export default function SearchScreen() {
           (user, index, self) => index === self.findIndex((u) => u.user_id === user.user_id)
         );
         setUsers(uniqueUsers);
-        setHasMore(uniqueUsers.length === LIMIT);
       } else {
         setUsers((prev) => {
           const combined = [...prev, ...filteredUsers];
@@ -288,9 +287,10 @@ export default function SearchScreen() {
             (user, index, self) => index === self.findIndex((u) => u.user_id === user.user_id)
           );
         });
-        setHasMore(filteredUsers.length === LIMIT);
       }
       setOffset(currentOffset + LIMIT);
+      // フィルター前のデータ数で判定（タグフィルターで減っても続きがある可能性）
+      setHasMore((usersData?.length || 0) === LIMIT);
     } catch (error) {
       console.error('ユーザー検索エラー:', error);
     } finally {
@@ -562,7 +562,8 @@ export default function SearchScreen() {
       }
 
       setOffset(currentOffset + LIMIT);
-      setHasMore(postsWithData.length === LIMIT);
+      // フィルター前のデータ数で判定（タグフィルターで減っても続きがある可能性）
+      setHasMore(postsData.length === LIMIT);
     } catch (error) {
       console.error('検索エラー:', error);
     } finally {

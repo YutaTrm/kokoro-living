@@ -22,6 +22,7 @@ import { supabase } from '@/src/lib/supabase';
 import { fetchPostMetadata, fetchPostTags } from '@/src/utils/postUtils';
 
 const SELECTED_LIST_KEY = 'selected_list_id';
+const LIMIT = 20;
 
 interface Post {
   id: string;
@@ -55,6 +56,8 @@ export default function TabOneScreen() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingPosts, setLoadingPosts] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [posts, setPosts] = useState<Post[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -115,7 +118,7 @@ export default function TabOneScreen() {
   // リストが変わったら投稿を再読み込み
   useEffect(() => {
     if (!loading) {
-      loadPosts();
+      loadPosts(true);
     }
   }, [selectedListId]);
 
@@ -150,7 +153,7 @@ export default function TabOneScreen() {
   // 画面にフォーカスが当たった時にタイムラインを再読み込み
   useFocusEffect(
     useCallback(() => {
-      loadPosts();
+      loadPosts(true);
     }, [selectedListId])
   );
 
@@ -161,16 +164,33 @@ export default function TabOneScreen() {
     setLoading(false);
 
     // ログイン状態に関わらず投稿を読み込む
-    loadPosts();
+    loadPosts(true);
   };
 
-  const loadPosts = async () => {
-    setLoadingPosts(true);
+  const loadPosts = async (reset = false) => {
+    if (!reset && (!hasMore || loadingMore)) return;
+
+    const currentOffset = reset ? 0 : posts.length;
+
     try {
+      if (reset) {
+        setLoadingPosts(true);
+        setHasMore(true);
+      } else {
+        setLoadingMore(true);
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
 
-      let postsData;
-      let postsError;
+      let postsData: Array<{
+        id: string;
+        content: string;
+        created_at: string;
+        experienced_at: string | null;
+        user_id: string;
+        is_hidden: boolean;
+      }> = [];
+      let postsError = null;
 
       if (user) {
         // ミュートしているユーザーIDを取得
@@ -193,7 +213,8 @@ export default function TabOneScreen() {
 
           if (listMemberIds.length === 0) {
             // リストにメンバーがいない場合
-            setPosts([]);
+            if (reset) setPosts([]);
+            setHasMore(false);
             return;
           }
 
@@ -205,7 +226,7 @@ export default function TabOneScreen() {
             .is('parent_post_id', null)
             .eq('is_hidden', false)
             .order('created_at', { ascending: false })
-            .limit(50);
+            .range(currentOffset, currentOffset + LIMIT - 1);
 
           // ミュートユーザーの投稿を除外
           const filteredPosts = (listPosts || []).filter(p => !mutedIds.includes(p.user_id));
@@ -219,36 +240,27 @@ export default function TabOneScreen() {
             .eq('follower_id', user.id);
 
           const followingIds = followingData?.map(f => f.following_id) || [];
+          const timelineUserIds = [user.id, ...followingIds];
 
-          // 自分の投稿（非表示を含む）
-          const { data: myPosts } = await supabase
+          // 自分とフォローしている人の投稿を一括取得
+          const { data: timelinePosts, error: timelineError } = await supabase
             .from('posts')
             .select('id, content, created_at, experienced_at, user_id, is_hidden')
-            .eq('user_id', user.id)
+            .in('user_id', timelineUserIds)
             .is('parent_post_id', null)
             .order('created_at', { ascending: false })
-            .limit(50);
+            .range(currentOffset, currentOffset + LIMIT - 1);
 
-          // フォローしている人の投稿（非表示を除外）
-          const { data: followingPosts, error: followingError } = await supabase
-            .from('posts')
-            .select('id, content, created_at, experienced_at, user_id, is_hidden')
-            .in('user_id', followingIds)
-            .is('parent_post_id', null)
-            .eq('is_hidden', false)
-            .order('created_at', { ascending: false })
-            .limit(50);
+          // 非表示・ミュートをフィルタリング（自分の投稿は非表示でも表示、ミュートは除外しない）
+          const filteredPosts = (timelinePosts || []).filter(p => {
+            if (p.user_id === user.id) return true; // 自分の投稿は常に表示
+            if (p.is_hidden) return false; // 他人の非表示投稿は除外
+            if (mutedIds.includes(p.user_id)) return false; // ミュートユーザーは除外
+            return true;
+          });
 
-          // マージして時系列順にソート
-          const allPosts = [...(myPosts || []), ...(followingPosts || [])];
-          // ミュートユーザーの投稿を除外（自分の投稿は除外しない）
-          const filteredPosts = allPosts.filter(p =>
-            p.user_id === user.id || !mutedIds.includes(p.user_id)
-          );
-          postsData = filteredPosts.sort((a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-          ).slice(0, 50);
-          postsError = followingError;
+          postsData = filteredPosts;
+          postsError = timelineError;
         }
       } else {
         // 未ログイン: すべての投稿を取得（非表示を除外）
@@ -258,16 +270,17 @@ export default function TabOneScreen() {
           .is('parent_post_id', null)
           .eq('is_hidden', false)
           .order('created_at', { ascending: false })
-          .limit(50);
+          .range(currentOffset, currentOffset + LIMIT - 1);
 
-        postsData = result.data;
+        postsData = result.data || [];
         postsError = result.error;
       }
 
       if (postsError) throw postsError;
 
       if (!postsData || postsData.length === 0) {
-        setPosts([]);
+        if (reset) setPosts([]);
+        setHasMore(false);
         return;
       }
 
@@ -295,6 +308,7 @@ export default function TabOneScreen() {
       const { diagnosesMap, treatmentsMap, medicationsMap } = tagsResult;
       const { repliesMap, likesMap, myLikesMap, myRepliesMap } = metadataResult;
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const formattedPosts: Post[] = postsData.map((post: any) => ({
         id: post.id,
         content: post.content,
@@ -315,18 +329,34 @@ export default function TabOneScreen() {
         hasRepliedByCurrentUser: myRepliesMap.get(post.id) || false,
       }));
 
-      setPosts(formattedPosts);
+      if (reset) {
+        setPosts(formattedPosts);
+      } else {
+        setPosts((prev) => {
+          const existingIds = new Set(prev.map((p) => p.id));
+          const newPosts = formattedPosts.filter((p) => !existingIds.has(p.id));
+          return [...prev, ...newPosts];
+        });
+      }
+      setHasMore(postsData.length === LIMIT);
     } catch (error) {
       console.error('投稿取得エラー:', error);
     } finally {
       setLoadingPosts(false);
+      setLoadingMore(false);
     }
   };
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadPosts();
+    await loadPosts(true);
     setRefreshing(false);
+  };
+
+  const handleLoadMore = () => {
+    if (!loadingMore && hasMore) {
+      loadPosts(false);
+    }
   };
 
   const renderEmptyComponent = () => {
@@ -489,6 +519,15 @@ export default function TabOneScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         ListEmptyComponent={renderEmptyComponent}
+        ListFooterComponent={
+          loadingMore ? (
+            <Box className="py-4 items-center">
+              <Spinner size="small" />
+            </Box>
+          ) : null
+        }
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.5}
       />
       {/* 気分チェックイン - 展開可能カード */}
       {isLoggedIn && hasCheckedIn && todayCheckin && (

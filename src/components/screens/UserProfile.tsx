@@ -89,6 +89,12 @@ export default function UserDetailScreen() {
   const [loadingMedical, setLoadingMedical] = useState(true);
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [loadingReplies, setLoadingReplies] = useState(false);
+  const [loadingMorePosts, setLoadingMorePosts] = useState(false);
+  const [loadingMoreReplies, setLoadingMoreReplies] = useState(false);
+  const [hasMorePosts, setHasMorePosts] = useState(true);
+  const [hasMoreReplies, setHasMoreReplies] = useState(true);
+
+  const POSTS_LIMIT = 20;
 
   useEffect(() => {
     if (id) {
@@ -252,9 +258,14 @@ export default function UserDetailScreen() {
     }
   };
 
-  const loadUserPosts = async () => {
-    setLoadingPosts(true);
+  const loadUserPosts = async (loadMore = false) => {
+    if (loadMore) {
+      setLoadingMorePosts(true);
+    } else {
+      setLoadingPosts(true);
+    }
     try {
+      const currentOffset = loadMore ? posts.length : 0;
       const { data: postsData, error: postsError } = await supabase
         .from('posts')
         .select('id, content, created_at, user_id')
@@ -262,14 +273,17 @@ export default function UserDetailScreen() {
         .is('parent_post_id', null)
         .eq('is_hidden', false)
         .order('created_at', { ascending: false })
-        .limit(20);
+        .range(currentOffset, currentOffset + POSTS_LIMIT - 1);
 
       if (postsError) throw postsError;
 
       if (!postsData || postsData.length === 0) {
-        setPosts([]);
+        if (!loadMore) setPosts([]);
+        setHasMorePosts(false);
         return;
       }
+
+      setHasMorePosts(postsData.length === POSTS_LIMIT);
 
       const postIds = postsData.map((p) => p.id);
 
@@ -308,17 +322,31 @@ export default function UserDetailScreen() {
         hasRepliedByCurrentUser: myRepliesMap.get(post.id) || false,
       }));
 
-      setPosts(formattedPosts);
+      if (loadMore) {
+        setPosts((prev) => {
+          const existingIds = new Set(prev.map((p) => p.id));
+          const newPosts = formattedPosts.filter((p) => !existingIds.has(p.id));
+          return [...prev, ...newPosts];
+        });
+      } else {
+        setPosts(formattedPosts);
+      }
     } catch (error) {
       console.error('投稿取得エラー:', error);
     } finally {
       setLoadingPosts(false);
+      setLoadingMorePosts(false);
     }
   };
 
-  const loadUserReplies = async () => {
-    setLoadingReplies(true);
+  const loadUserReplies = async (loadMore = false) => {
+    if (loadMore) {
+      setLoadingMoreReplies(true);
+    } else {
+      setLoadingReplies(true);
+    }
     try {
+      const currentOffset = loadMore ? replies.length : 0;
       const { data: repliesData, error: repliesError } = await supabase
         .from('posts')
         .select('id, content, created_at, user_id, parent_post_id')
@@ -326,14 +354,17 @@ export default function UserDetailScreen() {
         .not('parent_post_id', 'is', null)
         .eq('is_hidden', false)
         .order('created_at', { ascending: false })
-        .limit(20);
+        .range(currentOffset, currentOffset + POSTS_LIMIT - 1);
 
       if (repliesError) throw repliesError;
 
       if (!repliesData || repliesData.length === 0) {
-        setReplies([]);
+        if (!loadMore) setReplies([]);
+        setHasMoreReplies(false);
         return;
       }
+
+      setHasMoreReplies(repliesData.length === POSTS_LIMIT);
 
       const replyIds = repliesData.map((r) => r.id);
       const parentPostIds = [...new Set(repliesData.map((r) => r.parent_post_id).filter((id): id is string => id !== null))];
@@ -377,11 +408,28 @@ export default function UserDetailScreen() {
         };
       });
 
-      setReplies(formattedReplies);
+      if (loadMore) {
+        setReplies((prev) => {
+          const existingIds = new Set(prev.map((p) => p.id));
+          const newReplies = formattedReplies.filter((p) => !existingIds.has(p.id));
+          return [...prev, ...newReplies];
+        });
+      } else {
+        setReplies(formattedReplies);
+      }
     } catch (error) {
       console.error('返信取得エラー:', error);
     } finally {
       setLoadingReplies(false);
+      setLoadingMoreReplies(false);
+    }
+  };
+
+  const handleLoadMore = () => {
+    if (activeTab === 'posts' && hasMorePosts && !loadingMorePosts) {
+      loadUserPosts(true);
+    } else if (activeTab === 'replies' && hasMoreReplies && !loadingMoreReplies) {
+      loadUserReplies(true);
     }
   };
 
@@ -588,7 +636,7 @@ export default function UserDetailScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: profile.display_name }} />
+      <Stack.Screen options={{ title: profile.display_name ?? '' }} />
       <Box className="flex-1 bg-background-0">
         <FlatList
           data={getListData()}
@@ -596,6 +644,15 @@ export default function UserDetailScreen() {
           renderItem={({ item }) => <PostItem post={item} disableAvatarTap />}
           ListHeaderComponent={renderHeader}
           ListEmptyComponent={renderEmptyContent}
+          ListFooterComponent={
+            (loadingMorePosts || loadingMoreReplies) ? (
+              <Box className="py-4 items-center">
+                <Spinner size="small" />
+              </Box>
+            ) : null
+          }
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
         />
       </Box>
 

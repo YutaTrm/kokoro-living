@@ -15,11 +15,16 @@ interface User {
   bio: string | null;
 }
 
+const LIMIT = 20;
+
 export default function PostLikesScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [allBlockedIds, setAllBlockedIds] = useState<string[]>([]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -28,10 +33,12 @@ export default function PostLikesScreen() {
   }, []);
 
   useEffect(() => {
-    if (id && currentUserId) loadLikedUsers();
+    if (id && currentUserId) {
+      initializeAndLoad();
+    }
   }, [id, currentUserId]);
 
-  const loadLikedUsers = async () => {
+  const initializeAndLoad = async () => {
     if (!currentUserId) return;
 
     try {
@@ -49,7 +56,8 @@ export default function PostLikesScreen() {
 
       const blockedIds = blocksRes.data?.map((b) => b.blocked_id) || [];
       const blockedByIds = blockedByRes.data?.map((b) => b.blocker_id) || [];
-      const allBlockedIds = [...blockedIds, ...blockedByIds];
+      const blocked = [...blockedIds, ...blockedByIds];
+      setAllBlockedIds(blocked);
 
       // 投稿の作成者を確認
       const { data: postData } = await supabase
@@ -59,30 +67,55 @@ export default function PostLikesScreen() {
         .single();
 
       // 投稿の作成者がブロックリストに含まれている場合は空のリストを返す
-      if (postData && allBlockedIds.includes(postData.user_id)) {
+      if (postData && blocked.includes(postData.user_id)) {
         setUsers([]);
+        setLoading(false);
         return;
+      }
+
+      await loadLikedUsers(true, blocked);
+    } catch (error) {
+      console.error('初期化エラー:', error);
+      setLoading(false);
+    }
+  };
+
+  const loadLikedUsers = async (reset = false, blockedIds?: string[]) => {
+    if (!reset && (!hasMore || loadingMore)) return;
+
+    const currentOffset = reset ? 0 : users.length;
+    const blocked = blockedIds ?? allBlockedIds;
+
+    try {
+      if (reset) {
+        setLoading(true);
+        setHasMore(true);
+      } else {
+        setLoadingMore(true);
       }
 
       const { data: likesData, error: likesError } = await supabase
         .from('likes')
         .select('user_id')
         .eq('post_id', id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(currentOffset, currentOffset + LIMIT - 1);
 
       if (likesError) throw likesError;
       if (!likesData || likesData.length === 0) {
-        setUsers([]);
+        if (reset) setUsers([]);
+        setHasMore(false);
         return;
       }
 
       // ブロックユーザーを除外
       const userIds = likesData
         .map((l) => l.user_id)
-        .filter((userId) => !allBlockedIds.includes(userId));
+        .filter((userId) => !blocked.includes(userId));
 
       if (userIds.length === 0) {
-        setUsers([]);
+        if (reset) setUsers([]);
+        setHasMore(likesData.length === LIMIT);
         return;
       }
 
@@ -99,11 +132,27 @@ export default function PostLikesScreen() {
         .map((userId) => usersMap.get(userId))
         .filter((u): u is User => u !== undefined);
 
-      setUsers(orderedUsers);
+      if (reset) {
+        setUsers(orderedUsers);
+      } else {
+        setUsers((prev) => {
+          const existingIds = new Set(prev.map((u) => u.user_id));
+          const newUsers = orderedUsers.filter((u) => !existingIds.has(u.user_id));
+          return [...prev, ...newUsers];
+        });
+      }
+      setHasMore(likesData.length === LIMIT);
     } catch (error) {
       console.error('いいねユーザー取得エラー:', error);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  const handleLoadMore = () => {
+    if (!loadingMore && hasMore) {
+      loadLikedUsers(false);
     }
   };
 
@@ -138,6 +187,15 @@ export default function PostLikesScreen() {
             />
           )}
           ListEmptyComponent={renderEmpty}
+          ListFooterComponent={
+            loadingMore ? (
+              <Box className="py-4 items-center">
+                <Spinner size="small" />
+              </Box>
+            ) : null
+          }
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
         />
       </Box>
     </>

@@ -34,11 +34,15 @@ interface Notification {
   parent_post_avatar_url?: string | null; // 返信通知の場合、親投稿者のアバター
 }
 
+const LIMIT = 20;
+
 export default function NotificationsScreen() {
   const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const { refetch: refetchBadge } = useNotificationContext();
 
@@ -52,15 +56,25 @@ export default function NotificationsScreen() {
   useFocusEffect(
     useCallback(() => {
       if (userId) {
-        loadNotifications();
+        loadNotifications(true);
       }
     }, [userId])
   );
 
-  const loadNotifications = async () => {
+  const loadNotifications = async (reset = false) => {
     if (!userId) return;
+    if (!reset && (!hasMore || loadingMore)) return;
+
+    const currentOffset = reset ? 0 : notifications.length;
 
     try {
+      if (reset) {
+        setLoading(true);
+        setHasMore(true);
+      } else {
+        setLoadingMore(true);
+      }
+
       // ブロックしているユーザー、ブロックされているユーザー、ミュートしているユーザーを並列取得
       const [blocksRes, blockedByRes, mutesRes] = await Promise.all([
         supabase
@@ -96,7 +110,7 @@ export default function NotificationsScreen() {
         `)
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
-        .limit(50);
+        .range(currentOffset, currentOffset + LIMIT - 1);
 
       // ブロックリストがある場合のみ除外
       if (allBlockedIds.length > 0) {
@@ -207,19 +221,35 @@ export default function NotificationsScreen() {
           parent_post_avatar_url: n.post_id ? parentPostsAvatarMap.get(n.post_id) || null : null,
         }));
 
-      setNotifications(formatted);
+      if (reset) {
+        setNotifications(formatted);
+      } else {
+        setNotifications((prev) => {
+          const existingIds = new Set(prev.map((n) => n.id));
+          const newNotifications = formatted.filter((n) => !existingIds.has(n.id));
+          return [...prev, ...newNotifications];
+        });
+      }
+      setHasMore(formatted.length === LIMIT);
     } catch (error) {
       console.error('通知取得エラー:', error);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await loadNotifications();
+    await loadNotifications(true);
     setRefreshing(false);
   }, [userId]);
+
+  const handleLoadMore = () => {
+    if (!loadingMore && hasMore) {
+      loadNotifications(false);
+    }
+  };
 
   const markAsRead = async (notificationId: string) => {
     await supabase
@@ -352,7 +382,16 @@ export default function NotificationsScreen() {
           keyExtractor={(item) => item.id}
           renderItem={renderNotification}
           ListEmptyComponent={renderEmpty}
+          ListFooterComponent={
+            loadingMore ? (
+              <Box className="py-4 items-center">
+                <Spinner size="small" />
+              </Box>
+            ) : null
+          }
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
         />
       </Box>
     </LoginPrompt>

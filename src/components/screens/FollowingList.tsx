@@ -15,11 +15,16 @@ interface User {
   bio: string | null;
 }
 
+const LIMIT = 20;
+
 export default function FollowingListScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [allBlockedIds, setAllBlockedIds] = useState<string[]>([]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -28,10 +33,12 @@ export default function FollowingListScreen() {
   }, []);
 
   useEffect(() => {
-    if (id && currentUserId) loadFollowing();
+    if (id && currentUserId) {
+      initializeAndLoad();
+    }
   }, [id, currentUserId]);
 
-  const loadFollowing = async () => {
+  const initializeAndLoad = async () => {
     if (!currentUserId) return;
 
     try {
@@ -49,28 +56,53 @@ export default function FollowingListScreen() {
 
       const blockedIds = blocksRes.data?.map((b) => b.blocked_id) || [];
       const blockedByIds = blockedByRes.data?.map((b) => b.blocker_id) || [];
-      const allBlockedIds = [...blockedIds, ...blockedByIds];
+      const blocked = [...blockedIds, ...blockedByIds];
+      setAllBlockedIds(blocked);
+
+      await loadFollowing(true, blocked);
+    } catch (error) {
+      console.error('初期化エラー:', error);
+      setLoading(false);
+    }
+  };
+
+  const loadFollowing = async (reset = false, blockedIds?: string[]) => {
+    if (!reset && (!hasMore || loadingMore)) return;
+
+    const currentOffset = reset ? 0 : users.length;
+    const blocked = blockedIds ?? allBlockedIds;
+
+    try {
+      if (reset) {
+        setLoading(true);
+        setHasMore(true);
+      } else {
+        setLoadingMore(true);
+      }
 
       // フォロー中のユーザーIDを取得
       const { data: followsData, error: followsError } = await supabase
         .from('follows')
         .select('following_id')
         .eq('follower_id', id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(currentOffset, currentOffset + LIMIT - 1);
 
       if (followsError) throw followsError;
       if (!followsData || followsData.length === 0) {
-        setUsers([]);
+        if (reset) setUsers([]);
+        setHasMore(false);
         return;
       }
 
       // ブロックユーザーを除外
       const userIds = followsData
         .map((f) => f.following_id)
-        .filter((userId) => !allBlockedIds.includes(userId));
+        .filter((userId) => !blocked.includes(userId));
 
       if (userIds.length === 0) {
-        setUsers([]);
+        if (reset) setUsers([]);
+        setHasMore(followsData.length === LIMIT);
         return;
       }
 
@@ -88,11 +120,27 @@ export default function FollowingListScreen() {
         .map((userId) => usersMap.get(userId))
         .filter((u): u is User => u !== undefined);
 
-      setUsers(orderedUsers);
+      if (reset) {
+        setUsers(orderedUsers);
+      } else {
+        setUsers((prev) => {
+          const existingIds = new Set(prev.map((u) => u.user_id));
+          const newUsers = orderedUsers.filter((u) => !existingIds.has(u.user_id));
+          return [...prev, ...newUsers];
+        });
+      }
+      setHasMore(followsData.length === LIMIT);
     } catch (error) {
       console.error('フォロー一覧取得エラー:', error);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  const handleLoadMore = () => {
+    if (!loadingMore && hasMore) {
+      loadFollowing(false);
     }
   };
 
@@ -127,6 +175,15 @@ export default function FollowingListScreen() {
             />
           )}
           ListEmptyComponent={renderEmpty}
+          ListFooterComponent={
+            loadingMore ? (
+              <Box className="py-4 items-center">
+                <Spinner size="small" />
+              </Box>
+            ) : null
+          }
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
         />
       </Box>
     </>
