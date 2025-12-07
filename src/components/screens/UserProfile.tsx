@@ -54,6 +54,10 @@ interface Post {
   diagnoses: string[];
   treatments: string[];
   medications: string[];
+  repliesCount?: number;
+  likesCount?: number;
+  isLikedByCurrentUser?: boolean;
+  hasRepliedByCurrentUser?: boolean;
 }
 
 export default function UserDetailScreen() {
@@ -77,10 +81,10 @@ export default function UserDetailScreen() {
   const [medications, setMedications] = useState<MedicalRecord[]>([]);
   const [statuses, setStatuses] = useState<MedicalRecord[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
-  const [likedPosts, setLikedPosts] = useState<Post[]>([]);
+  const [replies, setReplies] = useState<Post[]>([]);
   const [loadingMedical, setLoadingMedical] = useState(true);
   const [loadingPosts, setLoadingPosts] = useState(false);
-  const [loadingLikes, setLoadingLikes] = useState(false);
+  const [loadingReplies, setLoadingReplies] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -93,8 +97,8 @@ export default function UserDetailScreen() {
     if (!id) return;
     if (activeTab === 'posts' && posts.length === 0) {
       loadUserPosts();
-    } else if (activeTab === 'likes' && likedPosts.length === 0) {
-      loadLikedPosts();
+    } else if (activeTab === 'replies' && replies.length === 0) {
+      loadUserReplies();
     }
   }, [id, activeTab]);
 
@@ -288,6 +292,64 @@ export default function UserDetailScreen() {
         .select('post_id, user_medications(ingredients(name), products(name))')
         .in('post_id', postIds);
 
+      // 返信数・いいね数・現在ユーザーの状態を並列取得
+      const [repliesRes, likesRes, myLikesRes, myRepliesRes] = await Promise.all([
+        // 返信数
+        supabase
+          .from('posts')
+          .select('parent_post_id')
+          .in('parent_post_id', postIds),
+        // いいね数
+        supabase
+          .from('likes')
+          .select('post_id')
+          .in('post_id', postIds),
+        // 現在ユーザーのいいね
+        currentUserId
+          ? supabase
+              .from('likes')
+              .select('post_id')
+              .eq('user_id', currentUserId)
+              .in('post_id', postIds)
+          : Promise.resolve({ data: [] }),
+        // 現在ユーザーの返信
+        currentUserId
+          ? supabase
+              .from('posts')
+              .select('parent_post_id')
+              .eq('user_id', currentUserId)
+              .in('parent_post_id', postIds)
+          : Promise.resolve({ data: [] }),
+      ]);
+
+      // 返信数マップ
+      const repliesMap = new Map<string, number>();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      repliesRes.data?.forEach((r: any) => {
+        const count = repliesMap.get(r.parent_post_id) || 0;
+        repliesMap.set(r.parent_post_id, count + 1);
+      });
+
+      // いいね数マップ
+      const likesMap = new Map<string, number>();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      likesRes.data?.forEach((l: any) => {
+        const count = likesMap.get(l.post_id) || 0;
+        likesMap.set(l.post_id, count + 1);
+      });
+
+      // 自分のいいね・返信マップ
+      const myLikesMap = new Map<string, boolean>();
+      const myRepliesMap = new Map<string, boolean>();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      myLikesRes.data?.forEach((l: any) => {
+        myLikesMap.set(l.post_id, true);
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      myRepliesRes.data?.forEach((r: any) => {
+        myRepliesMap.set(r.parent_post_id, true);
+      });
+
       const diagnosesMap = new Map<string, string[]>();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       diagnosesData?.forEach((d: any) => {
@@ -341,6 +403,10 @@ export default function UserDetailScreen() {
         diagnoses: diagnosesMap.get(post.id) || [],
         treatments: treatmentsMap.get(post.id) || [],
         medications: medicationsMap.get(post.id) || [],
+        repliesCount: repliesMap.get(post.id) || 0,
+        likesCount: likesMap.get(post.id) || 0,
+        isLikedByCurrentUser: myLikesMap.get(post.id) || false,
+        hasRepliedByCurrentUser: myRepliesMap.get(post.id) || false,
       }));
 
       setPosts(formattedPosts);
@@ -351,134 +417,116 @@ export default function UserDetailScreen() {
     }
   };
 
-  const loadLikedPosts = async () => {
-    setLoadingLikes(true);
+  const loadUserReplies = async () => {
+    setLoadingReplies(true);
     try {
-      // いいねした投稿のIDを取得
-      const { data: likesData, error: likesError } = await supabase
-        .from('likes')
-        .select('post_id')
-        .eq('user_id', id)
-        .order('created_at', { ascending: false });
-
-      if (likesError) throw likesError;
-
-      if (!likesData || likesData.length === 0) {
-        setLikedPosts([]);
-        return;
-      }
-
-      const postIds = likesData.map((l) => l.post_id);
-
-      // 投稿データを取得（非表示を除外）
-      const { data: postsData, error: postsError } = await supabase
+      const { data: repliesData, error: repliesError } = await supabase
         .from('posts')
         .select('id, content, created_at, user_id')
-        .in('id', postIds)
-        .is('parent_post_id', null)
-        .eq('is_hidden', false);
+        .eq('user_id', id)
+        .not('parent_post_id', 'is', null)
+        .eq('is_hidden', false)
+        .order('created_at', { ascending: false })
+        .limit(20);
 
-      if (postsError) throw postsError;
+      if (repliesError) throw repliesError;
 
-      if (!postsData || postsData.length === 0) {
-        setLikedPosts([]);
+      if (!repliesData || repliesData.length === 0) {
+        setReplies([]);
         return;
       }
 
       // ユーザー情報を取得
-      const userIds = [...new Set(postsData.map((p) => p.user_id))];
-      const { data: usersData } = await supabase
+      const { data: userData } = await supabase
         .from('users')
         .select('user_id, display_name, avatar_url')
-        .in('user_id', userIds);
+        .eq('user_id', id)
+        .single();
 
-      const usersMap = new Map(usersData?.map((u) => [u.user_id, u]) || []);
+      const replyIds = repliesData.map((r) => r.id);
 
-      // タグを取得
-      const { data: diagnosesData } = await supabase
-        .from('post_diagnoses')
-        .select('post_id, user_diagnoses(diagnoses(name))')
-        .in('post_id', postIds);
+      // 返信数・いいね数・現在ユーザーの状態を並列取得
+      const [childRepliesRes, likesRes, myLikesRes, myRepliesRes] = await Promise.all([
+        // 返信への返信数
+        supabase
+          .from('posts')
+          .select('parent_post_id')
+          .in('parent_post_id', replyIds),
+        // いいね数
+        supabase
+          .from('likes')
+          .select('post_id')
+          .in('post_id', replyIds),
+        // 現在ユーザーのいいね
+        currentUserId
+          ? supabase
+              .from('likes')
+              .select('post_id')
+              .eq('user_id', currentUserId)
+              .in('post_id', replyIds)
+          : Promise.resolve({ data: [] }),
+        // 現在ユーザーの返信
+        currentUserId
+          ? supabase
+              .from('posts')
+              .select('parent_post_id')
+              .eq('user_id', currentUserId)
+              .in('parent_post_id', replyIds)
+          : Promise.resolve({ data: [] }),
+      ]);
 
-      const { data: treatmentsData } = await supabase
-        .from('post_treatments')
-        .select('post_id, user_treatments(treatments(name))')
-        .in('post_id', postIds);
-
-      const { data: medicationsData } = await supabase
-        .from('post_medications')
-        .select('post_id, user_medications(ingredients(name))')
-        .in('post_id', postIds);
-
-      const diagnosesMap = new Map<string, string[]>();
+      // 返信数マップ
+      const repliesMap = new Map<string, number>();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      diagnosesData?.forEach((d: any) => {
-        const name = d.user_diagnoses?.diagnoses?.name;
-        if (name) {
-          if (!diagnosesMap.has(d.post_id)) {
-            diagnosesMap.set(d.post_id, []);
-          }
-          diagnosesMap.get(d.post_id)?.push(name);
-        }
+      childRepliesRes.data?.forEach((r: any) => {
+        const count = repliesMap.get(r.parent_post_id) || 0;
+        repliesMap.set(r.parent_post_id, count + 1);
       });
 
-      const treatmentsMap = new Map<string, string[]>();
+      // いいね数マップ
+      const likesMap = new Map<string, number>();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      treatmentsData?.forEach((t: any) => {
-        const name = t.user_treatments?.treatments?.name;
-        if (name) {
-          if (!treatmentsMap.has(t.post_id)) {
-            treatmentsMap.set(t.post_id, []);
-          }
-          treatmentsMap.get(t.post_id)?.push(name);
-        }
+      likesRes.data?.forEach((l: any) => {
+        const count = likesMap.get(l.post_id) || 0;
+        likesMap.set(l.post_id, count + 1);
       });
 
-      const medicationsMap = new Map<string, string[]>();
+      // 自分のいいね・返信マップ
+      const myLikesMap = new Map<string, boolean>();
+      const myRepliesMap = new Map<string, boolean>();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      medicationsData?.forEach((m: any) => {
-        const name = m.user_medications?.ingredients?.name;
-        if (name) {
-          if (!medicationsMap.has(m.post_id)) {
-            medicationsMap.set(m.post_id, []);
-          }
-          const meds = medicationsMap.get(m.post_id)!;
-          if (!meds.includes(name)) {
-            meds.push(name);
-          }
-        }
+      myLikesRes.data?.forEach((l: any) => {
+        myLikesMap.set(l.post_id, true);
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      myRepliesRes.data?.forEach((r: any) => {
+        myRepliesMap.set(r.parent_post_id, true);
       });
 
-      // いいねの順序を保持するためにpostIdsの順序でソート
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const formattedPosts: Post[] = postIds
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .map((postId) => postsData.find((p: any) => p.id === postId))
-        .filter(Boolean)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .map((post: any) => {
-          const user = usersMap.get(post.user_id);
-          return {
-            id: post.id,
-            content: post.content,
-            created_at: post.created_at,
-            is_hidden: false, // いいね一覧では非表示投稿は除外されている
-            user: {
-              display_name: user?.display_name || 'Unknown',
-              user_id: post.user_id,
-              avatar_url: user?.avatar_url || null,
-            },
-            diagnoses: diagnosesMap.get(post.id) || [],
-            treatments: treatmentsMap.get(post.id) || [],
-            medications: medicationsMap.get(post.id) || [],
-          };
-        });
+      const formattedReplies: Post[] = repliesData.map((reply) => ({
+        id: reply.id,
+        content: reply.content,
+        created_at: reply.created_at,
+        is_hidden: false,
+        user: {
+          display_name: userData?.display_name || 'Unknown',
+          user_id: reply.user_id,
+          avatar_url: userData?.avatar_url || null,
+        },
+        diagnoses: [],
+        treatments: [],
+        medications: [],
+        repliesCount: repliesMap.get(reply.id) || 0,
+        likesCount: likesMap.get(reply.id) || 0,
+        isLikedByCurrentUser: myLikesMap.get(reply.id) || false,
+        hasRepliedByCurrentUser: myRepliesMap.get(reply.id) || false,
+      }));
 
-      setLikedPosts(formattedPosts);
+      setReplies(formattedReplies);
     } catch (error) {
-      console.error('いいね取得エラー:', error);
+      console.error('返信取得エラー:', error);
     } finally {
-      setLoadingLikes(false);
+      setLoadingReplies(false);
     }
   };
 
@@ -583,7 +631,7 @@ export default function UserDetailScreen() {
         </Box>
 
         {/* タブバー */}
-        <ProfileTabBar activeTab={activeTab} onTabChange={setActiveTab} showBookmarks={false} />
+        <ProfileTabBar activeTab={activeTab} onTabChange={setActiveTab} hiddenTabs={['ai-reflection']} />
 
         {/* プロフィールタブの内容 */}
         {activeTab === 'profile' && (
@@ -601,7 +649,11 @@ export default function UserDetailScreen() {
   const renderEmptyContent = () => {
     if (activeTab === 'profile') return null;
 
-    const isLoading = activeTab === 'posts' ? loadingPosts : loadingLikes;
+    const isLoading =
+      activeTab === 'posts' ? loadingPosts :
+      activeTab === 'replies' ? loadingReplies :
+      false;
+
     if (isLoading) {
       return (
         <Box className="px-5 py-8 items-center">
@@ -610,7 +662,11 @@ export default function UserDetailScreen() {
       );
     }
 
-    const message = activeTab === 'posts' ? 'まだ投稿がありません' : 'まだいいねがありません';
+    const message =
+      activeTab === 'posts' ? 'まだ投稿がありません' :
+      activeTab === 'replies' ? 'まだ返信がありません' :
+      '';
+
     return (
       <Box className="px-5 py-8">
         <Text className="text-base text-center text-typography-400">{message}</Text>
@@ -621,7 +677,7 @@ export default function UserDetailScreen() {
   const getListData = () => {
     if (activeTab === 'profile') return [];
     if (activeTab === 'posts') return posts;
-    if (activeTab === 'likes') return likedPosts;
+    if (activeTab === 'replies') return replies;
     return [];
   };
 

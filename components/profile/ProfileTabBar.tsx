@@ -8,18 +8,22 @@ type TabType = 'profile' | 'posts' | 'replies' | 'ai-reflection';
 interface ProfileTabBarProps {
   activeTab: TabType;
   onTabChange: (tab: TabType) => void;
+  hiddenTabs?: TabType[];
 }
 
 export default function ProfileTabBar({
   activeTab,
   onTabChange,
+  hiddenTabs = [],
 }: ProfileTabBarProps) {
-  const tabs: { key: TabType; label: string }[] = [
+  const allTabs: { key: TabType; label: string }[] = [
     { key: 'profile', label: 'プロフィール' },
     { key: 'posts', label: '投稿' },
     { key: 'replies', label: '返信' },
     { key: 'ai-reflection', label: 'AI振り返り' },
   ];
+
+  const tabs = allTabs.filter((tab) => !hiddenTabs.includes(tab.key));
 
   return (
     <ScrollView
