@@ -92,6 +92,8 @@ interface AIReflection {
   created_at: string;
 }
 
+const REFLECTIONS_LIMIT = 20;
+
 // AI振り返りカードコンポーネント（メモ化で点滅防止）
 const AIReflectionCard = memo(
   function AIReflectionCard({ reflection }: { reflection: AIReflection }) {
@@ -144,6 +146,8 @@ export default function ProfileScreen() {
   const initialLoadCompleteRef = useRef(false);
   const [aiReflections, setAiReflections] = useState<any[]>([]);
   const [loadingReflections, setLoadingReflections] = useState(false);
+  const [loadingMoreReflections, setLoadingMoreReflections] = useState(false);
+  const [hasMoreReflections, setHasMoreReflections] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [ticketCount, setTicketCount] = useState(0);
   const [hasFreeQuota, setHasFreeQuota] = useState(false);
@@ -243,15 +247,25 @@ export default function ProfileScreen() {
     } else if (activeTab === 'replies') {
       loadUserReplies();
     } else if (activeTab === 'ai-reflection') {
-      loadAiReflections();
+      loadAiReflections(true);
     }
   }, [activeTab]);
 
-  const loadAiReflections = useCallback(async () => {
+  const loadAiReflections = useCallback(async (reset = false) => {
+    if (!reset && (!hasMoreReflections || loadingMoreReflections)) return;
+
+    const currentOffset = reset ? 0 : aiReflections.length;
+
     // 初回のみスピナーを表示（2回目以降はバックグラウンド更新）
-    if (!reflectionsLoadedRef.current) {
-      setLoadingReflections(true);
+    if (reset) {
+      if (!reflectionsLoadedRef.current) {
+        setLoadingReflections(true);
+      }
+      setHasMoreReflections(true);
+    } else {
+      setLoadingMoreReflections(true);
     }
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -260,18 +274,35 @@ export default function ProfileScreen() {
         .from('ai_reflections')
         .select('*')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(currentOffset, currentOffset + REFLECTIONS_LIMIT - 1);
 
       if (error) throw error;
 
-      setAiReflections(data || []);
+      if (!data || data.length === 0) {
+        if (reset) setAiReflections([]);
+        setHasMoreReflections(false);
+        return;
+      }
+
+      if (reset) {
+        setAiReflections(data);
+      } else {
+        setAiReflections((prev) => {
+          const existingIds = new Set(prev.map((r) => r.id));
+          const newReflections = data.filter((r) => !existingIds.has(r.id));
+          return [...prev, ...newReflections];
+        });
+      }
+      setHasMoreReflections(data.length === REFLECTIONS_LIMIT);
       reflectionsLoadedRef.current = true;
     } catch (error) {
       console.error('振り返り取得エラー:', error);
     } finally {
       setLoadingReflections(false);
+      setLoadingMoreReflections(false);
     }
-  }, []);
+  }, [aiReflections.length, hasMoreReflections, loadingMoreReflections]);
 
   // チケット情報を取得
   const loadTicketInfo = useCallback(async () => {
@@ -340,7 +371,7 @@ export default function ProfileScreen() {
   useFocusEffect(
     useCallback(() => {
       if (activeTab === 'ai-reflection') {
-        loadAiReflections();
+        loadAiReflections(true);
         loadTicketInfo();
       }
     }, [activeTab, loadAiReflections, loadTicketInfo])
@@ -384,7 +415,7 @@ export default function ProfileScreen() {
         // refをリセットして次回スピナー表示
         reflectionsLoadedRef.current = false;
         ticketInfoLoadedRef.current = false;
-        await loadAiReflections();
+        await loadAiReflections(true);
         await loadTicketInfo();
         Alert.alert('成功', 'AI振り返りが生成されました！');
         return;
@@ -431,7 +462,7 @@ export default function ProfileScreen() {
           console.log('New reflection was created despite error');
           reflectionsLoadedRef.current = false;
           ticketInfoLoadedRef.current = false;
-          await loadAiReflections();
+          await loadAiReflections(true);
           await loadTicketInfo();
           Alert.alert('成功', 'AI振り返りが生成されました！');
           return;
@@ -463,6 +494,13 @@ export default function ProfileScreen() {
   const handleConfirmGenerate = () => {
     setShowGenerateConfirmModal(false);
     executeGenerateReflection();
+  };
+
+  // AI振り返りの追加読み込み
+  const handleLoadMoreReflections = () => {
+    if (!loadingMoreReflections && hasMoreReflections) {
+      loadAiReflections(false);
+    }
   };
 
   // 確認モーダルのメッセージ
@@ -1477,29 +1515,9 @@ export default function ProfileScreen() {
               </VStack>
             )}
 
-            {/* 振り返り一覧 */}
-            {loadingReflections ? (
-              <Box className="py-8 items-center">
-                <Spinner size="large" />
-              </Box>
-            ) : aiReflections.length > 0 ? (
-              <VStack space="md" className="mt-4">
-                <Heading size="md">生成された振り返り</Heading>
-                {aiReflections.map((reflection) => (
-                  <AIReflectionCard
-                    key={reflection.id}
-                    reflection={reflection}
-                  />
-                ))}
-              </VStack>
-            ) : (
-              <Card className="p-8 bg-background-50">
-                <VStack space="sm" className="items-center">
-                  <Text className="text-center text-typography-500">
-                    まだ振り返りがありません
-                  </Text>
-                </VStack>
-              </Card>
+            {/* 振り返り一覧のヘッダー（リストはFlatListで表示） */}
+            {!loadingReflections && aiReflections.length > 0 && (
+              <Heading size="md" className="mt-4">生成された振り返り</Heading>
             )}
           </VStack>
         </Box>
@@ -1513,18 +1531,21 @@ export default function ProfileScreen() {
         return userPosts;
       case 'replies':
         return userReplies;
+      case 'ai-reflection':
+        return aiReflections;
       default:
         return [];
     }
   };
 
   const renderEmptyComponent = () => {
-    if (activeTab === 'profile' || activeTab === 'ai-reflection') return null;
+    if (activeTab === 'profile') return null;
 
     // ローディング中はスピナーを表示
     const isLoading =
       (activeTab === 'posts' && loadingPosts) ||
-      (activeTab === 'replies' && loadingReplies);
+      (activeTab === 'replies' && loadingReplies) ||
+      (activeTab === 'ai-reflection' && loadingReflections);
 
     if (isLoading) {
       return (
@@ -1538,6 +1559,7 @@ export default function ProfileScreen() {
     const messages = {
       posts: 'まだ投稿がありません',
       replies: 'まだ返信がありません',
+      'ai-reflection': 'まだ振り返りがありません',
     };
 
     return (
@@ -1566,23 +1588,42 @@ export default function ProfileScreen() {
     </>
   );
 
+  const renderItem = ({ item }: { item: Post | AIReflection }) => {
+    if (activeTab === 'ai-reflection') {
+      return <AIReflectionCard reflection={item as AIReflection} />;
+    }
+    return <PostItem post={item as Post} />;
+  };
+
+  const handleLoadMore = () => {
+    if (activeTab === 'ai-reflection') {
+      handleLoadMoreReflections();
+    }
+  };
+
+  const isLoadingMore =
+    (activeTab === 'ai-reflection' && loadingMoreReflections);
+
   return (
     <LoginPrompt>
       <Box className="flex-1">
-        {activeTab === 'ai-reflection' ? (
-          <ScrollView>
-            {!profile ? renderLoadingHeader() : renderHeader()}
-          </ScrollView>
-        ) : (
-          <FlatList
-            data={getCurrentData()}
-            renderItem={({ item }) => <PostItem post={item} />}
-            keyExtractor={(item) => item.id}
-            ListHeaderComponent={!profile ? renderLoadingHeader : renderHeader}
-            ListEmptyComponent={renderEmptyComponent}
-            removeClippedSubviews={false}
-          />
-        )}
+        <FlatList
+          data={getCurrentData()}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          ListHeaderComponent={!profile ? renderLoadingHeader : renderHeader}
+          ListEmptyComponent={renderEmptyComponent}
+          ListFooterComponent={
+            isLoadingMore ? (
+              <Box className="py-4 items-center">
+                <Spinner size="small" />
+              </Box>
+            ) : null
+          }
+          onEndReached={activeTab === 'ai-reflection' ? handleLoadMore : undefined}
+          onEndReachedThreshold={0.5}
+          removeClippedSubviews={false}
+        />
       </Box>
 
       {/* 複数選択モーダル */}
