@@ -382,6 +382,14 @@ export default function ProfileScreen() {
     }, [])
   );
 
+  // AI振り返りタブに切り替えた時にチケット情報をロード
+  useEffect(() => {
+    if (activeTab === 'ai-reflection') {
+      loadTicketInfo();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
   // メニューの開閉状態を更新
   const handleMenuOpenChange = useCallback((isOpen: boolean) => {
     isMenuOpenRef.current = isOpen;
