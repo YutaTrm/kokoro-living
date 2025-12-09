@@ -14,15 +14,23 @@ import { supabase } from '@/src/lib/supabase';
 
 // 商品ID
 const PRODUCT_IDS = Platform.select({
-  ios: ['ai_reflection_2_tickets'],
-  android: ['ai_reflection_2_tickets'],
+  ios: ['ai_reflection_tickets_2pack'],
+  android: ['ai_reflection_tickets_2pack'],
   default: [],
 }) as string[];
 
-export const usePurchase = () => {
+interface UsePurchaseOptions {
+  onPurchaseComplete?: () => void;
+}
+
+export const usePurchase = (options?: UsePurchaseOptions) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
+  const onPurchaseCompleteRef = { current: options?.onPurchaseComplete };
+
+  // オプションの更新を反映
+  onPurchaseCompleteRef.current = options?.onPurchaseComplete;
 
   // IAPの初期化と商品情報取得
   useEffect(() => {
@@ -38,14 +46,19 @@ export const usePurchase = () => {
         }
 
         // IAPを初期化
-        await initConnection();
-        console.log('IAP接続成功');
+        console.log('IAP初期化開始...');
+        const connectionResult = await initConnection();
+        console.log('IAP接続成功:', connectionResult);
 
         // 商品情報を取得
+        console.log('商品情報取得中... SKUs:', PRODUCT_IDS);
         const availableProducts = await fetchProducts({ skus: PRODUCT_IDS });
-        console.log('商品情報取得成功:', availableProducts);
-        if (availableProducts) {
+        console.log('商品情報取得結果:', JSON.stringify(availableProducts, null, 2));
+        console.log('商品数:', availableProducts?.length || 0);
+        if (availableProducts && availableProducts.length > 0) {
           setProducts(availableProducts as Product[]);
+        } else {
+          console.warn('⚠️ 商品が見つかりません。App Store Connectで商品が設定されているか確認してください');
         }
 
         // 購入リスナーを設定
@@ -62,6 +75,10 @@ export const usePurchase = () => {
                 // トランザクション完了
                 await finishTransaction({ purchase, isConsumable: true });
                 console.log('トランザクション完了');
+
+                // 購入成功
+                Alert.alert('成功', 'チケットを2枚追加しました！');
+                onPurchaseCompleteRef.current?.();
               } catch (error) {
                 console.error('レシート検証エラー:', error);
                 Alert.alert('エラー', '購入処理に失敗しました。サポートにお問い合わせください。');
@@ -71,6 +88,7 @@ export const usePurchase = () => {
         );
       } catch (error) {
         console.error('IAP初期化エラー:', error);
+        console.error('エラー詳細:', JSON.stringify(error, null, 2));
       }
     };
 
@@ -112,6 +130,9 @@ export const usePurchase = () => {
 
   // 購入処理
   const handlePurchase = useCallback(async () => {
+    console.log('handlePurchase開始');
+    console.log('PRODUCT_IDS:', PRODUCT_IDS);
+
     if (PRODUCT_IDS.length === 0) {
       Alert.alert('エラー', 'この端末では購入できません');
       return;
@@ -119,16 +140,35 @@ export const usePurchase = () => {
 
     setPurchasing(true);
     try {
-      // 購入リクエスト（プラットフォーム別）
-      const purchaseArgs = Platform.OS === 'ios'
-        ? { request: { sku: PRODUCT_IDS[0] }, type: 'in-app' as const }
-        : { request: { skus: PRODUCT_IDS }, type: 'in-app' as const };
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await requestPurchase(purchaseArgs as any);
+      console.log('購入リクエスト送信中...');
+      console.log('取得済み商品数:', products.length);
+      // 購入リクエスト
+      if (Platform.OS === 'ios') {
+        console.log('iOS購入リクエスト実行');
+        const result = await requestPurchase({
+          type: 'in-app',
+          request: {
+            ios: {
+              sku: PRODUCT_IDS[0],
+            },
+          },
+        });
+        console.log('iOS購入リクエスト結果:', result);
+      } else {
+        console.log('Android購入リクエスト実行');
+        const result = await requestPurchase({
+          type: 'in-app',
+          request: {
+            android: {
+              skus: PRODUCT_IDS,
+            },
+          },
+        });
+        console.log('Android購入リクエスト結果:', result);
+      }
 
       // 購入完了後の処理はpurchaseUpdatedListenerで行われる
-      Alert.alert('成功', 'チケットを2回分追加しました！');
+      console.log('購入リクエスト完了');
     } catch (error: unknown) {
       console.error('購入エラー:', error);
 
@@ -142,7 +182,7 @@ export const usePurchase = () => {
     } finally {
       setPurchasing(false);
     }
-  }, []);
+  }, [products]);
 
   return {
     products,

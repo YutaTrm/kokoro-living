@@ -1,9 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Pencil, Sparkles } from 'lucide-react-native';
+import { Pencil, Sparkles, TicketPlus } from 'lucide-react-native';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, FlatList, Image, Pressable, ScrollView, TouchableOpacity } from 'react-native';
+import { Alert, FlatList, Image, Platform, Pressable, TouchableOpacity } from 'react-native';
 
 // AIアバター画像
 const AI_AVATAR = require('@/assets/images/living-ai.png');
@@ -30,7 +30,7 @@ import { useMasterData } from '@/src/contexts/MasterDataContext';
 import { useFollow } from '@/src/hooks/useFollow';
 import { useMedicationMasters } from '@/src/hooks/useMedicationMasters';
 import { Post, usePostsData } from '@/src/hooks/usePostsData';
-// import { usePurchase } from '@/src/hooks/usePurchase'; // 課金機能は一時的に無効化
+import { usePurchase } from '@/src/hooks/usePurchase';
 import { supabase } from '@/src/lib/supabase';
 import { showError } from '@/src/utils/errorHandler';
 import { pickAndCompressImage } from '@/src/utils/imageCompression';
@@ -154,7 +154,13 @@ export default function ProfileScreen() {
   const [freeQuotaRemaining, setFreeQuotaRemaining] = useState(2);
   const [loadingTicketInfo, setLoadingTicketInfo] = useState(false);
   const [showGenerateConfirmModal, setShowGenerateConfirmModal] = useState(false);
-  // const { purchasing, handlePurchase } = usePurchase(); // 課金機能は一時的に無効化
+  const [showPurchaseConfirmModal, setShowPurchaseConfirmModal] = useState(false);
+  const { purchasing, handlePurchase } = usePurchase({
+    onPurchaseComplete: () => {
+      ticketInfoLoadedRef.current = false;
+      loadTicketInfo();
+    },
+  });
 
   const [diagnoses, setDiagnoses] = useState<MedicalRecord[]>([]);
   const [medications, setMedications] = useState<MedicalRecord[]>([]);
@@ -517,9 +523,25 @@ export default function ProfileScreen() {
   };
 
   // 確認モーダルのメッセージ
-  const generateConfirmMessage = '今月の無料枠を使用します。\nよろしいですか？';
+  const generateConfirmMessage = hasFreeQuota
+    ? '無料チケットを使用します。\nよろしいですか？'
+    : '有料チケットを1枚使用します。\nよろしいですか？';
 
   const generateConfirmNote = '・生成には約15秒〜1分程度かかります。画面を切り替えても生成は継続され、完了するとウィンドウでお知らせします。\n・AIによる分析のため、生成結果が正確でない場合があります。';
+
+  // チケット購入の確認ダイアログを表示
+  const handlePurchaseTicket = () => {
+    setShowPurchaseConfirmModal(true);
+  };
+
+  // 購入確認モーダルで「購入する」を押した時
+  const handleConfirmPurchase = () => {
+    console.log('handleConfirmPurchase呼び出し');
+    setShowPurchaseConfirmModal(false);
+    console.log('handlePurchase呼び出し前');
+    handlePurchase();
+    console.log('handlePurchase呼び出し後');
+  };
 
   const loadMasterData = () => {
     try {
@@ -1490,39 +1512,71 @@ export default function ProfileScreen() {
               </Box>
             ) : (
               <Card className="bg-background-10">
-                <HStack className="justify-between items-center">
-                  <Heading size="sm">今月の無料枠</Heading>
-                  <Text className="text-base">
-                    残り {freeQuotaRemaining} 回 / 2回
-                  </Text>
-                </HStack>
+                <VStack space="sm">
+                  <HStack className="justify-between items-center">
+                    <Heading size="sm">今月の無料チケット</Heading>
+                    <Text className="text-base">
+                      {freeQuotaRemaining} 枚
+                    </Text>
+                  </HStack>
+                  <HStack className="justify-between items-center">
+                    <Heading size="sm">有料チケット所持数</Heading>
+                    <Text className="text-base">
+                      {ticketCount} 枚
+                    </Text>
+                  </HStack>
+                </VStack>
               </Card>
             )}
 
-            {/* 生成ボタン */}
+            {/* 生成ボタン・購入ボタン */}
             {!loadingTicketInfo && (
               <VStack space="sm">
-                <Button
-                  onPress={handleGenerateReflection}
-                  isDisabled={generating || !hasFreeQuota}
-                  size="lg"
-                  className="w-full"
-                >
-                  {generating ? (
-                    <>
-                      <ButtonSpinner />
-                      <ButtonText>生成中...</ButtonText>
-                    </>
-                  ) : (
-                    <>
-                      <ButtonIcon as={Sparkles} />
-                      <ButtonText>AI振り返りを生成</ButtonText>
-                    </>
+                <HStack space="sm">
+                  {/* チケット追加ボタン（iOSのみ） */}
+                  {Platform.OS === 'ios' && (
+                    <Button
+                      onPress={handlePurchaseTicket}
+                      isDisabled={purchasing}
+                      size="lg"
+                      className="flex-1"
+                    >
+                      {purchasing ? (
+                        <>
+                          <ButtonSpinner />
+                          <ButtonText>購入中...</ButtonText>
+                        </>
+                      ) : (
+                        <>
+                          <ButtonIcon as={TicketPlus} />
+                          <ButtonText>チケットを購入</ButtonText>
+                        </>
+                      )}
+                    </Button>
                   )}
-                </Button>
+                  {/* AI振り返りを生成ボタン */}
+                  <Button
+                    onPress={handleGenerateReflection}
+                    isDisabled={generating || !hasFreeQuota}
+                    size="lg"
+                    className={Platform.OS === 'ios' ? 'flex-1' : 'w-full'}
+                  >
+                    {generating ? (
+                      <>
+                        <ButtonSpinner />
+                        <ButtonText>生成中...</ButtonText>
+                      </>
+                    ) : (
+                      <>
+                        <ButtonIcon as={Sparkles} />
+                        <ButtonText>AI振り返りを生成</ButtonText>
+                      </>
+                    )}
+                  </Button>
+                </HStack>
                 {!hasFreeQuota && (
                   <Text className="text-center text-typography-400 text-sm">
-                    来月分の無料枠をお待ち下さい
+                    無料チケットは毎月月初に2枚追加されます
                   </Text>
                 )}
               </VStack>
@@ -1710,6 +1764,17 @@ export default function ProfileScreen() {
         confirmText="生成する"
         confirmAction="primary"
         note={generateConfirmNote}
+      />
+
+      {/* チケット購入確認モーダル */}
+      <ConfirmModal
+        isOpen={showPurchaseConfirmModal}
+        onClose={() => setShowPurchaseConfirmModal(false)}
+        onConfirm={handleConfirmPurchase}
+        title="チケットを購入"
+        message="AI振り返りチケット（2枚）を100円で購入しますか？"
+        confirmText="購入する"
+        confirmAction="primary"
       />
     </LoginPrompt>
   );

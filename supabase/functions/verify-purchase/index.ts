@@ -43,8 +43,13 @@ serve(async (req) => {
 
     // レシート検証
     let isValid = false;
+    const skipVerification = Deno.env.get('SKIP_RECEIPT_VERIFICATION') === 'true';
 
-    if (platform === 'ios') {
+    if (skipVerification) {
+      // 開発/サンドボックス環境ではレシート検証をスキップ
+      console.log('レシート検証をスキップ（開発モード）');
+      isValid = true;
+    } else if (platform === 'ios') {
       // iOS: Apple App Store レシート検証
       isValid = await verifyAppleReceipt(receipt);
     } else if (platform === 'android') {
@@ -57,7 +62,10 @@ serve(async (req) => {
     }
 
     // チケット数を決定（商品IDから判断）
-    const ticketsToAdd = productId.includes('2_tickets') ? 2 : 0;
+    let ticketsToAdd = 0;
+    if (productId === 'ai_reflection_tickets_2pack') {
+      ticketsToAdd = 2;
+    }
 
     if (ticketsToAdd === 0) {
       throw new Error('無効な商品IDです');
