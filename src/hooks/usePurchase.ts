@@ -19,23 +19,6 @@ const PRODUCT_IDS = Platform.select({
   default: [],
 }) as string[];
 
-// 確認用の仮データ（本番では削除）
-const MOCK_PRODUCTS: Product[] = [
-  {
-    id: 'ai_reflection_tickets_2pack',
-    title: 'AI振り返りチケット(2枚)',
-    description: 'AI振り返り機能を2回利用できるチケットです。',
-    displayPrice: '¥100',
-  } as Product,
-  {
-    id: 'ai_reflection_tickets_5pack',
-    title: 'AI振り返りチケット(5枚)',
-    description: 'AI振り返り機能を5回利用できるチケットです。',
-    displayPrice: '¥200',
-  } as Product,
-];
-const USE_MOCK_PRODUCTS = true; // 確認用：本番ではfalseにする
-
 interface UsePurchaseOptions {
   onPurchaseComplete?: () => void;
 }
@@ -68,19 +51,14 @@ export const usePurchase = (options?: UsePurchaseOptions) => {
         console.log('IAP接続成功:', connectionResult);
 
         // 商品情報を取得
-        if (USE_MOCK_PRODUCTS) {
-          console.log('確認用の仮データを使用');
-          setProducts(MOCK_PRODUCTS);
+        console.log('商品情報取得中... SKUs:', PRODUCT_IDS);
+        const availableProducts = await fetchProducts({ skus: PRODUCT_IDS });
+        console.log('商品情報取得結果:', JSON.stringify(availableProducts, null, 2));
+        console.log('商品数:', availableProducts?.length || 0);
+        if (availableProducts && availableProducts.length > 0) {
+          setProducts(availableProducts as Product[]);
         } else {
-          console.log('商品情報取得中... SKUs:', PRODUCT_IDS);
-          const availableProducts = await fetchProducts({ skus: PRODUCT_IDS });
-          console.log('商品情報取得結果:', JSON.stringify(availableProducts, null, 2));
-          console.log('商品数:', availableProducts?.length || 0);
-          if (availableProducts && availableProducts.length > 0) {
-            setProducts(availableProducts as Product[]);
-          } else {
-            console.warn('⚠️ 商品が見つかりません。App Store Connectで商品が設定されているか確認してください');
-          }
+          console.warn('⚠️ 商品が見つかりません。App Store Connectで商品が設定されているか確認してください');
         }
 
         // 購入リスナーを設定
