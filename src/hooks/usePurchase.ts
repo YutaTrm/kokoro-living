@@ -6,6 +6,8 @@ import {
   requestPurchase,
   purchaseUpdatedListener,
   finishTransaction,
+  getAvailablePurchases,
+  clearTransactionIOS,
   type Purchase,
   type Product,
 } from 'react-native-iap';
@@ -14,8 +16,8 @@ import { supabase } from '@/src/lib/supabase';
 
 // 商品ID
 const PRODUCT_IDS = Platform.select({
-  ios: ['ai_reflection_tickets_2pack'],
-  android: ['ai_reflection_tickets_2pack'],
+  ios: ['ai_reflection_tickets_2pack', 'ai_reflection_tickets_5pack'],
+  android: ['ai_reflection_tickets_2pack', 'ai_reflection_tickets_5pack'],
   default: [],
 }) as string[];
 
@@ -49,6 +51,28 @@ export const usePurchase = (options?: UsePurchaseOptions) => {
         console.log('IAP初期化開始...');
         const connectionResult = await initConnection();
         console.log('IAP接続成功:', connectionResult);
+
+        // 未完了のトランザクションをクリア（iOS）
+        if (Platform.OS === 'ios') {
+          try {
+            await clearTransactionIOS();
+            console.log('iOSトランザクションクリア完了');
+          } catch (e) {
+            console.log('iOSトランザクションクリア:', e);
+          }
+        }
+
+        // 未処理の購入を完了させる
+        try {
+          const availablePurchases = await getAvailablePurchases();
+          console.log('未処理の購入:', availablePurchases.length);
+          for (const purchase of availablePurchases) {
+            await finishTransaction({ purchase, isConsumable: true });
+            console.log('未処理トランザクション完了:', purchase.transactionId);
+          }
+        } catch (e) {
+          console.log('未処理購入の処理:', e);
+        }
 
         // 商品情報を取得
         console.log('商品情報取得中... SKUs:', PRODUCT_IDS);
@@ -172,8 +196,14 @@ export const usePurchase = (options?: UsePurchaseOptions) => {
 
       // ユーザーキャンセルのチェック
       const errorMessage = error instanceof Error ? error.message : '';
+      const errorCode = (error as { code?: string })?.code || '';
+
       if (errorMessage.includes('cancel') || errorMessage.includes('Cancel')) {
         console.log('購入がキャンセルされました');
+      } else if (Platform.OS === 'ios' && (errorCode === 'E_UNKNOWN' || errorMessage.includes('purchase'))) {
+        // iOSでは購入完了後にrequestPurchaseがエラーを投げることがある
+        // purchaseUpdatedListenerで処理されるので無視
+        console.log('iOS購入フロー完了（リスナーで処理）');
       } else {
         Alert.alert('エラー', '購入に失敗しました');
       }
