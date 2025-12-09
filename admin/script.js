@@ -13,6 +13,7 @@ let reportsPage = 1;
 let postsPage = 1;
 let usersPage = 1;
 let checkinsPage = 1;
+let reflectionsPage = 1;
 
 // ページ読み込み時の処理
 window.addEventListener('DOMContentLoaded', async () => {
@@ -122,6 +123,9 @@ function showTab(tabName) {
     } else if (tabName === 'checkins') {
         document.getElementById('checkinsTab').classList.remove('hidden');
         loadCheckins();
+    } else if (tabName === 'reflections') {
+        document.getElementById('reflectionsTab').classList.remove('hidden');
+        loadReflections();
     }
 }
 
@@ -836,4 +840,192 @@ async function loadCheckins() {
         console.error('チェックイン読み込みエラー:', error);
         container.innerHTML = '<div class="text-center py-8 text-red-500">エラーが発生しました</div>';
     }
+}
+
+// 振り返り一覧読み込み
+async function loadReflections() {
+    const container = document.getElementById('reflectionsList');
+    container.innerHTML = '<div class="text-center py-8 text-gray-500">読み込み中...</div>';
+
+    try {
+        const start = (reflectionsPage - 1) * PAGE_SIZE;
+        const end = start + PAGE_SIZE - 1;
+
+        // 振り返りデータを取得
+        const { data: reflections, error: reflectionsError, count } = await supabaseAdmin
+            .from('ai_reflections')
+            .select('*', { count: 'exact' })
+            .order('created_at', { ascending: false })
+            .range(start, end);
+
+        if (reflectionsError) throw reflectionsError;
+
+        // ページング情報を更新
+        updatePagination('reflections', reflectionsPage, count);
+
+        if (reflections.length === 0) {
+            container.innerHTML = '<div class="text-center py-8 text-gray-500">振り返りはありません</div>';
+            return;
+        }
+
+        // ユーザー情報を取得
+        const userIds = [...new Set(reflections.map(r => r.user_id))];
+        const { data: users } = await supabaseAdmin
+            .from('users')
+            .select('user_id, display_name, avatar_url')
+            .in('user_id', userIds);
+
+        const usersMap = new Map(users?.map(u => [u.user_id, u]) || []);
+
+        const rows = reflections.map(reflection => {
+            const user = usersMap.get(reflection.user_id);
+            // 内容を100文字に制限
+            const truncatedContent = reflection.content.length > 100
+                ? reflection.content.substring(0, 100) + '...'
+                : reflection.content;
+
+            return `
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4">
+                    <div class="flex items-center gap-2">
+                        ${user?.avatar_url ?
+                            `<img src="${user.avatar_url}" class="w-10 h-10 rounded-full">` :
+                            '<div class="w-10 h-10 rounded-full bg-gray-300"></div>'
+                        }
+                        <span class="font-semibold text-gray-800">${user?.display_name || '削除済み'}</span>
+                    </div>
+                </td>
+                <td class="px-6 py-4 max-w-md">
+                    <p class="text-sm text-gray-600">${truncatedContent}</p>
+                    <button onclick="showReflectionDetail('${reflection.id}')" class="text-xs text-blue-500 hover:text-blue-700 mt-1">
+                        全文を表示
+                    </button>
+                </td>
+                <td class="px-6 py-4 text-center">
+                    ${reflection.is_free ?
+                        '<span class="px-2 py-1 text-xs font-semibold rounded bg-green-100 text-green-800">無料</span>' :
+                        '<span class="px-2 py-1 text-xs font-semibold rounded bg-blue-100 text-blue-800">チケット</span>'
+                    }
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-500 text-center">
+                    ${reflection.tokens_used || '-'}
+                </td>
+                <td class="px-6 py-4 text-gray-500 whitespace-nowrap">
+                    ${new Date(reflection.created_at).toLocaleString('ja-JP', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    })}
+                </td>
+            </tr>
+            `;
+        }).join('');
+
+        container.innerHTML = `
+            <table class="w-full">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ユーザー</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">内容</th>
+                        <th class="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">種別</th>
+                        <th class="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">トークン</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">日時</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    ${rows}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error('振り返り読み込みエラー:', error);
+        container.innerHTML = '<div class="text-center py-8 text-red-500">エラーが発生しました</div>';
+    }
+}
+
+// 振り返り詳細を表示
+async function showReflectionDetail(reflectionId) {
+    try {
+        const { data: reflection, error } = await supabaseAdmin
+            .from('ai_reflections')
+            .select('*')
+            .eq('id', reflectionId)
+            .single();
+
+        if (error) throw error;
+
+        // ユーザー情報を取得
+        const { data: user } = await supabaseAdmin
+            .from('users')
+            .select('display_name, avatar_url')
+            .eq('user_id', reflection.user_id)
+            .single();
+
+        const content = reflection.content.replace(/\n/g, '<br>');
+        const date = new Date(reflection.created_at).toLocaleString('ja-JP');
+
+        // モーダル表示
+        const modal = document.createElement('div');
+        modal.id = 'reflectionModal';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        modal.innerHTML = `
+            <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                    <div class="flex items-center gap-3">
+                        ${user?.avatar_url ?
+                            `<img src="${user.avatar_url}" class="w-10 h-10 rounded-full">` :
+                            '<div class="w-10 h-10 rounded-full bg-gray-300"></div>'
+                        }
+                        <div>
+                            <h3 class="font-semibold text-gray-800">${user?.display_name || '削除済み'}</h3>
+                            <p class="text-xs text-gray-500">${date}</p>
+                        </div>
+                    </div>
+                    <button onclick="closeReflectionModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                </div>
+                <div class="px-6 py-4 overflow-y-auto max-h-[60vh]">
+                    <p class="text-gray-700 leading-relaxed">${content}</p>
+                </div>
+                <div class="px-6 py-3 border-t border-gray-200 bg-gray-50 flex justify-between text-sm text-gray-500">
+                    <span>${reflection.is_free ? '無料枠' : 'チケット利用'}</span>
+                    <span>使用トークン: ${reflection.tokens_used || '-'}</span>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // モーダル外クリックで閉じる
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeReflectionModal();
+            }
+        });
+    } catch (error) {
+        console.error('振り返り詳細読み込みエラー:', error);
+        alert('エラーが発生しました');
+    }
+}
+
+// 振り返りモーダルを閉じる
+function closeReflectionModal() {
+    const modal = document.getElementById('reflectionModal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+// 振り返り一覧のページング
+function prevReflectionsPage() {
+    if (reflectionsPage > 1) {
+        reflectionsPage--;
+        loadReflections();
+    }
+}
+
+function nextReflectionsPage() {
+    reflectionsPage++;
+    loadReflections();
 }
