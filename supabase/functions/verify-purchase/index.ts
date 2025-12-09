@@ -65,6 +65,8 @@ serve(async (req) => {
     let ticketsToAdd = 0;
     if (productId === 'ai_reflection_tickets_2pack') {
       ticketsToAdd = 2;
+    } else if (productId === 'ai_reflection_tickets_5pack') {
+      ticketsToAdd = 5;
     }
 
     if (ticketsToAdd === 0) {
