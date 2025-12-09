@@ -19,6 +19,23 @@ const PRODUCT_IDS = Platform.select({
   default: [],
 }) as string[];
 
+// 確認用の仮データ（本番では削除）
+const MOCK_PRODUCTS: Product[] = [
+  {
+    id: 'ai_reflection_tickets_2pack',
+    title: 'AI振り返りチケット(2枚)',
+    description: 'AI振り返り機能を2回利用できるチケットです。',
+    displayPrice: '¥100',
+  } as Product,
+  {
+    id: 'ai_reflection_tickets_5pack',
+    title: 'AI振り返りチケット(5枚)',
+    description: 'AI振り返り機能を5回利用できるチケットです。',
+    displayPrice: '¥200',
+  } as Product,
+];
+const USE_MOCK_PRODUCTS = true; // 確認用：本番ではfalseにする
+
 interface UsePurchaseOptions {
   onPurchaseComplete?: () => void;
 }
@@ -51,14 +68,19 @@ export const usePurchase = (options?: UsePurchaseOptions) => {
         console.log('IAP接続成功:', connectionResult);
 
         // 商品情報を取得
-        console.log('商品情報取得中... SKUs:', PRODUCT_IDS);
-        const availableProducts = await fetchProducts({ skus: PRODUCT_IDS });
-        console.log('商品情報取得結果:', JSON.stringify(availableProducts, null, 2));
-        console.log('商品数:', availableProducts?.length || 0);
-        if (availableProducts && availableProducts.length > 0) {
-          setProducts(availableProducts as Product[]);
+        if (USE_MOCK_PRODUCTS) {
+          console.log('確認用の仮データを使用');
+          setProducts(MOCK_PRODUCTS);
         } else {
-          console.warn('⚠️ 商品が見つかりません。App Store Connectで商品が設定されているか確認してください');
+          console.log('商品情報取得中... SKUs:', PRODUCT_IDS);
+          const availableProducts = await fetchProducts({ skus: PRODUCT_IDS });
+          console.log('商品情報取得結果:', JSON.stringify(availableProducts, null, 2));
+          console.log('商品数:', availableProducts?.length || 0);
+          if (availableProducts && availableProducts.length > 0) {
+            setProducts(availableProducts as Product[]);
+          } else {
+            console.warn('⚠️ 商品が見つかりません。App Store Connectで商品が設定されているか確認してください');
+          }
         }
 
         // 購入リスナーを設定
@@ -129,19 +151,17 @@ export const usePurchase = (options?: UsePurchaseOptions) => {
   };
 
   // 購入処理
-  const handlePurchase = useCallback(async () => {
-    console.log('handlePurchase開始');
-    console.log('PRODUCT_IDS:', PRODUCT_IDS);
+  const handlePurchase = useCallback(async (sku: string) => {
+    console.log('handlePurchase開始, SKU:', sku);
 
-    if (PRODUCT_IDS.length === 0) {
-      Alert.alert('エラー', 'この端末では購入できません');
+    if (!sku) {
+      Alert.alert('エラー', '商品が選択されていません');
       return;
     }
 
     setPurchasing(true);
     try {
       console.log('購入リクエスト送信中...');
-      console.log('取得済み商品数:', products.length);
       // 購入リクエスト
       if (Platform.OS === 'ios') {
         console.log('iOS購入リクエスト実行');
@@ -149,7 +169,7 @@ export const usePurchase = (options?: UsePurchaseOptions) => {
           type: 'in-app',
           request: {
             ios: {
-              sku: PRODUCT_IDS[0],
+              sku,
             },
           },
         });
@@ -160,7 +180,7 @@ export const usePurchase = (options?: UsePurchaseOptions) => {
           type: 'in-app',
           request: {
             android: {
-              skus: PRODUCT_IDS,
+              skus: [sku],
             },
           },
         });
@@ -182,7 +202,7 @@ export const usePurchase = (options?: UsePurchaseOptions) => {
     } finally {
       setPurchasing(false);
     }
-  }, [products]);
+  }, []);
 
   return {
     products,

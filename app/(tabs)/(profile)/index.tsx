@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Pencil, Sparkles, TicketPlus } from 'lucide-react-native';
+import { Pencil, Sparkles, TicketPlus, X } from 'lucide-react-native';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, FlatList, Image, Platform, Pressable, TouchableOpacity } from 'react-native';
 
@@ -23,6 +23,14 @@ import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
 import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
+import {
+  Modal,
+  ModalBackdrop,
+  ModalBody,
+  ModalCloseButton,
+  ModalContent,
+  ModalHeader,
+} from '@/components/ui/modal';
 import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
@@ -154,8 +162,10 @@ export default function ProfileScreen() {
   const [freeQuotaRemaining, setFreeQuotaRemaining] = useState(2);
   const [loadingTicketInfo, setLoadingTicketInfo] = useState(false);
   const [showGenerateConfirmModal, setShowGenerateConfirmModal] = useState(false);
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [showPurchaseConfirmModal, setShowPurchaseConfirmModal] = useState(false);
-  const { purchasing, handlePurchase } = usePurchase({
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const { products, purchasing, handlePurchase } = usePurchase({
     onPurchaseComplete: () => {
       ticketInfoLoadedRef.current = false;
       loadTicketInfo();
@@ -529,19 +539,28 @@ export default function ProfileScreen() {
 
   const generateConfirmNote = '・生成には約15秒〜1分程度かかります。画面を切り替えても生成は継続され、完了するとウィンドウでお知らせします。\n・AIによる分析のため、生成結果が正確でない場合があります。';
 
-  // チケット購入の確認ダイアログを表示
+  // チケット購入モーダルを表示
   const handlePurchaseTicket = () => {
+    setShowPurchaseModal(true);
+  };
+
+  // 商品を選択
+  const handleSelectProduct = (productId: string) => {
+    setSelectedProductId(productId);
+    setShowPurchaseModal(false);
     setShowPurchaseConfirmModal(true);
   };
 
-  // 購入確認モーダルで「購入する」を押した時
+  // 購入確認後に購入実行
   const handleConfirmPurchase = () => {
-    console.log('handleConfirmPurchase呼び出し');
     setShowPurchaseConfirmModal(false);
-    console.log('handlePurchase呼び出し前');
-    handlePurchase();
-    console.log('handlePurchase呼び出し後');
+    if (selectedProductId) {
+      handlePurchase(selectedProductId);
+    }
   };
+
+  // 選択中の商品情報を取得
+  const selectedProduct = products.find((p) => p.id === selectedProductId);
 
   const loadMasterData = () => {
     try {
@@ -1539,6 +1558,7 @@ export default function ProfileScreen() {
                       onPress={handlePurchaseTicket}
                       isDisabled={purchasing}
                       size="lg"
+                      variant="outline"
                       className="flex-1"
                     >
                       {purchasing ? (
@@ -1766,13 +1786,56 @@ export default function ProfileScreen() {
         note={generateConfirmNote}
       />
 
-      {/* チケット購入確認モーダル */}
+      {/* チケット購入モーダル */}
+      <Modal isOpen={showPurchaseModal} onClose={() => setShowPurchaseModal(false)}>
+        <ModalBackdrop />
+        <ModalContent className="max-w-md">
+          <ModalHeader>
+            <Heading size="lg">チケットを購入</Heading>
+            <ModalCloseButton>
+              <Icon as={X} size="lg" className="text-typography-500" />
+            </ModalCloseButton>
+          </ModalHeader>
+          <ModalBody className="mb-0">
+            {products.length === 0 ? (
+              <Text className="text-center text-typography-500 py-4">
+                現在購入可能な商品はありません
+              </Text>
+            ) : (
+              <VStack space="sm">
+                {products.map((product) => (
+                  <Button
+                    key={product.id}
+                    onPress={() => handleSelectProduct(product.id)}
+                    isDisabled={purchasing}
+                    variant="solid"
+                    size="md"
+                    action="positive"
+                  >
+                    <ButtonText>{product.title} {product.displayPrice}</ButtonText>
+                  </Button>
+                ))}
+                <Button
+                  onPress={() => setShowPurchaseModal(false)}
+                  variant="outline"
+                  size="md"
+                  className="mt-4"
+                >
+                  <ButtonText>キャンセル</ButtonText>
+                </Button>
+              </VStack>
+            )}
+          </ModalBody>
+        </ModalContent>
+      </Modal>
+
+      {/* 購入確認モーダル */}
       <ConfirmModal
         isOpen={showPurchaseConfirmModal}
         onClose={() => setShowPurchaseConfirmModal(false)}
         onConfirm={handleConfirmPurchase}
-        title="チケットを購入"
-        message="AI振り返りチケット（2枚）を100円で購入しますか？"
+        title="購入確認"
+        message={selectedProduct ? `${selectedProduct.title}を${selectedProduct.displayPrice}で購入しますか？` : ''}
         confirmText="購入する"
         confirmAction="primary"
       />
