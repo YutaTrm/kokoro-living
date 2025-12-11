@@ -527,7 +527,7 @@ async function loadUsers() {
             ].join(' ');
 
             return `
-            <tr class="hover:bg-gray-50">
+            <tr class="hover:bg-gray-50 cursor-pointer" onclick="showUserDetail('${user.user_id}')">
                 <td class="px-6 py-4">
                     <div class="flex flex-col items-center gap-1">
                         ${user.avatar_url ?
@@ -1028,4 +1028,179 @@ function prevReflectionsPage() {
 function nextReflectionsPage() {
     reflectionsPage++;
     loadReflections();
+}
+
+// ユーザー詳細を表示
+async function showUserDetail(userId) {
+    try {
+        // ユーザー情報を取得
+        const { data: user, error: userError } = await supabaseAdmin
+            .from('users')
+            .select('*')
+            .eq('user_id', userId)
+            .single();
+
+        if (userError) throw userError;
+
+        // 投稿、いいね、チェックインを並列取得
+        const [postsResult, likesResult, checkinsResult] = await Promise.all([
+            supabaseAdmin
+                .from('posts')
+                .select('*')
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false })
+                .limit(20),
+            supabaseAdmin
+                .from('likes')
+                .select('post_id, created_at')
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false })
+                .limit(20),
+            supabaseAdmin
+                .from('mood_checkins')
+                .select('*')
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false })
+                .limit(20)
+        ]);
+
+        const posts = postsResult.data || [];
+        const likes = likesResult.data || [];
+        const checkins = checkinsResult.data || [];
+
+        // いいねした投稿の詳細を取得
+        let likedPosts = [];
+        if (likes.length > 0) {
+            const postIds = likes.map(l => l.post_id);
+            const { data: likedPostsData } = await supabaseAdmin
+                .from('posts')
+                .select('id, content, user_id, created_at')
+                .in('id', postIds);
+
+            // いいねした投稿の作者情報を取得
+            if (likedPostsData && likedPostsData.length > 0) {
+                const authorIds = [...new Set(likedPostsData.map(p => p.user_id))];
+                const { data: authors } = await supabaseAdmin
+                    .from('users')
+                    .select('user_id, display_name, avatar_url')
+                    .in('user_id', authorIds);
+                const authorsMap = new Map(authors?.map(u => [u.user_id, u]) || []);
+
+                likedPosts = likedPostsData.map(p => ({
+                    ...p,
+                    author: authorsMap.get(p.user_id)
+                }));
+            }
+        }
+
+        // 気分の絵文字マッピング
+        const MOOD_EMOJIS = { 1: '😞', 2: '😔', 3: '😐', 4: '🙂', 5: '😊' };
+
+        // 投稿リストHTML
+        const postsHtml = posts.length > 0 ? posts.map(post => `
+            <div class="p-3 border-b border-gray-100 ${post.is_hidden ? 'bg-red-50' : ''}">
+                <p class="text-sm text-gray-700">${post.content}</p>
+                <div class="flex justify-between items-center mt-2">
+                    <span class="text-xs text-gray-400">${new Date(post.created_at).toLocaleString('ja-JP')}</span>
+                    ${post.is_hidden ? '<span class="text-xs text-red-500">非表示</span>' : ''}
+                </div>
+            </div>
+        `).join('') : '<p class="text-gray-400 text-center py-4">投稿はありません</p>';
+
+        // いいねリストHTML
+        const likesHtml = likedPosts.length > 0 ? likedPosts.map(post => `
+            <div class="p-3 border-b border-gray-100">
+                <div class="flex items-center gap-2 mb-1">
+                    ${post.author?.avatar_url ?
+                        `<img src="${post.author.avatar_url}" class="w-6 h-6 rounded-full">` :
+                        '<div class="w-6 h-6 rounded-full bg-gray-300"></div>'
+                    }
+                    <span class="text-xs font-semibold text-gray-600">${post.author?.display_name || '削除済み'}</span>
+                </div>
+                <p class="text-sm text-gray-700">${post.content}</p>
+                <span class="text-xs text-gray-400">${new Date(post.created_at).toLocaleString('ja-JP')}</span>
+            </div>
+        `).join('') : '<p class="text-gray-400 text-center py-4">いいねはありません</p>';
+
+        // チェックインリストHTML
+        const checkinsHtml = checkins.length > 0 ? checkins.map(checkin => `
+            <div class="p-3 border-b border-gray-100 flex items-center gap-3">
+                <span class="text-2xl">${MOOD_EMOJIS[checkin.mood]}</span>
+                <span class="text-xs text-gray-400">${new Date(checkin.created_at).toLocaleString('ja-JP')}</span>
+            </div>
+        `).join('') : '<p class="text-gray-400 text-center py-4">チェックインはありません</p>';
+
+        // モーダル表示
+        const modal = document.createElement('div');
+        modal.id = 'userDetailModal';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        modal.innerHTML = `
+            <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                    <div class="flex items-center gap-3">
+                        ${user.avatar_url ?
+                            `<img src="${user.avatar_url}" class="w-12 h-12 rounded-full">` :
+                            '<div class="w-12 h-12 rounded-full bg-gray-300"></div>'
+                        }
+                        <div>
+                            <h3 class="font-semibold text-gray-800">${user.display_name}</h3>
+                            <p class="text-xs text-gray-500">登録: ${new Date(user.created_at).toLocaleDateString('ja-JP')}</p>
+                        </div>
+                    </div>
+                    <button onclick="closeUserDetailModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                </div>
+                <div class="px-6 py-4 overflow-y-auto max-h-[75vh]">
+                    <div class="grid grid-cols-3 gap-4">
+                        <!-- 投稿 -->
+                        <div class="border border-gray-200 rounded-lg overflow-hidden">
+                            <div class="bg-gray-50 px-4 py-2 border-b border-gray-200">
+                                <h4 class="font-semibold text-gray-700">投稿 (${posts.length})</h4>
+                            </div>
+                            <div class="max-h-96 overflow-y-auto">
+                                ${postsHtml}
+                            </div>
+                        </div>
+                        <!-- いいね -->
+                        <div class="border border-gray-200 rounded-lg overflow-hidden">
+                            <div class="bg-gray-50 px-4 py-2 border-b border-gray-200">
+                                <h4 class="font-semibold text-gray-700">いいね (${likedPosts.length})</h4>
+                            </div>
+                            <div class="max-h-96 overflow-y-auto">
+                                ${likesHtml}
+                            </div>
+                        </div>
+                        <!-- チェックイン -->
+                        <div class="border border-gray-200 rounded-lg overflow-hidden">
+                            <div class="bg-gray-50 px-4 py-2 border-b border-gray-200">
+                                <h4 class="font-semibold text-gray-700">チェックイン (${checkins.length})</h4>
+                            </div>
+                            <div class="max-h-96 overflow-y-auto">
+                                ${checkinsHtml}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // モーダル外クリックで閉じる
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeUserDetailModal();
+            }
+        });
+    } catch (error) {
+        console.error('ユーザー詳細読み込みエラー:', error);
+        alert('エラーが発生しました');
+    }
+}
+
+// ユーザー詳細モーダルを閉じる
+function closeUserDetailModal() {
+    const modal = document.getElementById('userDetailModal');
+    if (modal) {
+        modal.remove();
+    }
 }
