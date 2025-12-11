@@ -133,7 +133,10 @@ export const usePurchase = (options?: UsePurchaseOptions) => {
     if (!user) throw new Error('ユーザーが見つかりません');
 
     const platform = Platform.OS === 'ios' ? 'ios' : 'android';
-    const receipt = purchase.transactionId || '';
+    // iOS: transactionReceipt (base64), Android: purchaseToken
+    const receipt = Platform.OS === 'ios'
+      ? purchase.transactionReceipt || ''
+      : purchase.purchaseToken || '';
 
     // Edge Functionを呼び出し
     const { data, error } = await supabase.functions.invoke('verify-purchase', {
