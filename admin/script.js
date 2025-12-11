@@ -1086,10 +1086,16 @@ async function showUserDetail(userId) {
                     .in('user_id', authorIds);
                 const authorsMap = new Map(authors?.map(u => [u.user_id, u]) || []);
 
-                likedPosts = likedPostsData.map(p => ({
+                // いいねした順序を保持するためにMapで管理
+                const postsMap = new Map(likedPostsData.map(p => [p.id, {
                     ...p,
                     author: authorsMap.get(p.user_id)
-                }));
+                }]));
+
+                // likesの順序（いいねした順）で並べ替え
+                likedPosts = likes
+                    .map(l => postsMap.get(l.post_id))
+                    .filter(Boolean);
             }
         }
 
