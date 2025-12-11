@@ -119,7 +119,7 @@ export const AIReflectionTab = ({
               {/* AI振り返りを生成ボタン */}
               <Button
                 onPress={onGenerateReflection}
-                isDisabled={generating || !hasFreeQuota}
+                isDisabled={generating || (!hasFreeQuota && ticketCount === 0)}
                 size="lg"
                 className={Platform.OS === 'ios' ? 'flex-1' : 'w-full'}
               >
