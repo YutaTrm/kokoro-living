@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.kokoroliving.app",
-      "buildNumber": "29",
+      "buildNumber": "30",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "CFBundleDevelopmentRegion": "ja",
@@ -28,7 +28,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "versionCode": 29,
+      "versionCode": 30,
       "permissions": [
         "android.permission.INTERNET",
         "android.permission.READ_MEDIA_IMAGES"
