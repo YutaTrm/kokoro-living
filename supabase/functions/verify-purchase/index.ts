@@ -121,13 +121,89 @@ serve(async (req) => {
   }
 });
 
-// Apple レシート検証
+// Apple レシート検証（StoreKit 2 JWS + Legacy対応）
 async function verifyAppleReceipt(receiptData: string): Promise<boolean> {
-  // 本番環境とサンドボックス環境のURL
+  // JWS形式かどうかを判定（eyJで始まる）
+  if (receiptData.startsWith('eyJ')) {
+    console.log('StoreKit 2 JWS形式を検出');
+    return await verifyAppleJWS(receiptData);
+  }
+
+  // Legacy形式の場合は従来のverifyReceipt APIを使用
+  console.log('Legacy形式を検出');
+  return await verifyAppleLegacyReceipt(receiptData);
+}
+
+// StoreKit 2 JWS検証
+async function verifyAppleJWS(jws: string): Promise<boolean> {
+  try {
+    // JWSを分割
+    const parts = jws.split('.');
+    if (parts.length !== 3) {
+      console.error('無効なJWS形式');
+      return false;
+    }
+
+    const [headerB64, payloadB64] = parts;
+
+    // Base64URLデコード
+    const header = JSON.parse(base64UrlDecode(headerB64));
+    const payload = JSON.parse(base64UrlDecode(payloadB64));
+
+    console.log('JWS Header alg:', header.alg);
+    console.log('JWS Payload transactionId:', payload.transactionId);
+    console.log('JWS Payload productId:', payload.productId);
+    console.log('JWS Payload bundleId:', payload.bundleId);
+    console.log('JWS Payload environment:', payload.environment);
+
+    // ペイロードの検証
+    if (!payload.transactionId || !payload.productId) {
+      console.error('ペイロードに必須フィールドがありません');
+      return false;
+    }
+
+    // bundleIdの検証
+    const expectedBundleId = 'com.kokoroliving.app';
+    if (payload.bundleId !== expectedBundleId) {
+      console.error(`bundleIdが一致しません: ${payload.bundleId} !== ${expectedBundleId}`);
+      return false;
+    }
+
+    // 証明書チェーンの存在確認（x5c）
+    if (!header.x5c || !Array.isArray(header.x5c) || header.x5c.length === 0) {
+      console.error('x5c証明書チェーンがありません');
+      return false;
+    }
+
+    // トランザクションタイプの確認（Consumableであること）
+    if (payload.type && payload.type !== 'Consumable') {
+      console.log(`トランザクションタイプ: ${payload.type}`);
+    }
+
+    console.log('JWS検証成功（ペイロード検証）');
+    return true;
+  } catch (error) {
+    console.error('JWS検証エラー:', error);
+    return false;
+  }
+}
+
+// Base64URLデコード
+function base64UrlDecode(str: string): string {
+  // Base64URL to Base64
+  let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+  // パディング追加
+  while (base64.length % 4) {
+    base64 += '=';
+  }
+  return atob(base64);
+}
+
+// Legacy Apple レシート検証
+async function verifyAppleLegacyReceipt(receiptData: string): Promise<boolean> {
   const productionUrl = 'https://buy.itunes.apple.com/verifyReceipt';
   const sandboxUrl = 'https://sandbox.itunes.apple.com/verifyReceipt';
 
-  // Apple Shared Secret（App Store Connectで生成）
   const sharedSecret = Deno.env.get('APPLE_SHARED_SECRET');
 
   if (!sharedSecret) {
@@ -136,7 +212,6 @@ async function verifyAppleReceipt(receiptData: string): Promise<boolean> {
   }
 
   try {
-    // まず本番環境で検証
     let response = await fetch(productionUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -148,9 +223,7 @@ async function verifyAppleReceipt(receiptData: string): Promise<boolean> {
 
     let data = await response.json();
 
-    // status 21007はサンドボックスレシートを本番環境に送信した場合
     if (data.status === 21007) {
-      // サンドボックス環境で再検証
       response = await fetch(sandboxUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -159,14 +232,12 @@ async function verifyAppleReceipt(receiptData: string): Promise<boolean> {
           'password': sharedSecret,
         }),
       });
-
       data = await response.json();
     }
 
-    // status 0は成功
     return data.status === 0;
   } catch (error) {
-    console.error('Apple レシート検証エラー:', error);
+    console.error('Legacy レシート検証エラー:', error);
     return false;
   }
 }

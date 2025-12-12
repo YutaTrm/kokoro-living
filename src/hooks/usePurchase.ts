@@ -88,7 +88,9 @@ export const usePurchase = (options?: UsePurchaseOptions) => {
         // 購入リスナーを設定
         purchaseUpdateSubscription = purchaseUpdatedListener(
           async (purchase: Purchase) => {
-            console.log('購入イベント受信:', purchase);
+            console.log('購入イベント受信:', JSON.stringify(purchase, null, 2));
+            console.log('transactionReceipt存在:', !!purchase.transactionReceipt);
+            console.log('transactionReceipt長さ:', purchase.transactionReceipt?.length || 0);
             const receipt = purchase.transactionId;
 
             if (receipt) {
@@ -133,10 +135,18 @@ export const usePurchase = (options?: UsePurchaseOptions) => {
     if (!user) throw new Error('ユーザーが見つかりません');
 
     const platform = Platform.OS === 'ios' ? 'ios' : 'android';
-    // iOS: transactionReceipt (base64), Android: purchaseToken
+    // iOS StoreKit 2: purchaseToken (JWS), Legacy: transactionReceipt
+    // Android: purchaseToken
     const receipt = Platform.OS === 'ios'
-      ? purchase.transactionReceipt || ''
+      ? (purchase.transactionReceipt || purchase.purchaseToken || '')
       : purchase.purchaseToken || '';
+
+    console.log('=== verifyPurchase ===');
+    console.log('platform:', platform);
+    console.log('productId:', purchase.productId);
+    console.log('transactionId:', purchase.transactionId);
+    console.log('receipt長さ:', receipt.length);
+    console.log('receipt先頭100文字:', receipt.substring(0, 100));
 
     // Edge Functionを呼び出し
     const { data, error } = await supabase.functions.invoke('verify-purchase', {
@@ -148,6 +158,8 @@ export const usePurchase = (options?: UsePurchaseOptions) => {
         receipt,
       },
     });
+
+    console.log('Edge Function response:', { data, error });
 
     if (error) throw error;
     if (data?.error) throw new Error(data.error);
