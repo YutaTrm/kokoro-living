@@ -8,6 +8,7 @@ export interface Post {
   id: string;
   content: string;
   created_at: string;
+  experienced_at?: string | null;
   is_hidden?: boolean;
   parent_post_id?: string | null;
   parentContent?: string;
@@ -107,7 +108,7 @@ export const usePostsData = () => {
 
       const { data: postsData, error: postsError } = await supabase
         .from('posts')
-        .select('id, content, created_at, user_id, is_hidden')
+        .select('id, content, created_at, user_id, is_hidden, experienced_at')
         .eq('user_id', user.id)
         .is('parent_post_id', null)
         .order('created_at', { ascending: false });
@@ -146,6 +147,7 @@ export const usePostsData = () => {
           id: post.id,
           content: post.content,
           created_at: post.created_at,
+          experienced_at: post.experienced_at,
           is_hidden: post.is_hidden || false,
           user: {
             display_name: userData?.display_name || 'Unknown',
@@ -263,7 +265,7 @@ export const usePostsData = () => {
 
       const { data: likesData, error: likesError } = await supabase
         .from('likes')
-        .select('post_id, posts!inner(id, content, created_at, user_id)')
+        .select('post_id, posts!inner(id, content, created_at, user_id, experienced_at)')
         .eq('user_id', user.id)
         .eq('posts.is_hidden', false)
         .order('created_at', { ascending: false });
@@ -304,6 +306,7 @@ export const usePostsData = () => {
           id: like.posts.id,
           content: like.posts.content,
           created_at: like.posts.created_at,
+          experienced_at: like.posts.experienced_at,
           is_hidden: false, // いいね一覧では非表示投稿は除外されている
           user: {
             display_name: usersMap.get(like.posts.user_id)?.display_name || 'Unknown',
@@ -334,7 +337,7 @@ export const usePostsData = () => {
 
       const { data: bookmarksData, error: bookmarksError } = await supabase
         .from('bookmarks')
-        .select('post_id, posts!inner(id, content, created_at, user_id)')
+        .select('post_id, posts!inner(id, content, created_at, user_id, experienced_at)')
         .eq('user_id', user.id)
         .eq('posts.is_hidden', false)
         .order('created_at', { ascending: false });
@@ -377,6 +380,7 @@ export const usePostsData = () => {
           id: bookmark.posts.id,
           content: bookmark.posts.content,
           created_at: bookmark.posts.created_at,
+          experienced_at: bookmark.posts.experienced_at,
           is_hidden: false, // ブックマーク一覧では非表示投稿は除外されている
           user: {
             display_name: usersMap.get(bookmark.posts.user_id)?.display_name || 'Unknown',

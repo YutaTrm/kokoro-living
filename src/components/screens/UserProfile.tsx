@@ -46,6 +46,7 @@ interface Post {
   id: string;
   content: string;
   created_at: string;
+  experienced_at?: string | null;
   is_hidden?: boolean;
   parent_post_id?: string | null;
   parentContent?: string;
@@ -268,7 +269,7 @@ export default function UserDetailScreen() {
       const currentOffset = loadMore ? posts.length : 0;
       const { data: postsData, error: postsError } = await supabase
         .from('posts')
-        .select('id, content, created_at, user_id')
+        .select('id, content, created_at, user_id, experienced_at')
         .eq('user_id', id)
         .is('parent_post_id', null)
         .eq('is_hidden', false)
@@ -307,6 +308,7 @@ export default function UserDetailScreen() {
         id: post.id,
         content: post.content,
         created_at: post.created_at,
+        experienced_at: post.experienced_at,
         is_hidden: false,
         user: {
           display_name: userData?.display_name || 'Unknown',
