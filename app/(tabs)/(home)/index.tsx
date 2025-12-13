@@ -1,10 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { List } from 'lucide-react-native';
+import { List, ListCheck } from 'lucide-react-native';
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { Alert, FlatList, Pressable, RefreshControl } from 'react-native';
 
+import { GoodThingsModal } from '@/components/GoodThingsModal';
 import CreateListModal from '@/components/home/CreateListModal';
 import EditListModal from '@/components/home/EditListModal';
 import HomeDrawer from '@/components/home/HomeDrawer';
@@ -17,6 +18,7 @@ import { AddIcon, Icon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
+import { useGoodThings } from '@/src/hooks/useGoodThings';
 import { MOOD_EMOJIS, MOOD_LABELS, useMoodCheckin } from '@/src/hooks/useMoodCheckin';
 import { supabase } from '@/src/lib/supabase';
 import { fetchPostMetadata, fetchPostTags } from '@/src/utils/postUtils';
@@ -72,6 +74,10 @@ export default function TabOneScreen() {
   const { todayCheckin, stats, submitting, submitCheckin, hasCheckedIn, loading: moodLoading } = useMoodCheckin();
   const [isMoodModalOpen, setIsMoodModalOpen] = useState(false);
   const [isMoodCardExpanded, setIsMoodCardExpanded] = useState(false);
+
+  // いいことリスト機能
+  const { todayItems, submitting: goodThingsSubmitting, submitGoodThings } = useGoodThings();
+  const [isGoodThingsModalOpen, setIsGoodThingsModalOpen] = useState(false);
 
   // ヘッダーにドロワーアイコンを設定
   useLayoutEffect(() => {
@@ -573,16 +579,28 @@ export default function TabOneScreen() {
         </Pressable>
       )}
 
-      {/* 投稿ボタンはログイン時のみ表示 */}
+      {/* フローティングボタン（ログイン時のみ表示） */}
       {isLoggedIn && (
-        <Button
-          className="absolute right-5 bottom-5 rounded-full shadow-lg h-16 w-16 bg-primary-400"
-          variant="solid"
-          size="md"
-          onPress={() => router.push('/create-post')}
-        >
-          <ButtonIcon as={AddIcon} size="xl" className="text-white w-6 h-6" />
-        </Button>
+        <HStack space="md" className="absolute right-5 bottom-5">
+          {/* いいことリストボタン */}
+          <Button
+            className="rounded-full shadow-lg h-16 w-16 bg-secondary-400 mr-4"
+            variant="solid"
+            size="md"
+            onPress={() => setIsGoodThingsModalOpen(true)}
+          >
+            <ButtonIcon as={ListCheck} size="xl" className="text-white w-6 h-6" />
+          </Button>
+          {/* 投稿ボタン */}
+          <Button
+            className="rounded-full shadow-lg h-16 w-16 bg-primary-400"
+            variant="solid"
+            size="md"
+            onPress={() => router.push('/create-post')}
+          >
+            <ButtonIcon as={AddIcon} size="xl" className="text-white w-6 h-6" />
+          </Button>
+        </HStack>
       )}
 
       {/* ホームドロワー */}
@@ -616,6 +634,15 @@ export default function TabOneScreen() {
         onClose={() => setIsMoodModalOpen(false)}
         onSubmit={handleMoodSubmit}
         submitting={submitting}
+      />
+
+      {/* いいことリストモーダル */}
+      <GoodThingsModal
+        visible={isGoodThingsModalOpen}
+        onClose={() => setIsGoodThingsModalOpen(false)}
+        onSubmit={submitGoodThings}
+        submitting={goodThingsSubmitting}
+        todayItems={todayItems}
       />
     </Box>
   );

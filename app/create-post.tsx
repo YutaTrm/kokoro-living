@@ -29,7 +29,7 @@ const SELECTED_TAGS_KEY = 'last_selected_tags';
 
 export default function CreatePostScreen() {
   const router = useRouter();
-  const { postId } = useLocalSearchParams<{ postId?: string }>();
+  const { postId, prefill } = useLocalSearchParams<{ postId?: string; prefill?: string }>();
   const { data: masterData } = useMasterData();
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
@@ -67,11 +67,16 @@ export default function CreatePostScreen() {
         } catch (error) {
           console.error('タグ読み込みエラー:', error);
         }
+
+        // prefillがある場合は初期値として設定
+        if (prefill) {
+          setContent(prefill);
+        }
       }
     };
 
     initializeData();
-  }, [postId]);
+  }, [postId, prefill]);
 
   // selectedTagsが変更されたらAsyncStorageに保存（編集モード以外）
   useEffect(() => {
