@@ -1,4 +1,5 @@
 import { useNavigation, useRouter } from 'expo-router';
+import { useColorScheme } from 'nativewind';
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { Calendar, DateData, LocaleConfig } from 'react-native-calendars';
@@ -73,6 +74,8 @@ function get5amBasedToday(): string {
 export default function MoodHistoryScreen() {
   const router = useRouter();
   const navigation = useNavigation();
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const [loading, setLoading] = useState(true);
   const [checkins, setCheckins] = useState<MoodCheckin[]>([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -242,6 +245,10 @@ export default function MoodHistoryScreen() {
                   textDayFontSize: 14,
                   textMonthFontSize: 18,
                   textMonthFontWeight: 'bold',
+                  calendarBackground: 'transparent',
+                  textSectionTitleColor: isDark ? '#a3a3a3' : '#6b7280',
+                  arrowColor: isDark ? '#f5f5f5' : '#171717',
+                  disabledArrowColor: isDark ? '#525252' : '#d1d5db',
                   // @ts-ignore - カスタムスタイルシート
                   'stylesheet.calendar.main': {
                     week: {
@@ -260,7 +267,7 @@ export default function MoodHistoryScreen() {
                   const year = currentMonth.getFullYear();
                   const month = currentMonth.getMonth() + 1;
                   return (
-                    <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>
+                    <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10, color: isDark ? '#f5f5f5' : '#171717' }}>
                       {year} {month}月
                     </Text>
                   );
@@ -278,14 +285,13 @@ export default function MoodHistoryScreen() {
                       alignItems: 'center',
                       justifyContent: 'flex-start',
                       paddingTop: 2,
-                      backgroundColor: isToday ? '#e0f2fe' : 'transparent',//transparent
-                      // borderRadius: 8,
+                      backgroundColor: isToday ? (isDark ? '#1e3a5f' : '#e0f2fe') : 'transparent',
                       width: 40,
                       height: 60,
                     }}>
                       <Text style={{
                         fontSize: 14,
-                        color: isDisabled ? '#d1d5db' : '#000',
+                        color: isDisabled ? (isDark ? '#525252' : '#d1d5db') : (isDark ? '#f5f5f5' : '#171717'),
                         fontWeight: isToday ? 'bold' : 'normal',
                       }}>
                         {date.day}
@@ -295,7 +301,7 @@ export default function MoodHistoryScreen() {
                           <Text style={{ fontSize: 20, lineHeight: 24 }}>
                             {MOOD_EMOJIS[checkin.mood as keyof typeof MOOD_EMOJIS]}
                           </Text>
-                          <Text style={{ fontSize: 10, color: '#6b7280', marginTop: -6 }}>
+                          <Text style={{ fontSize: 10, color: isDark ? '#a3a3a3' : '#6b7280', marginTop: -6 }}>
                             {(() => {
                               const date = new Date(checkin.created_at);
                               const jstOffset = 9 * 60 * 60 * 1000;
