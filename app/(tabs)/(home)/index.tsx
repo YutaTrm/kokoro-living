@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { ListCheck, ScrollText } from 'lucide-react-native';
+import { List, ListCheck } from 'lucide-react-native';
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { Alert, FlatList, Pressable, RefreshControl } from 'react-native';
 
@@ -84,7 +84,7 @@ export default function TabOneScreen() {
     navigation.setOptions({
       headerRight: () => (
         <Pressable onPress={() => setIsDrawerOpen(true)} style={{ marginLeft: 5, padding: 4 }}>
-          <Icon as={ScrollText} size="lg" className="text-typography-900" />
+          <Icon as={List} size="lg" className="text-typography-900" />
         </Pressable>
       ),
     });
@@ -589,7 +589,8 @@ export default function TabOneScreen() {
             variant="solid"
             action="secondary"
             size="md"
-            onPress={() => !hasRecordedToday && setIsGoodThingsModalOpen(true)}
+            disabled={hasRecordedToday}
+            onPress={() => setIsGoodThingsModalOpen(true)}
           >
             <ButtonIcon
               as={ListCheck}
