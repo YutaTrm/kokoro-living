@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { List, ListCheck } from 'lucide-react-native';
+import { ListCheck, ScrollText } from 'lucide-react-native';
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { Alert, FlatList, Pressable, RefreshControl } from 'react-native';
 
@@ -76,7 +76,7 @@ export default function TabOneScreen() {
   const [isMoodCardExpanded, setIsMoodCardExpanded] = useState(false);
 
   // いいことリスト機能
-  const { todayItems, submitting: goodThingsSubmitting, submitGoodThings } = useGoodThings();
+  const { todayItems, submitting: goodThingsSubmitting, submitGoodThings, hasRecordedToday, fetchTodayItems } = useGoodThings();
   const [isGoodThingsModalOpen, setIsGoodThingsModalOpen] = useState(false);
 
   // ヘッダーにドロワーアイコンを設定
@@ -84,7 +84,7 @@ export default function TabOneScreen() {
     navigation.setOptions({
       headerRight: () => (
         <Pressable onPress={() => setIsDrawerOpen(true)} style={{ marginLeft: 5, padding: 4 }}>
-          <Icon as={List} size="lg" className="text-typography-900" />
+          <Icon as={ScrollText} size="lg" className="text-typography-900" />
         </Pressable>
       ),
     });
@@ -156,11 +156,12 @@ export default function TabOneScreen() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // 画面にフォーカスが当たった時にタイムラインを再読み込み
+  // 画面にフォーカスが当たった時にタイムラインと良かったリストを再読み込み
   useFocusEffect(
     useCallback(() => {
       loadPosts(true);
-    }, [selectedListId])
+      fetchTodayItems();
+    }, [selectedListId, fetchTodayItems])
   );
 
   const checkLoginStatus = async () => {
@@ -582,19 +583,25 @@ export default function TabOneScreen() {
       {/* フローティングボタン（ログイン時のみ表示） */}
       {isLoggedIn && (
         <HStack space="md" className="absolute right-5 bottom-5">
-          {/* いいことリストボタン */}
+          {/* 良かったリストボタン */}
           <Button
-            className="rounded-full shadow-lg h-16 w-16 bg-secondary-400 mr-4"
+            className={`rounded-full shadow-lg h-16 w-16 ${hasRecordedToday ? 'bg-background-300' : 'bg-secondary-400'}`}
             variant="solid"
+            action="secondary"
             size="md"
-            onPress={() => setIsGoodThingsModalOpen(true)}
+            onPress={() => !hasRecordedToday && setIsGoodThingsModalOpen(true)}
           >
-            <ButtonIcon as={ListCheck} size="xl" className="text-white w-6 h-6" />
+            <ButtonIcon
+              as={ListCheck}
+              size="xl"
+              className={`w-6 h-6 ${hasRecordedToday ? 'text-typography-500' : 'text-white'}`}
+            />
           </Button>
           {/* 投稿ボタン */}
           <Button
-            className="rounded-full shadow-lg h-16 w-16 bg-primary-400"
+            className="rounded-full shadow-lg h-16 w-16"
             variant="solid"
+            action="primary"
             size="md"
             onPress={() => router.push('/create-post')}
           >

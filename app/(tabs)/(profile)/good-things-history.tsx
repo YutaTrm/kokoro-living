@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { Alert, FlatList, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import ConfirmModal from '@/components/ConfirmModal';
 import TextEditModal from '@/components/profile/TextEditModal';
 import { Box } from '@/components/ui/box';
 import { Heading } from '@/components/ui/heading';
@@ -31,6 +32,8 @@ export default function GoodThingsHistoryScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [editingItem, setEditingItem] = useState<GoodThing | null>(null);
+  const [deletingItem, setDeletingItem] = useState<GoodThing | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -56,25 +59,21 @@ export default function GoodThingsHistoryScreen() {
   }, [hasMore, loadingMore, fetchHistory]);
 
   const handleDelete = useCallback((item: GoodThing) => {
-    Alert.alert(
-      '削除確認',
-      `「${item.content}」を削除しますか？`,
-      [
-        { text: 'キャンセル', style: 'cancel' },
-        {
-          text: '削除',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteItem(item.id);
-            } catch {
-              Alert.alert('エラー', '削除に失敗しました');
-            }
-          },
-        },
-      ]
-    );
-  }, [deleteItem]);
+    setDeletingItem(item);
+  }, []);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!deletingItem) return;
+    setIsDeleting(true);
+    try {
+      await deleteItem(deletingItem.id);
+      setDeletingItem(null);
+    } catch {
+      Alert.alert('エラー', '削除に失敗しました');
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [deletingItem, deleteItem]);
 
   const handleEdit = useCallback((item: GoodThing) => {
     setEditingItem(item);
@@ -176,6 +175,17 @@ export default function GoodThingsHistoryScreen() {
         initialValue={editingItem?.content || ''}
         maxLength={100}
         multiline={false}
+      />
+
+      <ConfirmModal
+        isOpen={!!deletingItem}
+        onClose={() => setDeletingItem(null)}
+        onConfirm={handleConfirmDelete}
+        title="削除確認"
+        message={`「${deletingItem?.content || ''}」を削除しますか？`}
+        confirmText="削除"
+        isLoading={isDeleting}
+        confirmAction="negative"
       />
     </SafeAreaView>
   );
