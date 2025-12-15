@@ -247,7 +247,7 @@ export default function NotificationsScreen() {
   }, [userId]);
 
   const handleLoadMore = () => {
-    if (!loadingMore && hasMore) {
+    if (!loading && !loadingMore && hasMore) {
       loadNotifications(false);
     }
   };

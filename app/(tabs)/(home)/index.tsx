@@ -162,9 +162,6 @@ export default function TabOneScreen() {
     const loggedIn = !!session;
     setIsLoggedIn(loggedIn);
     setLoading(false);
-
-    // ログイン状態に関わらず投稿を読み込む
-    loadPosts(true);
   };
 
   const loadPosts = async (reset = false) => {
@@ -354,7 +351,7 @@ export default function TabOneScreen() {
   };
 
   const handleLoadMore = () => {
-    if (!loadingMore && hasMore) {
+    if (!loadingPosts && !loadingMore && hasMore) {
       loadPosts(false);
     }
   };

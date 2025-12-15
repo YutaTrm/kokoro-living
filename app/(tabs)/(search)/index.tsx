@@ -692,7 +692,7 @@ export default function SearchScreen() {
   };
 
   const handleLoadMore = () => {
-    if (!loadingMore && hasMore && hasSearched) {
+    if (!loading && !loadingMore && hasMore && hasSearched) {
       if (searchTab === 'posts') {
         searchPosts(false);
       } else {
