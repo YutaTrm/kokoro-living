@@ -38,6 +38,7 @@ interface Post {
   diagnoses: string[];
   treatments: string[];
   medications: string[];
+  statuses: string[];
   repliesCount?: number;
   likesCount?: number;
   isLikedByCurrentUser?: boolean;
@@ -302,7 +303,7 @@ export default function TabOneScreen() {
         (usersRes.data || []).map(u => [u.user_id, { display_name: u.display_name, avatar_url: u.avatar_url }])
       );
 
-      const { diagnosesMap, treatmentsMap, medicationsMap } = tagsResult;
+      const { diagnosesMap, treatmentsMap, medicationsMap, statusesMap } = tagsResult;
       const { repliesMap, likesMap, myLikesMap, myRepliesMap } = metadataResult;
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -320,6 +321,7 @@ export default function TabOneScreen() {
         diagnoses: diagnosesMap.get(post.id) || [],
         treatments: treatmentsMap.get(post.id) || [],
         medications: medicationsMap.get(post.id) || [],
+        statuses: statusesMap.get(post.id) || [],
         repliesCount: repliesMap.get(post.id) || 0,
         likesCount: likesMap.get(post.id) || 0,
         isLikedByCurrentUser: myLikesMap.get(post.id) || false,

@@ -48,6 +48,7 @@ interface Post {
   diagnoses: string[];
   treatments: string[];
   medications: string[];
+  statuses: string[];
   isMuted?: boolean;
   repliesCount?: number;
   likesCount?: number;
@@ -514,7 +515,7 @@ export default function SearchScreen() {
         fetchParentPostInfo(parentPostIds),
       ]);
 
-      const { diagnosesMap, treatmentsMap, medicationsMap } = tagsResult;
+      const { diagnosesMap, treatmentsMap, medicationsMap, statusesMap } = tagsResult;
 
       // 投稿データを組み立て
       const postsWithData = filteredPosts.map((post) => {
@@ -542,6 +543,7 @@ export default function SearchScreen() {
           diagnoses: diagnosesMap.get(post.id) || [],
           treatments: treatmentsMap.get(post.id) || [],
           medications: medicationsMap.get(post.id) || [],
+          statuses: statusesMap.get(post.id) || [],
           isMuted: mutedUserIds.includes(post.user_id),
           repliesCount: stats.repliesCount,
           likesCount: stats.likesCount,

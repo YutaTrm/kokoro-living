@@ -33,6 +33,10 @@ const bgColorMap: Record<string, string> = {
   'amber-300': 'bg-amber-300',
   'amber-400': 'bg-amber-400',
   'amber-500': 'bg-amber-500',
+  // orange
+  'orange-300': 'bg-orange-300',
+  'orange-400': 'bg-orange-400',
+  'orange-500': 'bg-orange-500',
   // gray (終了済みなど)
   'gray-300': 'bg-gray-300',
   'gray-400': 'bg-gray-400',

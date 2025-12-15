@@ -21,6 +21,7 @@ export interface Post {
   diagnoses: string[];
   treatments: string[];
   medications: string[];
+  statuses: string[];
   repliesCount?: number;
   likesCount?: number;
   isLikedByCurrentUser?: boolean;
@@ -31,31 +32,42 @@ interface TagsResult {
   diagnoses: string[];
   treatments: string[];
   medications: string[];
+  statuses: string[];
 }
 
 export const fetchTagsForPosts = async (
   postIds: string[]
 ): Promise<Map<string, TagsResult>> => {
-  const { data: diagnosesTagsData } = await supabase
-    .from('post_diagnoses')
-    .select('post_id, user_diagnoses(diagnoses(name))')
-    .in('post_id', postIds);
+  const [diagnosesRes, treatmentsRes, medicationsRes, statusesRes] = await Promise.all([
+    supabase
+      .from('post_diagnoses')
+      .select('post_id, user_diagnoses(diagnoses(name))')
+      .in('post_id', postIds),
+    supabase
+      .from('post_treatments')
+      .select('post_id, user_treatments(treatments(name))')
+      .in('post_id', postIds),
+    supabase
+      .from('post_medications')
+      .select('post_id, user_medications(ingredients(name), products(name))')
+      .in('post_id', postIds),
+    supabase
+      .from('post_statuses')
+      .select('post_id, user_statuses(statuses(name))')
+      .in('post_id', postIds),
+  ]);
 
-  const { data: treatmentsTagsData } = await supabase
-    .from('post_treatments')
-    .select('post_id, user_treatments(treatments(name))')
-    .in('post_id', postIds);
-
-  const { data: medicationsTagsData } = await supabase
-    .from('post_medications')
-    .select('post_id, user_medications(ingredients(name), products(name))')
-    .in('post_id', postIds);
+  const diagnosesTagsData = diagnosesRes.data;
+  const treatmentsTagsData = treatmentsRes.data;
+  const medicationsTagsData = medicationsRes.data;
+  const statusesTagsData = statusesRes.data;
 
   const tagsMap = new Map<string, TagsResult>();
   postIds.forEach((postId) => {
     const diagnoses: string[] = [];
     const treatments: string[] = [];
     const medications: string[] = [];
+    const statuses: string[] = [];
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     diagnosesTagsData?.forEach((d: any) => {
@@ -81,7 +93,14 @@ export const fetchTagsForPosts = async (
       }
     });
 
-    tagsMap.set(postId, { diagnoses, treatments, medications });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    statusesTagsData?.forEach((s: any) => {
+      if (s.post_id === postId && s.user_statuses?.statuses?.name) {
+        statuses.push(s.user_statuses.statuses.name);
+      }
+    });
+
+    tagsMap.set(postId, { diagnoses, treatments, medications, statuses });
   });
 
   return tagsMap;
@@ -136,6 +155,7 @@ export const usePostsData = () => {
           diagnoses: [],
           treatments: [],
           medications: [],
+          statuses: [],
         };
         const stats = statsMap.get(post.id) || {
           repliesCount: 0,
@@ -157,6 +177,7 @@ export const usePostsData = () => {
           diagnoses: tags.diagnoses,
           treatments: tags.treatments,
           medications: tags.medications,
+          statuses: tags.statuses,
           repliesCount: stats.repliesCount,
           likesCount: stats.likesCount,
           isLikedByCurrentUser: stats.isLikedByCurrentUser,
@@ -216,6 +237,7 @@ export const usePostsData = () => {
           diagnoses: [],
           treatments: [],
           medications: [],
+          statuses: [],
         };
         const stats = statsMap.get(reply.id) || {
           repliesCount: 0,
@@ -240,6 +262,7 @@ export const usePostsData = () => {
           diagnoses: tags.diagnoses,
           treatments: tags.treatments,
           medications: tags.medications,
+          statuses: tags.statuses,
           repliesCount: stats.repliesCount,
           likesCount: stats.likesCount,
           isLikedByCurrentUser: stats.isLikedByCurrentUser,
@@ -301,6 +324,7 @@ export const usePostsData = () => {
           diagnoses: [],
           treatments: [],
           medications: [],
+          statuses: [],
         };
         return {
           id: like.posts.id,
@@ -316,6 +340,7 @@ export const usePostsData = () => {
           diagnoses: tags.diagnoses,
           treatments: tags.treatments,
           medications: tags.medications,
+          statuses: tags.statuses,
         };
       });
 
@@ -375,6 +400,7 @@ export const usePostsData = () => {
           diagnoses: [],
           treatments: [],
           medications: [],
+          statuses: [],
         };
         return {
           id: bookmark.posts.id,
@@ -390,6 +416,7 @@ export const usePostsData = () => {
           diagnoses: tags.diagnoses,
           treatments: tags.treatments,
           medications: tags.medications,
+          statuses: tags.statuses,
         };
       });
 
