@@ -75,7 +75,7 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
       {hasAvatar ? (
         <AvatarImage source={{ uri: post.user.avatar_url! }} />
       ) : (
-        <DefaultAvatar size={48} />
+        <DefaultAvatar size="md" />
       )}
     </Avatar>
   ) : (
@@ -84,7 +84,7 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
         {hasAvatar ? (
           <AvatarImage source={{ uri: post.user.avatar_url! }} />
         ) : (
-          <DefaultAvatar size={48} />
+          <DefaultAvatar size="md" />
         )}
       </Avatar>
     </Pressable>

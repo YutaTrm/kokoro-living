@@ -32,7 +32,7 @@ export default function UserListItem({ userId, displayName, avatarUrl, bio, hide
           {avatarUrl ? (
             <AvatarImage source={{ uri: avatarUrl }} />
           ) : (
-            <DefaultAvatar size={48} />
+            <DefaultAvatar size="md" />
           )}
         </Avatar>
         <VStack className="flex-1" space="xs">

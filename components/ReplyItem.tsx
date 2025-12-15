@@ -216,7 +216,7 @@ export default function ReplyItem({
         <Box className={`px-4 py-3 ${showBorder ? 'border-b border-outline-200' : ''}`}>
           <HStack space="sm" className="items-center">
             <Avatar size="sm">
-              <DefaultAvatar size={32} />
+              <DefaultAvatar size="sm" />
             </Avatar>
             <Text className="text-base text-typography-400">ミュートユーザーの投稿（タップして表示）</Text>
           </HStack>
@@ -236,7 +236,7 @@ export default function ReplyItem({
                 {reply.user.avatar_url ? (
                   <AvatarImage source={{ uri: reply.user.avatar_url }} />
                 ) : (
-                  <DefaultAvatar size={32} />
+                  <DefaultAvatar size="md" />
                 )}
               </Avatar>
             </Pressable>

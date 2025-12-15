@@ -456,7 +456,7 @@ export default function UserDetailScreen() {
               {profile.avatar_url ? (
                 <AvatarImage source={{ uri: profile.avatar_url }} />
               ) : (
-                <DefaultAvatar size={64} />
+                <DefaultAvatar size="lg" />
               )}
             </Avatar>
             <VStack className="flex-1" space="xs">
