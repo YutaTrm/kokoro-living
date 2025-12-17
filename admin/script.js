@@ -1,9 +1,9 @@
-// Supabase クライアント初期化
+// Supabase クライアント初期化（重複読み込み対策）
 // 認証用（ANON_KEY）
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+var supabase = supabase || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // データ取得用（SERVICE_ROLE_KEY、RLSをバイパス）
-const supabaseAdmin = window.supabase.createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+var supabaseAdmin = supabaseAdmin || window.supabase.createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 let currentUser = null;
 
