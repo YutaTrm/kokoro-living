@@ -1,9 +1,9 @@
-// Supabase クライアント初期化（重複読み込み対策）
+// Supabase クライアント初期化
 // 認証用（ANON_KEY）
-var supabase = supabase || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // データ取得用（SERVICE_ROLE_KEY、RLSをバイパス）
-var supabaseAdmin = supabaseAdmin || window.supabase.createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+const supabaseAdmin = window.supabase.createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 let currentUser = null;
 
@@ -1210,3 +1210,30 @@ function closeUserDetailModal() {
         modal.remove();
     }
 }
+
+// グローバルに関数を公開（type="module"対応）
+window.login = login;
+window.logout = logout;
+window.showTab = showTab;
+window.loadReports = loadReports;
+window.loadPosts = loadPosts;
+window.loadUsers = loadUsers;
+window.loadCheckins = loadCheckins;
+window.loadReflections = loadReflections;
+window.hidePost = hidePost;
+window.showPost = showPost;
+window.viewPost = viewPost;
+window.prevReportsPage = prevReportsPage;
+window.nextReportsPage = nextReportsPage;
+window.prevPostsPage = prevPostsPage;
+window.nextPostsPage = nextPostsPage;
+window.prevUsersPage = prevUsersPage;
+window.nextUsersPage = nextUsersPage;
+window.prevCheckinsPage = prevCheckinsPage;
+window.nextCheckinsPage = nextCheckinsPage;
+window.prevReflectionsPage = prevReflectionsPage;
+window.nextReflectionsPage = nextReflectionsPage;
+window.showReflectionDetail = showReflectionDetail;
+window.closeReflectionModal = closeReflectionModal;
+window.showUserDetail = showUserDetail;
+window.closeUserDetailModal = closeUserDetailModal;
