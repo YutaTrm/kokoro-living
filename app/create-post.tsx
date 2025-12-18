@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -31,7 +31,9 @@ export default function CreatePostScreen() {
   const router = useRouter();
   const { postId } = useLocalSearchParams<{ postId?: string }>();
   const { data: masterData } = useMasterData();
-  const [content, setContent] = useState('');
+  const contentRef = useRef('');
+  const inputRef = useRef<TextInput>(null);
+  const [contentLength, setContentLength] = useState(0);
   const [loading, setLoading] = useState(false);
   const [loadingTags, setLoadingTags] = useState(true);
   const [loadingPost, setLoadingPost] = useState(!!postId);
@@ -47,7 +49,7 @@ export default function CreatePostScreen() {
   const [isExperiencedAtUnset, setIsExperiencedAtUnset] = useState(true);
 
   const maxLength = 140;
-  const remainingChars = maxLength - content.length;
+  const remainingChars = maxLength - contentLength;
   const isEditMode = !!postId;
 
   useEffect(() => {
@@ -229,7 +231,12 @@ export default function CreatePostScreen() {
         return;
       }
 
-      setContent(post.content);
+      contentRef.current = post.content;
+      setContentLength(post.content.length);
+      // TextInputの初期値を設定
+      if (inputRef.current) {
+        inputRef.current.setNativeProps({ text: post.content });
+      }
       setIsReply(!!post.parent_post_id);
 
       // experienced_atを設定
@@ -310,6 +317,7 @@ export default function CreatePostScreen() {
   };
 
   const handlePost = async () => {
+    const content = contentRef.current;
     if (!content.trim()) {
       Alert.alert('エラー', '投稿内容を入力してください');
       return;
@@ -458,7 +466,7 @@ export default function CreatePostScreen() {
           </Button>
           <Button
             onPress={handlePost}
-            disabled={loading || !content.trim()}
+            disabled={loading || contentLength === 0}
             size="sm"
           >
             <ButtonText>{loading ? (isEditMode ? '更新中...' : '投稿中...') : (isEditMode ? '更新' : '投稿')}</ButtonText>
@@ -474,13 +482,17 @@ export default function CreatePostScreen() {
           {/* テキスト入力 */}
           <Box>
             <TextInput
+              ref={inputRef}
               className="min-h-[120px] text-typography-900 text-lg"
               placeholder="状態や感情など自由に記述してください"
               placeholderTextColor="#999"
               multiline
               textAlignVertical="top"
-              value={content}
-              onChangeText={setContent}
+              defaultValue=""
+              onChangeText={(text) => {
+                contentRef.current = text;
+                setContentLength(text.length);
+              }}
               maxLength={maxLength}
               autoFocus
             />

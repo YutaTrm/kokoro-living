@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ChevronDownIcon, CircleIcon, XIcon } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, TextInput, View } from 'react-native';
 
 import PostItem from '@/components/PostItem';
@@ -78,7 +78,8 @@ const SEARCH_TAGS_KEY = 'search_selected_tags';
 export default function SearchScreen() {
   const { data: masterData } = useMasterData();
   const [searchTab, setSearchTab] = useState<SearchTab>('users');
-  const [searchQuery, setSearchQuery] = useState('');
+  const searchQueryRef = useRef('');
+  const searchInputRef = useRef<TextInput>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [users, setUsers] = useState<UserResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -191,7 +192,7 @@ export default function SearchScreen() {
 
   const handleSearch = () => {
     // 入力チェック
-    if (!searchQuery.trim() && selectedTags.length === 0) {
+    if (!searchQueryRef.current.trim() && selectedTags.length === 0) {
       setHasSearched(false);
       return;
     }
@@ -256,8 +257,8 @@ export default function SearchScreen() {
       }
 
       // キーワード検索（bio）
-      if (searchQuery.trim()) {
-        query = query.ilike('bio', `%${searchQuery.trim()}%`);
+      if (searchQueryRef.current.trim()) {
+        query = query.ilike('bio', `%${searchQueryRef.current.trim()}%`);
       }
 
       // ページネーション
@@ -457,8 +458,8 @@ export default function SearchScreen() {
       }
 
       // フリーワード検索
-      if (searchQuery.trim()) {
-        query = query.ilike('content', `%${searchQuery.trim()}%`);
+      if (searchQueryRef.current.trim()) {
+        query = query.ilike('content', `%${searchQueryRef.current.trim()}%`);
       }
 
       // ソート
@@ -704,7 +705,8 @@ export default function SearchScreen() {
   };
 
   const handleClear = () => {
-    setSearchQuery('');
+    searchQueryRef.current = '';
+    searchInputRef.current?.clear();
     setSelectedTags([]);
     setSortBy('created_at');
     setTagFilterMode('or');
@@ -875,11 +877,14 @@ export default function SearchScreen() {
         </Text>
         <HStack space="sm" className="mb-3">
           <TextInput
+            ref={searchInputRef}
             className="flex-1 border border-outline-200 rounded-lg px-3 py-2 text-lg text-typography-900"
             placeholder="キーワード"
             placeholderTextColor="#999"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
+            defaultValue=""
+            onChangeText={(text) => {
+              searchQueryRef.current = text;
+            }}
             onSubmitEditing={handleSearch}
             returnKeyType="search"
           />
