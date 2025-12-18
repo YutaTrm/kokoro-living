@@ -33,6 +33,7 @@ interface PostItemProps {
     diagnoses: string[];
     treatments: string[];
     medications: string[];
+    statuses: string[];
     isMuted?: boolean;
     repliesCount?: number;
     likesCount?: number;
@@ -75,7 +76,7 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
       {hasAvatar ? (
         <AvatarImage source={{ uri: post.user.avatar_url! }} />
       ) : (
-        <DefaultAvatar size={48} />
+        <DefaultAvatar size="md" />
       )}
     </Avatar>
   ) : (
@@ -84,7 +85,7 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
         {hasAvatar ? (
           <AvatarImage source={{ uri: post.user.avatar_url! }} />
         ) : (
-          <DefaultAvatar size={48} />
+          <DefaultAvatar size="md" />
         )}
       </Avatar>
     </Pressable>
@@ -116,7 +117,7 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
               <Text className="text-sm text-typography-500">{formatRelativeDate(post.created_at)}</Text>
 
               {/* タグ（横スクロール） */}
-              {(post.diagnoses.length > 0 || post.treatments.length > 0 || post.medications.length > 0) && (
+              {(post.diagnoses.length > 0 || post.treatments.length > 0 || post.medications.length > 0 || post.statuses.length > 0) && (
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -131,6 +132,9 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
                     ))}
                     {post.medications.map((tag, index) => (
                       <Tag key={`m-${index}`} name={tag} color="cyan-400" size="xs" />
+                    ))}
+                    {post.statuses.map((tag, index) => (
+                      <Tag key={`s-${index}`} name={tag} color="orange-400" size="xs" />
                     ))}
                   </HStack>
                 </ScrollView>

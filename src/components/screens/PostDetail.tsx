@@ -9,7 +9,8 @@ import PostActionButtons from '@/components/PostActionButtons';
 import ReplyIndicator from '@/components/ReplyIndicator';
 import ReplyItem from '@/components/ReplyItem';
 import Tag from '@/components/Tag';
-import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
+import DefaultAvatar from '@/components/icons/DefaultAvatar';
+import { Avatar, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonText } from '@/components/ui/button';
 import { HStack } from '@/components/ui/hstack';
@@ -798,7 +799,7 @@ export default function PostDetailScreen() {
                   {post.user.avatar_url ? (
                     <AvatarImage source={{ uri: post.user.avatar_url }} />
                   ) : (
-                    <AvatarFallbackText>{post.user.display_name}</AvatarFallbackText>
+                    <DefaultAvatar size="md" />
                   )}
                 </Avatar>
                 <VStack>

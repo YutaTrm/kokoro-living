@@ -88,7 +88,7 @@ export default function ProfileHeader({
             {profile.avatarUrl ? (
               <AvatarImage source={{ uri: profile.avatarUrl }} />
             ) : (
-              <DefaultAvatar size={64} />
+              <DefaultAvatar size="lg" />
             )}
           </Avatar>
           {/* カメラボタン（右下に重なる） */}

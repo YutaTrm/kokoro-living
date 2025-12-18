@@ -6,7 +6,8 @@ import { FlatList, Pressable, RefreshControl } from 'react-native';
 
 import LoginPrompt from '@/components/LoginPrompt';
 import ReplyIndicator from '@/components/ReplyIndicator';
-import { Avatar, AvatarFallbackText, AvatarImage } from '@/components/ui/avatar';
+import DefaultAvatar from '@/components/icons/DefaultAvatar';
+import { Avatar, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
 import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
@@ -246,7 +247,7 @@ export default function NotificationsScreen() {
   }, [userId]);
 
   const handleLoadMore = () => {
-    if (!loadingMore && hasMore) {
+    if (!loading && !loadingMore && hasMore) {
       loadNotifications(false);
     }
   };
@@ -318,8 +319,11 @@ export default function NotificationsScreen() {
           <HStack className="items-start">
             <HStack space="sm" className="flex-1 items-start">
               <Avatar size="sm">
-                <AvatarFallbackText>{item.actor.display_name}</AvatarFallbackText>
-                {item.actor.avatar_url && <AvatarImage source={{ uri: item.actor.avatar_url }} />}
+                {item.actor.avatar_url ? (
+                  <AvatarImage source={{ uri: item.actor.avatar_url }} />
+                ) : (
+                  <DefaultAvatar size="sm" />
+                )}
               </Avatar>
               <Text className="flex-1 text-sm">
                 <Text className="font-semibold">{item.actor.display_name}さん</Text>

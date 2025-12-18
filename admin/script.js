@@ -1210,3 +1210,30 @@ function closeUserDetailModal() {
         modal.remove();
     }
 }
+
+// グローバルに関数を公開（type="module"対応）
+window.login = login;
+window.logout = logout;
+window.showTab = showTab;
+window.loadReports = loadReports;
+window.loadPosts = loadPosts;
+window.loadUsers = loadUsers;
+window.loadCheckins = loadCheckins;
+window.loadReflections = loadReflections;
+window.hidePost = hidePost;
+window.showPost = showPost;
+window.viewPost = viewPost;
+window.prevReportsPage = prevReportsPage;
+window.nextReportsPage = nextReportsPage;
+window.prevPostsPage = prevPostsPage;
+window.nextPostsPage = nextPostsPage;
+window.prevUsersPage = prevUsersPage;
+window.nextUsersPage = nextUsersPage;
+window.prevCheckinsPage = prevCheckinsPage;
+window.nextCheckinsPage = nextCheckinsPage;
+window.prevReflectionsPage = prevReflectionsPage;
+window.nextReflectionsPage = nextReflectionsPage;
+window.showReflectionDetail = showReflectionDetail;
+window.closeReflectionModal = closeReflectionModal;
+window.showUserDetail = showUserDetail;
+window.closeUserDetailModal = closeUserDetailModal;

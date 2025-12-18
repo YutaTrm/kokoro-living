@@ -40,6 +40,7 @@ interface Post {
   diagnoses: string[];
   treatments: string[];
   medications: string[];
+  statuses: string[];
   repliesCount?: number;
   likesCount?: number;
   isLikedByCurrentUser?: boolean;
@@ -169,9 +170,6 @@ export default function TabOneScreen() {
     const loggedIn = !!session;
     setIsLoggedIn(loggedIn);
     setLoading(false);
-
-    // ログイン状態に関わらず投稿を読み込む
-    loadPosts(true);
   };
 
   const loadPosts = async (reset = false) => {
@@ -198,6 +196,7 @@ export default function TabOneScreen() {
         is_hidden: boolean;
       }> = [];
       let postsError = null;
+      let rawPostsCount = 0; // フィルタリング前の件数を保持
 
       if (user) {
         // ミュートしているユーザーIDを取得
@@ -236,6 +235,7 @@ export default function TabOneScreen() {
             .range(currentOffset, currentOffset + LIMIT - 1);
 
           // ミュートユーザーの投稿を除外
+          rawPostsCount = (listPosts || []).length;
           const filteredPosts = (listPosts || []).filter(p => !mutedIds.includes(p.user_id));
           postsData = filteredPosts;
           postsError = listError;
@@ -259,6 +259,7 @@ export default function TabOneScreen() {
             .range(currentOffset, currentOffset + LIMIT - 1);
 
           // 非表示・ミュートをフィルタリング（自分の投稿は非表示でも表示、ミュートは除外しない）
+          rawPostsCount = (timelinePosts || []).length;
           const filteredPosts = (timelinePosts || []).filter(p => {
             if (p.user_id === user.id) return true; // 自分の投稿は常に表示
             if (p.is_hidden) return false; // 他人の非表示投稿は除外
@@ -280,14 +281,17 @@ export default function TabOneScreen() {
           .range(currentOffset, currentOffset + LIMIT - 1);
 
         postsData = result.data || [];
+        rawPostsCount = postsData.length;
         postsError = result.error;
       }
 
       if (postsError) throw postsError;
 
+      // フィルタ後のデータが空の場合
       if (!postsData || postsData.length === 0) {
         if (reset) setPosts([]);
-        setHasMore(false);
+        // 元データが空なら終了、フィルタで消えただけなら続行可能性あり
+        setHasMore(rawPostsCount === LIMIT);
         return;
       }
 
@@ -312,7 +316,7 @@ export default function TabOneScreen() {
         (usersRes.data || []).map(u => [u.user_id, { display_name: u.display_name, avatar_url: u.avatar_url }])
       );
 
-      const { diagnosesMap, treatmentsMap, medicationsMap } = tagsResult;
+      const { diagnosesMap, treatmentsMap, medicationsMap, statusesMap } = tagsResult;
       const { repliesMap, likesMap, myLikesMap, myRepliesMap } = metadataResult;
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -330,6 +334,7 @@ export default function TabOneScreen() {
         diagnoses: diagnosesMap.get(post.id) || [],
         treatments: treatmentsMap.get(post.id) || [],
         medications: medicationsMap.get(post.id) || [],
+        statuses: statusesMap.get(post.id) || [],
         repliesCount: repliesMap.get(post.id) || 0,
         likesCount: likesMap.get(post.id) || 0,
         isLikedByCurrentUser: myLikesMap.get(post.id) || false,
@@ -345,7 +350,7 @@ export default function TabOneScreen() {
           return [...prev, ...newPosts];
         });
       }
-      setHasMore(postsData.length === LIMIT);
+      setHasMore(rawPostsCount === LIMIT);
     } catch (error) {
       console.error('投稿取得エラー:', error);
     } finally {
@@ -361,7 +366,7 @@ export default function TabOneScreen() {
   };
 
   const handleLoadMore = () => {
-    if (!loadingMore && hasMore) {
+    if (!loadingPosts && !loadingMore && hasMore) {
       loadPosts(false);
     }
   };

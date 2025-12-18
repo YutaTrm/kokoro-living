@@ -40,7 +40,7 @@ export default function ReplyIndicator({
               onError={() => setImageError(true)}
             />
           ) : (
-            <DefaultAvatar size={20} />
+            <DefaultAvatar size="xs" />
           )}
         </Avatar>
         <Text className="text-sm text-typography-500 pr-4 flex-1" numberOfLines={1}>

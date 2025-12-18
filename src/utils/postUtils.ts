@@ -146,16 +146,18 @@ export async function fetchPostTags(postIds: string[]): Promise<{
   diagnosesMap: Map<string, string[]>;
   treatmentsMap: Map<string, string[]>;
   medicationsMap: Map<string, string[]>;
+  statusesMap: Map<string, string[]>;
 }> {
   if (postIds.length === 0) {
     return {
       diagnosesMap: new Map(),
       treatmentsMap: new Map(),
       medicationsMap: new Map(),
+      statusesMap: new Map(),
     };
   }
 
-  const [diagnosesRes, treatmentsRes, medicationsRes] = await Promise.all([
+  const [diagnosesRes, treatmentsRes, medicationsRes, statusesRes] = await Promise.all([
     supabase
       .from('post_diagnoses')
       .select('post_id, user_diagnoses(diagnoses(name))')
@@ -167,6 +169,10 @@ export async function fetchPostTags(postIds: string[]): Promise<{
     supabase
       .from('post_medications')
       .select('post_id, user_medications(ingredients(name), products(name))')
+      .in('post_id', postIds),
+    supabase
+      .from('post_statuses')
+      .select('post_id, user_statuses(statuses(name))')
       .in('post_id', postIds),
   ]);
 
@@ -209,5 +215,17 @@ export async function fetchPostTags(postIds: string[]): Promise<{
     }
   });
 
-  return { diagnosesMap, treatmentsMap, medicationsMap };
+  const statusesMap = new Map<string, string[]>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  statusesRes.data?.forEach((s: any) => {
+    const name = s.user_statuses?.statuses?.name;
+    if (name) {
+      if (!statusesMap.has(s.post_id)) {
+        statusesMap.set(s.post_id, []);
+      }
+      statusesMap.get(s.post_id)?.push(name);
+    }
+  });
+
+  return { diagnosesMap, treatmentsMap, medicationsMap, statusesMap };
 }

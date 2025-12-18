@@ -1,12 +1,24 @@
 import Svg, { Circle, Path } from 'react-native-svg';
 
+type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+
+const sizeMap: Record<AvatarSize, number> = {
+  xs: 22,
+  sm: 30,
+  md: 44,
+  lg: 56,
+  xl: 92,
+  '2xl': 124,
+};
+
 interface DefaultAvatarProps {
-  size?: number;
+  size?: AvatarSize;
 }
 
-export default function DefaultAvatar({ size = 48 }: DefaultAvatarProps) {
+export default function DefaultAvatar({ size = 'md' }: DefaultAvatarProps) {
+  const pixelSize = sizeMap[size];
   return (
-    <Svg width={size} height={size} viewBox="0 0 48 48" fill="none">
+    <Svg width={pixelSize} height={pixelSize} viewBox="0 0 48 48" fill="none">
       {/* 背景円 */}
       <Circle cx="24" cy="24" r="24" fill="#E5E7EB" />
 

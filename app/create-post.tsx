@@ -44,7 +44,7 @@ export default function CreatePostScreen() {
   const currentDate = new Date();
   const [experiencedYear, setExperiencedYear] = useState(currentDate.getFullYear().toString());
   const [experiencedMonth, setExperiencedMonth] = useState((currentDate.getMonth() + 1).toString());
-  const [isExperiencedAtUnset, setIsExperiencedAtUnset] = useState(false);
+  const [isExperiencedAtUnset, setIsExperiencedAtUnset] = useState(true);
 
   const maxLength = 140;
   const remainingChars = maxLength - content.length;
