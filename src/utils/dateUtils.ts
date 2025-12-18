@@ -41,7 +41,7 @@ export const formatExperiencedAt = (dateString: string): string => {
   const date = new Date(dateString);
   const year = date.getFullYear();
   const month = date.getMonth() + 1;
-  return `${year}年${month}月頃`;
+  return `${year}年${month}月当時`;
 };
 
 /**
