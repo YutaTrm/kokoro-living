@@ -1,8 +1,9 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { Href, Stack, useLocalSearchParams, useRouter, useSegments } from 'expo-router';
-import { CalendarDays, ChevronDown, Edit, Flag, MoreVertical, Trash2 } from 'lucide-react-native';
+import { CalendarDays, ChevronDown, Copy, Edit, Flag, MoreVertical, Trash2 } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView as RNScrollView } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 
 import ConfirmModal from '@/components/ConfirmModal';
 import PostActionButtons from '@/components/PostActionButtons';
@@ -816,6 +817,13 @@ export default function PostDetailScreen() {
               >
                 {isOwnPost ? (
                   <>
+                    <MenuItem key="copy" textValue="コピー" onPress={() => {
+                      Clipboard.setStringAsync(post.content);
+                      Alert.alert('コピーしました');
+                    }}>
+                      <Icon as={Copy} size="md" className="text-typography-700" />
+                      <MenuItemLabel className="ml-2">投稿をコピー</MenuItemLabel>
+                    </MenuItem>
                     <MenuItem key="edit" textValue="編集" onPress={handleEdit}>
                       <Icon as={Edit} size="md" className="text-typography-700" />
                       <MenuItemLabel className="ml-2">投稿を編集</MenuItemLabel>
