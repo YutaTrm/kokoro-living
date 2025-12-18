@@ -78,11 +78,11 @@ export default function TabOneScreen() {
     navigation.setOptions({
       headerRight: () => (
         <Pressable onPress={() => setIsDrawerOpen(true)} style={{ marginLeft: 5, padding: 4 }}>
-          <Icon as={List} size="lg" className="text-typography-900" />
+          <Icon as={List} size="lg" className={selectedListId ? "text-primary-400" : "text-typography-900"} strokeWidth={selectedListId ? 3 : 2} />
         </Pressable>
       ),
     });
-  }, [navigation]);
+  }, [navigation, selectedListId]);
 
   // 選択中のリストをAsyncStorageから読み込み
   useEffect(() => {
