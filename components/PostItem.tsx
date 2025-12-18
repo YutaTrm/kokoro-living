@@ -1,5 +1,5 @@
 import { Href, useRouter, useSegments } from 'expo-router';
-import { Clock, Flag, Heart, MessageCircle } from 'lucide-react-native';
+import { CalendarDays, Clock, Flag, Heart, MessageCircle } from 'lucide-react-native';
 import { Pressable, ScrollView } from 'react-native';
 
 import DefaultAvatar from '@/components/icons/DefaultAvatar';
@@ -111,10 +111,9 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
               </Box>
             )}
 
-            {/* ユーザー名、時間、タグ */}
+            {/* ユーザー名、タグ */}
             <HStack space="xs" className="items-center flex-1">
               <Text className="font-semibold text-base">{displayName}</Text>
-              <Text className="text-sm text-typography-500">{formatRelativeDate(post.created_at)}</Text>
 
               {/* タグ（横スクロール） */}
               {(post.diagnoses.length > 0 || post.treatments.length > 0 || post.medications.length > 0 || post.statuses.length > 0) && (
@@ -146,17 +145,21 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
               {post.content}
             </Text>
 
-            {/* 体験日とアクションボタン（横並び） */}
+            {/* 体験日・投稿時間とアクションボタン（横並び） */}
             <HStack className="items-center justify-between">
-              {/* 体験日（左側） */}
-              {post.experienced_at ? (
+              {/* 体験日・投稿時間（左側） */}
+              <HStack space="md" className="items-center">
                 <HStack space="xs" className="items-center">
                   <Icon as={Clock} size="sm" className="text-typography-500" />
-                  <Text className="text-sm text-typography-500">{formatExperiencedAt(post.experienced_at)}</Text>
+                  <Text className="text-sm text-typography-500">{formatRelativeDate(post.created_at)}</Text>
                 </HStack>
-              ) : (
-                <Box />
-              )}
+                {post.experienced_at && (
+                  <HStack space="xs" className="items-center">
+                    <Icon as={CalendarDays} size="sm" className="text-typography-500" />
+                    <Text className="text-sm text-typography-500">{formatExperiencedAt(post.experienced_at)}</Text>
+                  </HStack>
+                )}
+              </HStack>
 
               {/* アクションボタン（右側） */}
               <HStack space="lg" className="items-center">

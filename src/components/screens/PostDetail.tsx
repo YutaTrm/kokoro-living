@@ -1,6 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { Href, Stack, useLocalSearchParams, useRouter, useSegments } from 'expo-router';
-import { ChevronDown, Clock, Edit, Flag, MoreVertical, Trash2 } from 'lucide-react-native';
+import { CalendarDays, ChevronDown, Edit, Flag, MoreVertical, Trash2 } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView as RNScrollView } from 'react-native';
 
@@ -23,6 +23,7 @@ import { Text } from '@/components/ui/text';
 import { Textarea, TextareaInput } from '@/components/ui/textarea';
 import { VStack } from '@/components/ui/vstack';
 import { supabase } from '@/src/lib/supabase';
+import { formatExperiencedAt } from '@/src/utils/dateUtils';
 import { getCurrentTab } from '@/src/utils/getCurrentTab';
 
 interface Post {
@@ -587,13 +588,6 @@ export default function PostDetailScreen() {
     });
   };
 
-  const formatExperiencedAt = (dateString: string) => {
-    const date = new Date(dateString);
-    const year = date.getFullYear();
-    const month = date.getMonth() + 1;
-    return `${year}年${month}月頃`;
-  };
-
   const handleReply = () => {
     if (!isLoggedIn) {
       Alert.alert('エラー', 'ログインしてください');
@@ -857,7 +851,7 @@ export default function PostDetailScreen() {
 
           {post.experienced_at && (
             <HStack space="xs" className="items-center mb-2">
-              <Icon as={Clock} size="sm" className="text-typography-700" />
+              <Icon as={CalendarDays} size="sm" className="text-typography-500" />
               <Text className="text-sm text-typography-500">{formatExperiencedAt(post.experienced_at)}</Text>
             </HStack>
           )}
