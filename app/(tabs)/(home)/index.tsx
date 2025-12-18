@@ -11,9 +11,8 @@ import HomeDrawer from '@/components/home/HomeDrawer';
 import { MoodCheckinModal } from '@/components/MoodCheckinModal';
 import PostItem from '@/components/PostItem';
 import { Box } from '@/components/ui/box';
-import { Button, ButtonIcon } from '@/components/ui/button';
 import { HStack } from '@/components/ui/hstack';
-import { AddIcon, Icon } from '@/components/ui/icon';
+import { Icon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
@@ -576,18 +575,6 @@ export default function TabOneScreen() {
             </VStack>
           )}
         </Pressable>
-      )}
-
-      {/* 投稿ボタンはログイン時のみ表示 */}
-      {isLoggedIn && (
-        <Button
-          className="absolute right-5 bottom-5 rounded-full shadow-lg h-16 w-16 bg-primary-400"
-          variant="solid"
-          size="md"
-          onPress={() => router.push('/create-post')}
-        >
-          <ButtonIcon as={AddIcon} size="xl" className="text-white w-6 h-6" />
-        </Button>
       )}
 
       {/* ホームドロワー */}
