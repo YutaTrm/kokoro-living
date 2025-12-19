@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { Bookmark, Heart, History, LogOut, MessageCircleOff, Moon, ShieldBan, Sun, UserX, X } from 'lucide-react-native';
+import { Bookmark, History, LogOut, MessageCircleOff, Moon, ShieldBan, Sun, UserX, X } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, Pressable } from 'react-native';
 
@@ -49,11 +49,6 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
   const handleMoodHistory = () => {
     onClose();
     router.push('/(tabs)/(profile)/mood-history');
-  };
-
-  const handleLikes = () => {
-    onClose();
-    router.push('/(tabs)/(profile)/likes');
   };
 
   const handleBookmarks = () => {
@@ -150,14 +145,6 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
                 <HStack space="md" className="items-center">
                   <Icon as={History} size="md" className="text-typography-700" />
                   <Text className="text-lg -ml-2">チェックイン履歴</Text>
-                </HStack>
-              </Pressable>
-
-              {/* いいね一覧 */}
-              <Pressable onPress={handleLikes}>
-                <HStack space="md" className="items-center">
-                  <Icon as={Heart} size="md" className="text-typography-700" />
-                  <Text className="text-lg -ml-2">いいね一覧</Text>
                 </HStack>
               </Pressable>
 
