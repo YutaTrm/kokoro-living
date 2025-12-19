@@ -761,7 +761,7 @@ export default function UserDetailScreen() {
           ListHeaderComponent={renderHeader}
           ListEmptyComponent={renderEmptyContent}
           ListFooterComponent={
-            (loadingMorePosts || loadingMoreReplies || loadingMoreLikes) ? (
+            (loadingMorePosts || loadingMoreReplies || loadingMoreLikes) && !(loadingPosts || loadingReplies || loadingLikes) ? (
               <Box className="py-4 items-center">
                 <Spinner size="small" />
               </Box>
