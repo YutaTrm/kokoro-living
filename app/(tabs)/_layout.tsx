@@ -27,6 +27,14 @@ function TabsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
     }
   }, [pathname, refetch]);
 
+  // 各タブのルート画面かどうかを判定
+  const isRootScreen =
+    pathname === '/' ||
+    pathname === '/index' ||
+    pathname === '/search' ||
+    pathname === '/notifications' ||
+    pathname === '/profile';
+
   return (
     <View className="flex-1">
       <Tabs
@@ -101,8 +109,8 @@ function TabsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
       />
       </Tabs>
 
-      {/* 投稿ボタン（FAB） */}
-      {isLoggedIn && (
+      {/* 投稿ボタン（FAB）- 各タブのルート画面のみ表示 */}
+      {isLoggedIn && isRootScreen && (
         <Button
           className="absolute right-5 bottom-28 rounded-full shadow-lg h-16 w-16 bg-primary-400"
           variant="solid"
