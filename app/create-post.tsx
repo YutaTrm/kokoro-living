@@ -34,6 +34,7 @@ export default function CreatePostScreen() {
   const contentRef = useRef('');
   const inputRef = useRef<TextInput>(null);
   const [contentLength, setContentLength] = useState(0);
+  const [initialContent, setInitialContent] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingTags, setLoadingTags] = useState(true);
   const [loadingPost, setLoadingPost] = useState(!!postId);
@@ -233,10 +234,7 @@ export default function CreatePostScreen() {
 
       contentRef.current = post.content;
       setContentLength(post.content.length);
-      // TextInputの初期値を設定
-      if (inputRef.current) {
-        inputRef.current.setNativeProps({ text: post.content });
-      }
+      setInitialContent(post.content);
       setIsReply(!!post.parent_post_id);
 
       // experienced_atを設定
@@ -482,13 +480,14 @@ export default function CreatePostScreen() {
           {/* テキスト入力 */}
           <Box>
             <TextInput
+              key={postId || 'new'}
               ref={inputRef}
               className="min-h-[120px] text-typography-900 text-lg"
               placeholder="状態や感情など自由に記述してください"
               placeholderTextColor="#999"
               multiline
               textAlignVertical="top"
-              defaultValue=""
+              defaultValue={initialContent}
               onChangeText={(text) => {
                 contentRef.current = text;
                 setContentLength(text.length);
