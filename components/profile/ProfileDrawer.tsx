@@ -89,7 +89,7 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
         return;
       }
 
-      const { error } = await supabase.rpc('delete_user_account', { user_id: user.id });
+      const { error } = await supabase.rpc('delete_user_account');
       if (error) throw error;
 
       Alert.alert('退会完了', 'アカウントが削除されました');
