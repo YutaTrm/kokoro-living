@@ -5,6 +5,7 @@ import { List } from 'lucide-react-native';
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { Alert, FlatList, Pressable, RefreshControl } from 'react-native';
 
+import AdBanner from '@/components/AdBanner';
 import CreateListModal from '@/components/home/CreateListModal';
 import EditListModal from '@/components/home/EditListModal';
 import HomeDrawer from '@/components/home/HomeDrawer';
@@ -514,6 +515,7 @@ export default function TabOneScreen() {
   // タイムライン表示（ログイン状態に関わらず）
   return (
     <Box className="flex-1">
+      {isLoggedIn && <AdBanner />}
       <FlatList
         className=""
         data={posts}

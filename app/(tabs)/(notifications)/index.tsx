@@ -4,6 +4,7 @@ import { Heart, MessageCircle, UserRoundPlus } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Pressable, RefreshControl } from 'react-native';
 
+import AdBanner from '@/components/AdBanner';
 import LoginPrompt from '@/components/LoginPrompt';
 import ReplyIndicator from '@/components/ReplyIndicator';
 import DefaultAvatar from '@/components/icons/DefaultAvatar';
@@ -381,6 +382,7 @@ export default function NotificationsScreen() {
   return (
     <LoginPrompt>
       <Box className="flex-1 bg-background-0">
+        <AdBanner />
         <FlatList
           data={notifications}
           keyExtractor={(item) => item.id}

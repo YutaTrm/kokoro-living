@@ -3,6 +3,7 @@ import { Pencil, X } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, TouchableOpacity } from 'react-native';
 
+import AdBanner from '@/components/AdBanner';
 import ConfirmModal from '@/components/ConfirmModal';
 import LoginPrompt from '@/components/LoginPrompt';
 import PostItem from '@/components/PostItem';
@@ -394,6 +395,7 @@ export default function ProfileScreen() {
   return (
     <LoginPrompt>
       <Box className="flex-1">
+        <AdBanner />
         <FlatList
           data={getCurrentData()}
           renderItem={renderItem}

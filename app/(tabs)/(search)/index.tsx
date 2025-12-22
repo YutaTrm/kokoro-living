@@ -3,6 +3,7 @@ import { ChevronDownIcon, CircleIcon, XIcon } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, TextInput, View } from 'react-native';
 
+import AdBanner from '@/components/AdBanner';
 import PostItem from '@/components/PostItem';
 import TagFilterModal from '@/components/search/TagFilterModal';
 import Tag from '@/components/Tag';
@@ -792,6 +793,7 @@ export default function SearchScreen() {
 
   return (
     <Box className="flex-1 bg-background-0">
+      <AdBanner />
       {/* 検索タブ */}
       <HStack className="border-b border-outline-200">
         <Pressable

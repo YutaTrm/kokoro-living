@@ -41,6 +41,7 @@
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
     "react-native-calendars": "^1.1313.0",
+    "react-native-google-mobile-ads": "^16.0.1",
     "react-native-iap": "^14.4.46",
     "react-native-nitro-modules": "^0.31.10",
     "react-native-reanimated": "~4.1.0",

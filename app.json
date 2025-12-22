@@ -20,7 +20,10 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "CFBundleDevelopmentRegion": "ja",
-        "CFBundleLocalizations": ["ja", "en"]
+        "CFBundleLocalizations": [
+          "ja",
+          "en"
+        ]
       }
     },
     "android": {
@@ -77,6 +80,13 @@
           "photosPermission": "AI振り返り結果を画像として保存するために写真ライブラリへのアクセスが必要です。",
           "savePhotosPermission": "AI振り返り結果を画像として保存するために写真ライブラリへのアクセスが必要です。",
           "isAccessMediaLocationEnabled": false
+        }
+      ],
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-8595003034177265~5249141023",
+          "iosAppId": "ca-app-pub-8595003034177265~5249141023"
         }
       ]
     ],
