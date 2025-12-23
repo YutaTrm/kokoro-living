@@ -514,6 +514,7 @@ async function loadUsers() {
             const authUser = authUsersMap.get(user.user_id);
             const provider = authUser?.app_metadata?.provider || authUser?.identities?.[0]?.provider || '不明';
             const authDisplayName = authUser?.user_metadata?.full_name || authUser?.user_metadata?.name || '';
+            const twitterUsername = provider === 'twitter' ? (authUser?.user_metadata?.user_name || authUser?.user_metadata?.preferred_username || '') : '';
             const tags = userTagsMap.get(user.user_id) || { diagnoses: [], medications: [], treatments: [], statuses: [] };
             const followingCount = followingCountMap.get(user.user_id) || 0;
             const followersCount = followersCountMap.get(user.user_id) || 0;
@@ -544,6 +545,7 @@ async function loadUsers() {
                             ${user.is_admin ? '<span class="px-2 py-1 text-xs font-semibold rounded bg-blue-100 text-blue-800">管理者</span>' : ''}
                         </div>
                         ${authDisplayName ? `<span class="text-xs text-gray-500">Auth: ${authDisplayName}</span>` : ''}
+                        ${twitterUsername ? `<a href="https://x.com/${twitterUsername}" target="_blank" rel="noopener noreferrer" class="text-xs text-blue-500 hover:text-blue-700 hover:underline" onclick="event.stopPropagation()">@${twitterUsername}</a>` : ''}
                     </div>
                 </td>
                 <td class="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
