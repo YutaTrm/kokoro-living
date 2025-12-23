@@ -214,8 +214,22 @@ export function useMoodCheckin() {
     }
   };
 
+  // 認証状態の変化を監視してチェックイン状態を再取得
   useEffect(() => {
     fetchTodayCheckin();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') {
+        // ログイン時に再取得
+        fetchTodayCheckin();
+      } else if (event === 'SIGNED_OUT') {
+        // ログアウト時はリセット
+        setTodayCheckin(null);
+        setStats({ totalCheckins: 0, sameMoodCount: 0, moodCounts: {} });
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
