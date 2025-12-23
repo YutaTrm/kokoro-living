@@ -99,7 +99,8 @@ export default function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
       onClose();
     } catch (error) {
       console.error('退会エラー:', error);
-      Alert.alert('エラー', '退会処理に失敗しました');
+      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+      Alert.alert('エラー', `退会処理に失敗しました\n\n${errorMessage}`);
     }
   };
 
