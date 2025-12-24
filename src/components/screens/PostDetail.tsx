@@ -1,7 +1,7 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { Href, Stack, useLocalSearchParams, useRouter, useSegments } from 'expo-router';
 import { CalendarDays, ChevronDown, Copy, Edit, Flag, MoreVertical, Trash2 } from 'lucide-react-native';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView as RNScrollView } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 
@@ -83,7 +83,7 @@ export default function PostDetailScreen() {
   const [loadingDeeperReplies, setLoadingDeeperReplies] = useState<Set<string>>(new Set());
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportReason, setReportReason] = useState<string>('harassment');
-  const [reportDescription, setReportDescription] = useState('');
+  const reportDescriptionRef = useRef('');
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -643,7 +643,7 @@ export default function PostDetailScreen() {
       const { data, error } = await supabase.rpc('report_post', {
         p_post_id: id,
         p_reason: reportReason,
-        p_description: reportDescription || null,
+        p_description: reportDescriptionRef.current || null,
       });
 
       if (error) throw error;
@@ -652,7 +652,7 @@ export default function PostDetailScreen() {
 
       setShowReportModal(false);
       setReportReason('harassment');
-      setReportDescription('');
+      reportDescriptionRef.current = '';
 
       if (result.hidden) {
         Alert.alert(
@@ -915,7 +915,10 @@ export default function PostDetailScreen() {
       </RNScrollView>
 
       {/* 通報モーダル */}
-      <Modal isOpen={showReportModal} onClose={() => setShowReportModal(false)} size="md">
+      <Modal isOpen={showReportModal} onClose={() => {
+        reportDescriptionRef.current = '';
+        setShowReportModal(false);
+      }} size="md">
         <ModalBackdrop />
         <ModalContent>
           <ModalHeader>
@@ -967,8 +970,8 @@ export default function PostDetailScreen() {
                 <Textarea>
                   <TextareaInput
                     placeholder="詳しい説明があれば記入してください"
-                    value={reportDescription}
-                    onChangeText={setReportDescription}
+                    defaultValue=""
+                    onChangeText={(text) => { reportDescriptionRef.current = text; }}
                     className="min-h-[80px]"
                   />
                 </Textarea>
@@ -979,7 +982,10 @@ export default function PostDetailScreen() {
             <HStack space="sm" className="flex-1">
               <Button
                 variant="outline"
-                onPress={() => setShowReportModal(false)}
+                onPress={() => {
+                  reportDescriptionRef.current = '';
+                  setShowReportModal(false);
+                }}
                 className="flex-1"
                 disabled={isSubmittingReport}
               >
