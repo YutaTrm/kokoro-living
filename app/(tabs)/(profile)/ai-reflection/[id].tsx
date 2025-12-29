@@ -2,7 +2,7 @@ import * as MediaLibrary from 'expo-media-library';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { Download } from 'lucide-react-native';
 import { useLayoutEffect, useRef, useState } from 'react';
-import { Alert, Image, ScrollView, View } from 'react-native';
+import { Alert, Image, Platform, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ViewShot from 'react-native-view-shot';
 
@@ -102,7 +102,7 @@ export default function AIReflectionDetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 bg-background-0" edges={['bottom']}>
+      <SafeAreaView className="flex-1 bg-background-0" edges={Platform.OS === 'ios' ? ['bottom'] : []}>
         <Box className="flex-1 items-center justify-center">
           <Spinner size="large" />
         </Box>
@@ -112,7 +112,7 @@ export default function AIReflectionDetailScreen() {
 
   if (!reflection) {
     return (
-      <SafeAreaView className="flex-1 bg-background-0" edges={['bottom']}>
+      <SafeAreaView className="flex-1 bg-background-0" edges={Platform.OS === 'ios' ? ['bottom'] : []}>
         <Box className="flex-1 items-center justify-center p-4">
           <Text className="text-center text-typography-500">
             振り返りが見つかりませんでした
@@ -123,7 +123,7 @@ export default function AIReflectionDetailScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-background-0" edges={['bottom']}>
+    <SafeAreaView className="flex-1 bg-background-0" edges={Platform.OS === 'ios' ? ['bottom'] : []}>
       <ScrollView className="flex-1 p-4">
         <VStack space="md">
           {/* キャプチャ対象のカード */}
