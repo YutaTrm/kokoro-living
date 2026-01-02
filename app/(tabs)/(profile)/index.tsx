@@ -502,7 +502,7 @@ export default function ProfileScreen() {
                     size="md"
                     action="positive"
                   >
-                    <ButtonText>{product.title} {product.displayPrice}</ButtonText>
+                    <ButtonText>{product.title.replace(/\s*[\(（].*[\)）]$/, '')} {product.displayPrice}</ButtonText>
                   </Button>
                 ))}
                 <Button
