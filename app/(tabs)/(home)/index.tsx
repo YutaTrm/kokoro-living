@@ -199,8 +199,44 @@ export default function TabOneScreen() {
 
         const mutedIds = mutesData?.map(m => m.muted_id) || [];
 
-        // リストが選択されている場合
-        if (selectedListId) {
+        // すべての投稿が選択されている場合
+        if (selectedListId === 'all') {
+          // ブロックしているユーザーIDを取得
+          const { data: blocksData } = await supabase
+            .from('blocks')
+            .select('blocked_id')
+            .eq('blocker_id', user.id);
+          const blockedIds = blocksData?.map(b => b.blocked_id) || [];
+
+          // 自分をブロックしているユーザーIDを取得
+          const { data: blockedByData } = await supabase
+            .from('blocks')
+            .select('blocker_id')
+            .eq('blocked_id', user.id);
+          const blockedByIds = blockedByData?.map(b => b.blocker_id) || [];
+
+          const excludeUserIds = [...blockedIds, ...blockedByIds, ...mutedIds];
+
+          // 全投稿を取得（ブロック・ミュートを除外）
+          let query = supabase
+            .from('posts')
+            .select('id, content, created_at, experienced_at, user_id, is_hidden')
+            .is('parent_post_id', null)
+            .eq('is_hidden', false)
+            .order('created_at', { ascending: false })
+            .range(currentOffset, currentOffset + LIMIT - 1);
+
+          // 除外するユーザーがいる場合のみフィルタを追加
+          if (excludeUserIds.length > 0) {
+            query = query.not('user_id', 'in', `(${excludeUserIds.join(',')})`);
+          }
+
+          const { data: allPosts, error: allError } = await query;
+
+          rawPostsCount = (allPosts || []).length;
+          postsData = allPosts || [];
+          postsError = allError;
+        } else if (selectedListId) {
           // リストに追加されたユーザーIDを取得
           const { data: listMembersData } = await supabase
             .from('list_members')

@@ -140,6 +140,17 @@ export default function HomeDrawer({
                 </HStack>
               </Pressable>
 
+              {/* すべての投稿 */}
+              <Pressable onPress={() => { onSelectList('all'); onClose(); }}>
+                <HStack space="md" className="items-center">
+                  <Text
+                    className={`text-lg ${selectedListId === 'all' ? 'text-primary-500 font-semibold' : ''}`}
+                  >
+                    すべての投稿
+                  </Text>
+                </HStack>
+              </Pressable>
+
               {lists.length > 0 && <Divider className="my-2" />}
 
               {/* リスト */}
