@@ -2,15 +2,19 @@ import { Tabs, usePathname, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
+import { GoodThingsModal } from '@/components/GoodThingsModal';
 import { Button, ButtonIcon } from '@/components/ui/button';
+import { VStack } from '@/components/ui/vstack';
 import { Icon, AddIcon } from '@/components/ui/icon';
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
+import { useGoodThings } from '@/src/hooks/useGoodThings';
 import { NotificationProvider, useNotificationContext } from '@/src/contexts/NotificationContext';
 import { supabase } from '@/src/lib/supabase';
 
 import {
   Bell,
   House,
+  ListCheck,
   Search,
   User,
 } from 'lucide-react-native';
@@ -19,6 +23,14 @@ function TabsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
   const { unreadCount, refetch } = useNotificationContext();
   const pathname = usePathname();
   const router = useRouter();
+  const {
+    hasRecordedToday,
+    todayItems,
+    submitGoodThings,
+    submitting: goodThingsSubmitting,
+    fetchTodayItems,
+  } = useGoodThings();
+  const [isGoodThingsModalOpen, setIsGoodThingsModalOpen] = useState(false);
 
   // 通知タブにフォーカスした時に再フェッチ
   useEffect(() => {
@@ -26,6 +38,13 @@ function TabsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
       refetch();
     }
   }, [pathname, refetch]);
+
+  // ルート画面にフォーカスした時に良かったリストを再取得
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchTodayItems();
+    }
+  }, [pathname, isLoggedIn, fetchTodayItems]);
 
   // 各タブのルート画面かどうかを判定
   const isRootScreen =
@@ -109,17 +128,43 @@ function TabsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
       />
       </Tabs>
 
-      {/* 投稿ボタン（FAB）- 各タブのルート画面のみ表示 */}
+      {/* フローティングボタン（FAB）- 各タブのルート画面のみ表示 */}
       {isLoggedIn && isRootScreen && (
-        <Button
-          className="absolute right-5 bottom-28 rounded-full shadow-lg h-16 w-16 bg-primary-400"
-          variant="solid"
-          size="md"
-          onPress={() => router.push('/create-post')}
-        >
-          <ButtonIcon as={AddIcon} size="xl" className="text-white w-6 h-6" />
-        </Button>
+        <VStack space="md" className="absolute right-5 bottom-28">
+          {/* 良かったリストボタン */}
+          <Button
+            className={`rounded-full shadow-lg h-16 w-16 ${hasRecordedToday ? 'bg-background-300' : 'bg-secondary-400'}`}
+            variant="solid"
+            size="md"
+            disabled={hasRecordedToday}
+            onPress={() => setIsGoodThingsModalOpen(true)}
+          >
+            <ButtonIcon
+              as={ListCheck}
+              size="xl"
+              className={`w-6 h-6 ${hasRecordedToday ? 'text-typography-500' : 'text-white'}`}
+            />
+          </Button>
+          {/* 投稿ボタン */}
+          <Button
+            className="rounded-full shadow-lg h-16 w-16 bg-primary-400"
+            variant="solid"
+            size="md"
+            onPress={() => router.push('/create-post')}
+          >
+            <ButtonIcon as={AddIcon} size="xl" className="text-white w-6 h-6" />
+          </Button>
+        </VStack>
       )}
+
+      {/* いいことリストモーダル */}
+      <GoodThingsModal
+        visible={isGoodThingsModalOpen}
+        onClose={() => setIsGoodThingsModalOpen(false)}
+        onSubmit={submitGoodThings}
+        submitting={goodThingsSubmitting}
+        todayItems={todayItems}
+      />
     </View>
   );
 }

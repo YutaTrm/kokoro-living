@@ -1,11 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useNavigation, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { List, ListCheck } from 'lucide-react-native';
+import { List } from 'lucide-react-native';
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { Alert, FlatList, Pressable, RefreshControl } from 'react-native';
 
-import { GoodThingsModal } from '@/components/GoodThingsModal';
 import CreateListModal from '@/components/home/CreateListModal';
 import EditListModal from '@/components/home/EditListModal';
 import HomeDrawer from '@/components/home/HomeDrawer';
@@ -17,7 +16,6 @@ import { Icon } from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
-import { useGoodThings } from '@/src/hooks/useGoodThings';
 import { MOOD_EMOJIS, MOOD_LABELS, useMoodCheckin } from '@/src/hooks/useMoodCheckin';
 import { supabase } from '@/src/lib/supabase';
 import { fetchPostMetadata, fetchPostTags } from '@/src/utils/postUtils';
@@ -75,9 +73,6 @@ export default function TabOneScreen() {
   const [isMoodModalOpen, setIsMoodModalOpen] = useState(false);
   const [isMoodCardExpanded, setIsMoodCardExpanded] = useState(false);
 
-  // いいことリスト機能
-  const { todayItems, submitting: goodThingsSubmitting, submitGoodThings, hasRecordedToday, fetchTodayItems } = useGoodThings();
-  const [isGoodThingsModalOpen, setIsGoodThingsModalOpen] = useState(false);
 
   // ヘッダーにドロワーアイコンを設定
   useLayoutEffect(() => {
@@ -156,12 +151,11 @@ export default function TabOneScreen() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // 画面にフォーカスが当たった時にタイムラインと良かったリストを再読み込み
+  // 画面にフォーカスが当たった時にタイムラインを再読み込み
   useFocusEffect(
     useCallback(() => {
       loadPosts(true);
-      fetchTodayItems();
-    }, [selectedListId, fetchTodayItems])
+    }, [selectedListId])
   );
 
   const checkLoginStatus = async () => {
@@ -620,37 +614,6 @@ export default function TabOneScreen() {
         </Pressable>
       )}
 
-      {/* フローティングボタン（ログイン時のみ表示） */}
-      {isLoggedIn && (
-        <HStack space="md" className="absolute right-5 bottom-5">
-          {/* 良かったリストボタン */}
-          <Button
-            className={`rounded-full shadow-lg h-16 w-16 ${hasRecordedToday ? 'bg-background-300' : 'bg-secondary-400'}`}
-            variant="solid"
-            action="secondary"
-            size="md"
-            disabled={hasRecordedToday}
-            onPress={() => setIsGoodThingsModalOpen(true)}
-          >
-            <ButtonIcon
-              as={ListCheck}
-              size="xl"
-              className={`w-6 h-6 ${hasRecordedToday ? 'text-typography-500' : 'text-white'}`}
-            />
-          </Button>
-          {/* 投稿ボタン */}
-          <Button
-            className="rounded-full shadow-lg h-16 w-16"
-            variant="solid"
-            action="primary"
-            size="md"
-            onPress={() => router.push('/create-post')}
-          >
-            <ButtonIcon as={AddIcon} size="xl" className="text-white w-6 h-6" />
-          </Button>
-        </HStack>
-      )}
-
       {/* ホームドロワー */}
       <HomeDrawer
         isOpen={isDrawerOpen}
@@ -682,15 +645,6 @@ export default function TabOneScreen() {
         onClose={() => setIsMoodModalOpen(false)}
         onSubmit={handleMoodSubmit}
         submitting={submitting}
-      />
-
-      {/* いいことリストモーダル */}
-      <GoodThingsModal
-        visible={isGoodThingsModalOpen}
-        onClose={() => setIsGoodThingsModalOpen(false)}
-        onSubmit={submitGoodThings}
-        submitting={goodThingsSubmitting}
-        todayItems={todayItems}
       />
     </Box>
   );
