@@ -440,36 +440,65 @@ export const useMedicalRecords = (currentUserId: string | null) => {
       }
 
       if (selectModalType === 'medication') {
-        // 服薬の特別処理
-        for (const id of newIds) {
-          let ingredientId: string;
-          let productId: string | null = null;
+        // 服薬の特別処理（バッチ処理でN+1問題を回避）
+        const ingredientIds = newIds
+          .filter(id => id.startsWith('ingredient-'))
+          .map(id => id.replace('ingredient-', ''));
 
-          if (id.startsWith('ingredient-')) {
-            ingredientId = id.replace('ingredient-', '');
-          } else if (id.startsWith('product-')) {
-            const actualProductId = id.replace('product-', '');
-            const { data: productData } = await supabase
-              .from('products')
-              .select('ingredient_id')
-              .eq('id', actualProductId)
-              .single();
+        const productIdStrings = newIds
+          .filter(id => id.startsWith('product-'))
+          .map(id => id.replace('product-', ''));
 
-            if (!productData) continue;
-            ingredientId = productData.ingredient_id;
-            productId = actualProductId;
-          } else {
-            continue;
+        // product_idからingredient_idを一括取得
+        let productMap = new Map<string, string>();
+        if (productIdStrings.length > 0) {
+          const { data: productDataList } = await supabase
+            .from('products')
+            .select('id, ingredient_id')
+            .in('id', productIdStrings);
+
+          if (productDataList) {
+            productMap = new Map(productDataList.map(p => [p.id, p.ingredient_id]));
           }
+        }
 
-          const { error } = await supabase.from('user_medications').insert({
+        // バッチINSERT用のデータを準備
+        const insertData: Array<{
+          user_id: string;
+          ingredient_id: string;
+          product_id: string | null;
+          start_date: null;
+          end_date: null;
+        }> = [];
+
+        // ingredient-で始まるIDを追加
+        for (const ingredientId of ingredientIds) {
+          insertData.push({
             user_id: user.id,
             ingredient_id: ingredientId,
-            product_id: productId,
+            product_id: null,
             start_date: null,
             end_date: null,
           });
+        }
 
+        // product-で始まるIDを追加
+        for (const productId of productIdStrings) {
+          const ingredientId = productMap.get(productId);
+          if (ingredientId) {
+            insertData.push({
+              user_id: user.id,
+              ingredient_id: ingredientId,
+              product_id: productId,
+              start_date: null,
+              end_date: null,
+            });
+          }
+        }
+
+        // 一度にバッチINSERT
+        if (insertData.length > 0) {
+          const { error } = await supabase.from('user_medications').insert(insertData);
           if (error) {
             console.error('服薬保存エラー:', error);
           }
@@ -493,14 +522,16 @@ export const useMedicalRecords = (currentUserId: string | null) => {
             break;
         }
 
-        for (const id of newIds) {
-          const { error } = await supabase.from(tableName).insert({
-            user_id: user.id,
-            [idColumn]: id,
-            start_date: null,
-            end_date: null,
-          });
+        // バッチINSERT用のデータを準備（N+1問題を回避）
+        const insertData = newIds.map(id => ({
+          user_id: user.id,
+          [idColumn]: id,
+          start_date: null,
+          end_date: null,
+        }));
 
+        if (insertData.length > 0) {
+          const { error } = await supabase.from(tableName).insert(insertData);
           if (error) {
             console.error(`${tableName}保存エラー:`, error);
           }
