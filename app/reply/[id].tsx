@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, ScrollView, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -23,13 +23,15 @@ interface ParentPost {
 export default function ReplyScreen() {
   const router = useRouter();
   const { id: parentPostId } = useLocalSearchParams<{ id: string }>();
-  const [content, setContent] = useState('');
+  const contentRef = useRef('');
+  const inputRef = useRef<TextInput>(null);
+  const [contentLength, setContentLength] = useState(0);
   const [loading, setLoading] = useState(false);
   const [parentPost, setParentPost] = useState<ParentPost | null>(null);
   const [loadingParent, setLoadingParent] = useState(true);
 
   const maxLength = 140;
-  const remainingChars = maxLength - content.length;
+  const remainingChars = maxLength - contentLength;
 
   useEffect(() => {
     if (parentPostId) {
@@ -74,6 +76,7 @@ export default function ReplyScreen() {
   };
 
   const handlePost = async () => {
+    const content = contentRef.current;
     if (!content.trim()) {
       Alert.alert('エラー', '返信内容を入力してください');
       return;
@@ -131,7 +134,7 @@ export default function ReplyScreen() {
         </Button>
         <Button
           onPress={handlePost}
-          disabled={loading || !content.trim()}
+          disabled={loading || contentLength === 0}
           size="sm"
         >
           <ButtonText>{loading ? '返信中...' : '返信'}</ButtonText>
@@ -159,13 +162,17 @@ export default function ReplyScreen() {
           {/* テキスト入力 */}
           <Box>
             <TextInput
+              ref={inputRef}
               className="min-h-[120px] text-lg text-typography-600"
               placeholder="返信を入力"
               placeholderTextColor="#999"
               multiline
               textAlignVertical="top"
-              value={content}
-              onChangeText={setContent}
+              defaultValue=""
+              onChangeText={(text) => {
+                contentRef.current = text;
+                setContentLength(text.length);
+              }}
               maxLength={maxLength}
               autoFocus
             />

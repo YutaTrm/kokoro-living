@@ -1,6 +1,6 @@
 import { useNavigation } from 'expo-router';
 import { useLayoutEffect } from 'react';
-import { FlatList } from 'react-native';
+import { FlatList, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import PostItem from '@/components/PostItem';
@@ -22,7 +22,7 @@ export default function LikesScreen() {
 
   if (loadingLikes) {
     return (
-      <SafeAreaView className="flex-1 bg-background-0" edges={['bottom']}>
+      <SafeAreaView className="flex-1 bg-background-0" edges={Platform.OS === 'ios' ? ['bottom'] : []}>
         <Box className="flex-1 items-center justify-center">
           <Spinner size="large" />
         </Box>
@@ -31,7 +31,7 @@ export default function LikesScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-background-0" edges={['bottom']}>
+    <SafeAreaView className="flex-1 bg-background-0" edges={Platform.OS === 'ios' ? ['bottom'] : []}>
       <FlatList
         data={likedPosts}
         renderItem={({ item }) => <PostItem post={item} />}

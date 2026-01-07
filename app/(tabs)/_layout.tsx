@@ -1,7 +1,9 @@
-import { Tabs, usePathname } from 'expo-router';
+import { Tabs, usePathname, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
+import { View } from 'react-native';
 
-import { Icon } from '@/components/ui/icon';
+import { Button, ButtonIcon } from '@/components/ui/button';
+import { Icon, AddIcon } from '@/components/ui/icon';
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
 import { NotificationProvider, useNotificationContext } from '@/src/contexts/NotificationContext';
 import { supabase } from '@/src/lib/supabase';
@@ -13,9 +15,10 @@ import {
   User,
 } from 'lucide-react-native';
 
-function TabsContent() {
+function TabsContent({ isLoggedIn }: { isLoggedIn: boolean }) {
   const { unreadCount, refetch } = useNotificationContext();
   const pathname = usePathname();
+  const router = useRouter();
 
   // 通知タブにフォーカスした時に再フェッチ
   useEffect(() => {
@@ -24,8 +27,17 @@ function TabsContent() {
     }
   }, [pathname, refetch]);
 
+  // 各タブのルート画面かどうかを判定
+  const isRootScreen =
+    pathname === '/' ||
+    pathname === '/index' ||
+    pathname === '/search' ||
+    pathname === '/notifications' ||
+    pathname === '/profile';
+
   return (
-    <Tabs
+    <View className="flex-1">
+      <Tabs
       screenOptions={{
         tabBarShowLabel: false,
         // Disable the static render of the header on web
@@ -95,7 +107,20 @@ function TabsContent() {
           ),
         }}
       />
-    </Tabs>
+      </Tabs>
+
+      {/* 投稿ボタン（FAB）- 各タブのルート画面のみ表示 */}
+      {isLoggedIn && isRootScreen && (
+        <Button
+          className="absolute right-5 bottom-28 rounded-full shadow-lg h-16 w-16 bg-primary-400"
+          variant="solid"
+          size="md"
+          onPress={() => router.push('/create-post')}
+        >
+          <ButtonIcon as={AddIcon} size="xl" className="text-white w-6 h-6" />
+        </Button>
+      )}
+    </View>
   );
 }
 
@@ -116,7 +141,7 @@ export default function TabLayout() {
 
   return (
     <NotificationProvider userId={userId}>
-      <TabsContent />
+      <TabsContent isLoggedIn={!!userId} />
     </NotificationProvider>
   );
 }

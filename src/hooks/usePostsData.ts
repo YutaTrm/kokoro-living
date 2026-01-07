@@ -288,7 +288,7 @@ export const usePostsData = () => {
 
       const { data: likesData, error: likesError } = await supabase
         .from('likes')
-        .select('post_id, posts!inner(id, content, created_at, user_id, experienced_at)')
+        .select('post_id, posts!inner(id, content, created_at, user_id, experienced_at, parent_post_id)')
         .eq('user_id', user.id)
         .eq('posts.is_hidden', false)
         .order('created_at', { ascending: false });
@@ -316,7 +316,13 @@ export const usePostsData = () => {
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const postIds = likesData.map((like: any) => like.posts.id);
-      const tagsMap = await fetchTagsForPosts(postIds);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const parentPostIds = [...new Set(likesData.map((like: any) => like.posts.parent_post_id).filter((pid: string | null): pid is string => pid !== null))];
+
+      const [tagsMap, parentInfoMap] = await Promise.all([
+        fetchTagsForPosts(postIds),
+        fetchParentPostInfo(parentPostIds),
+      ]);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const formattedPosts: Post[] = likesData.map((like: any) => {
@@ -326,12 +332,16 @@ export const usePostsData = () => {
           medications: [],
           statuses: [],
         };
+        const parentInfo = like.posts.parent_post_id ? parentInfoMap.get(like.posts.parent_post_id) : undefined;
         return {
           id: like.posts.id,
           content: like.posts.content,
           created_at: like.posts.created_at,
           experienced_at: like.posts.experienced_at,
-          is_hidden: false, // いいね一覧では非表示投稿は除外されている
+          is_hidden: false,
+          parent_post_id: like.posts.parent_post_id,
+          parentContent: parentInfo?.content,
+          parentAvatarUrl: parentInfo?.avatarUrl,
           user: {
             display_name: usersMap.get(like.posts.user_id)?.display_name || 'Unknown',
             user_id: like.posts.user_id,
@@ -341,6 +351,7 @@ export const usePostsData = () => {
           treatments: tags.treatments,
           medications: tags.medications,
           statuses: tags.statuses,
+          isLikedByCurrentUser: true,
         };
       });
 

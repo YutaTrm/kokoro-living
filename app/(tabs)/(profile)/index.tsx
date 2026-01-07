@@ -94,10 +94,13 @@ export default function ProfileScreen() {
   const {
     userPosts,
     userReplies,
+    likedPosts,
     loadingPosts,
     loadingReplies,
+    loadingLikes,
     loadUserPosts,
     loadUserReplies,
+    loadLikedPosts,
   } = usePostsData();
 
   // Initial load
@@ -129,6 +132,8 @@ export default function ProfileScreen() {
       loadUserPosts();
     } else if (activeTab === 'replies') {
       loadUserReplies();
+    } else if (activeTab === 'likes') {
+      loadLikedPosts();
     } else if (activeTab === 'ai-reflection') {
       aiReflection.loadAiReflections(true);
     }
@@ -314,6 +319,8 @@ export default function ProfileScreen() {
         return userPosts;
       case 'replies':
         return userReplies;
+      case 'likes':
+        return likedPosts;
       case 'ai-reflection':
         return aiReflection.aiReflections;
       default:
@@ -327,6 +334,7 @@ export default function ProfileScreen() {
     const isLoading =
       (activeTab === 'posts' && loadingPosts) ||
       (activeTab === 'replies' && loadingReplies) ||
+      (activeTab === 'likes' && loadingLikes) ||
       (activeTab === 'ai-reflection' && aiReflection.loadingReflections);
 
     if (isLoading) {
@@ -340,6 +348,7 @@ export default function ProfileScreen() {
     const messages = {
       posts: 'まだ投稿がありません',
       replies: 'まだ返信がありません',
+      likes: 'まだいいねがありません',
       'ai-reflection': 'まだ振り返りがありません',
     };
 
@@ -493,7 +502,7 @@ export default function ProfileScreen() {
                     size="md"
                     action="positive"
                   >
-                    <ButtonText>{product.title} {product.displayPrice}</ButtonText>
+                    <ButtonText>{product.title.replace(/\s*[\(（].*[\)）]$/, '')} {product.displayPrice}</ButtonText>
                   </Button>
                 ))}
                 <Button

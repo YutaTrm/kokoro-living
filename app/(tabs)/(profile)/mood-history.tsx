@@ -1,7 +1,7 @@
 import { useNavigation, useRouter } from 'expo-router';
 import { useColorScheme } from 'nativewind';
 import { useEffect, useLayoutEffect, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { Platform, ScrollView, View } from 'react-native';
 import { Calendar, DateData, LocaleConfig } from 'react-native-calendars';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -222,7 +222,7 @@ export default function MoodHistoryScreen() {
     : false;
 
   return (
-    <SafeAreaView className="flex-1 bg-background-0" edges={['bottom']}>
+    <SafeAreaView className="flex-1 bg-background-0" edges={Platform.OS === 'ios' ? ['bottom'] : []}>
       <ScrollView className="flex-1">
         <VStack className="p-4" space="xl">
           {/* ローディング */}

@@ -88,13 +88,17 @@ export default function UserDetailScreen() {
   const [statuses, setStatuses] = useState<MedicalRecord[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [replies, setReplies] = useState<Post[]>([]);
+  const [likedPosts, setLikedPosts] = useState<Post[]>([]);
   const [loadingMedical, setLoadingMedical] = useState(true);
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [loadingReplies, setLoadingReplies] = useState(false);
+  const [loadingLikes, setLoadingLikes] = useState(false);
   const [loadingMorePosts, setLoadingMorePosts] = useState(false);
   const [loadingMoreReplies, setLoadingMoreReplies] = useState(false);
+  const [loadingMoreLikes, setLoadingMoreLikes] = useState(false);
   const [hasMorePosts, setHasMorePosts] = useState(true);
   const [hasMoreReplies, setHasMoreReplies] = useState(true);
+  const [hasMoreLikes, setHasMoreLikes] = useState(true);
 
   const POSTS_LIMIT = 20;
 
@@ -111,6 +115,8 @@ export default function UserDetailScreen() {
       loadUserPosts();
     } else if (activeTab === 'replies' && replies.length === 0) {
       loadUserReplies();
+    } else if (activeTab === 'likes' && likedPosts.length === 0) {
+      loadUserLikedPosts();
     }
   }, [id, activeTab]);
 
@@ -430,11 +436,112 @@ export default function UserDetailScreen() {
     }
   };
 
+  const loadUserLikedPosts = async (loadMore = false) => {
+    if (loadMore) {
+      setLoadingMoreLikes(true);
+    } else {
+      setLoadingLikes(true);
+    }
+    try {
+      const currentOffset = loadMore ? likedPosts.length : 0;
+      const { data: likesData, error: likesError } = await supabase
+        .from('likes')
+        .select('post_id, posts!inner(id, content, created_at, user_id, experienced_at, parent_post_id)')
+        .eq('user_id', id)
+        .eq('posts.is_hidden', false)
+        .order('created_at', { ascending: false })
+        .range(currentOffset, currentOffset + POSTS_LIMIT - 1);
+
+      if (likesError) throw likesError;
+
+      if (!likesData || likesData.length === 0) {
+        if (!loadMore) setLikedPosts([]);
+        setHasMoreLikes(false);
+        return;
+      }
+
+      setHasMoreLikes(likesData.length === POSTS_LIMIT);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const postUserIds = [...new Set(likesData.map((like: any) => like.posts.user_id))];
+      const { data: usersData } = await supabase
+        .from('users')
+        .select('user_id, display_name, avatar_url')
+        .in('user_id', postUserIds);
+
+      const usersMap = new Map(
+        (usersData || []).map((u) => [
+          u.user_id,
+          { display_name: u.display_name, avatar_url: u.avatar_url },
+        ])
+      );
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const postIds = likesData.map((like: any) => like.posts.id);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const parentPostIds = [...new Set(likesData.map((like: any) => like.posts.parent_post_id).filter((pid: string | null): pid is string => pid !== null))];
+
+      const [tagsResult, metadataResult, parentInfoMap] = await Promise.all([
+        fetchPostTags(postIds),
+        fetchPostMetadata(postIds, currentUserId),
+        fetchParentPostInfo(parentPostIds),
+      ]);
+
+      const { diagnosesMap, treatmentsMap, medicationsMap, statusesMap } = tagsResult;
+      const { repliesMap, likesMap, myLikesMap, myRepliesMap } = metadataResult;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const formattedPosts: Post[] = likesData.map((like: any) => {
+        const parentInfo = like.posts.parent_post_id ? parentInfoMap.get(like.posts.parent_post_id) : undefined;
+        return {
+          id: like.posts.id,
+          content: like.posts.content,
+          created_at: like.posts.created_at,
+          experienced_at: like.posts.experienced_at,
+          is_hidden: false,
+          parent_post_id: like.posts.parent_post_id,
+          parentContent: parentInfo?.content,
+          parentAvatarUrl: parentInfo?.avatarUrl,
+          user: {
+            display_name: usersMap.get(like.posts.user_id)?.display_name || 'Unknown',
+            user_id: like.posts.user_id,
+            avatar_url: usersMap.get(like.posts.user_id)?.avatar_url || null,
+          },
+          diagnoses: diagnosesMap.get(like.posts.id) || [],
+          treatments: treatmentsMap.get(like.posts.id) || [],
+          medications: medicationsMap.get(like.posts.id) || [],
+          statuses: statusesMap.get(like.posts.id) || [],
+          repliesCount: repliesMap.get(like.posts.id) || 0,
+          likesCount: likesMap.get(like.posts.id) || 0,
+          isLikedByCurrentUser: myLikesMap.get(like.posts.id) || false,
+          hasRepliedByCurrentUser: myRepliesMap.get(like.posts.id) || false,
+        };
+      });
+
+      if (loadMore) {
+        setLikedPosts((prev) => {
+          const existingIds = new Set(prev.map((p) => p.id));
+          const newPosts = formattedPosts.filter((p) => !existingIds.has(p.id));
+          return [...prev, ...newPosts];
+        });
+      } else {
+        setLikedPosts(formattedPosts);
+      }
+    } catch (error) {
+      console.error('いいね取得エラー:', error);
+    } finally {
+      setLoadingLikes(false);
+      setLoadingMoreLikes(false);
+    }
+  };
+
   const handleLoadMore = () => {
     if (activeTab === 'posts' && hasMorePosts && !loadingMorePosts) {
       loadUserPosts(true);
     } else if (activeTab === 'replies' && hasMoreReplies && !loadingMoreReplies) {
       loadUserReplies(true);
+    } else if (activeTab === 'likes' && hasMoreLikes && !loadingMoreLikes) {
+      loadUserLikedPosts(true);
     }
   };
 
@@ -561,6 +668,7 @@ export default function UserDetailScreen() {
     const isLoading =
       activeTab === 'posts' ? loadingPosts :
       activeTab === 'replies' ? loadingReplies :
+      activeTab === 'likes' ? loadingLikes :
       false;
 
     if (isLoading) {
@@ -574,6 +682,7 @@ export default function UserDetailScreen() {
     const message =
       activeTab === 'posts' ? 'まだ投稿がありません' :
       activeTab === 'replies' ? 'まだ返信がありません' :
+      activeTab === 'likes' ? 'まだいいねがありません' :
       '';
 
     return (
@@ -587,6 +696,7 @@ export default function UserDetailScreen() {
     if (activeTab === 'profile') return [];
     if (activeTab === 'posts') return posts;
     if (activeTab === 'replies') return replies;
+    if (activeTab === 'likes') return likedPosts;
     return [];
   };
 
@@ -651,7 +761,7 @@ export default function UserDetailScreen() {
           ListHeaderComponent={renderHeader}
           ListEmptyComponent={renderEmptyContent}
           ListFooterComponent={
-            (loadingMorePosts || loadingMoreReplies) ? (
+            (loadingMorePosts || loadingMoreReplies || loadingMoreLikes) && !(loadingPosts || loadingReplies || loadingLikes) ? (
               <Box className="py-4 items-center">
                 <Spinner size="small" />
               </Box>

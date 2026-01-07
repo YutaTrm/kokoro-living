@@ -135,8 +135,8 @@ export default function ProfileHeader({
           </Box>
         </Box>
         <VStack className="flex-1 justify-center" space="xs">
-          <HStack className="items-center" space="xs">
-            <Heading size="xl" className="text-primary-500">
+          <HStack className="items-start" space="xs">
+            <Heading size="xl" className="text-primary-500 flex-1">
               {profile.userName || 'ユーザー'}
             </Heading>
             <TouchableOpacity onPress={onEditName} className="p-1">

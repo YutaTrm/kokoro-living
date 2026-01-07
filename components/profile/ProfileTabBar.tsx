@@ -3,7 +3,7 @@ import { ScrollView } from 'react-native';
 import { Button, ButtonText } from '@/components/ui/button';
 import { HStack } from '@/components/ui/hstack';
 
-type TabType = 'profile' | 'posts' | 'replies' | 'ai-reflection';
+type TabType = 'profile' | 'posts' | 'replies' | 'likes' | 'ai-reflection';
 
 interface ProfileTabBarProps {
   activeTab: TabType;
@@ -20,6 +20,7 @@ export default function ProfileTabBar({
     { key: 'profile', label: 'プロフィール' },
     { key: 'posts', label: '投稿' },
     { key: 'replies', label: '返信' },
+    { key: 'likes', label: 'いいね' },
     { key: 'ai-reflection', label: 'AI振り返り' },
   ];
 

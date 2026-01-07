@@ -1,6 +1,5 @@
 import { Sparkles, TicketPlus } from 'lucide-react-native';
-import { Image, Platform } from 'react-native';
-import { Product } from 'react-native-iap';
+import { Image } from 'react-native';
 
 import { Box } from '@/components/ui/box';
 import { Button, ButtonIcon, ButtonSpinner, ButtonText } from '@/components/ui/button';
@@ -94,34 +93,32 @@ export const AIReflectionTab = ({
         {!loadingTicketInfo && (
           <VStack space="sm">
             <HStack space="sm">
-              {/* チケット追加ボタン（iOSのみ） */}
-              {Platform.OS === 'ios' && (
-                <Button
-                  onPress={onPurchaseTicket}
-                  isDisabled={purchasing}
-                  size="lg"
-                  variant="outline"
-                  className="flex-1"
-                >
-                  {purchasing ? (
-                    <>
-                      <ButtonSpinner />
-                      <ButtonText>購入中...</ButtonText>
-                    </>
-                  ) : (
-                    <>
-                      <ButtonIcon as={TicketPlus} />
-                      <ButtonText>チケットを購入</ButtonText>
-                    </>
-                  )}
-                </Button>
-              )}
+              {/* チケット追加ボタン */}
+              <Button
+                onPress={onPurchaseTicket}
+                isDisabled={purchasing}
+                size="lg"
+                variant="outline"
+                className="flex-1"
+              >
+                {purchasing ? (
+                  <>
+                    <ButtonSpinner />
+                    <ButtonText>購入中...</ButtonText>
+                  </>
+                ) : (
+                  <>
+                    <ButtonIcon as={TicketPlus} />
+                    <ButtonText>チケット購入</ButtonText>
+                  </>
+                )}
+              </Button>
               {/* AI振り返りを生成ボタン */}
               <Button
                 onPress={onGenerateReflection}
                 isDisabled={generating || (!hasFreeQuota && ticketCount === 0)}
                 size="lg"
-                className={Platform.OS === 'ios' ? 'flex-1' : 'w-full'}
+                className="flex-1"
               >
                 {generating ? (
                   <>
@@ -131,7 +128,7 @@ export const AIReflectionTab = ({
                 ) : (
                   <>
                     <ButtonIcon as={Sparkles} />
-                    <ButtonText>AI振り返りを生成</ButtonText>
+                    <ButtonText>AI振り返り生成</ButtonText>
                   </>
                 )}
               </Button>
