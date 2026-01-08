@@ -224,30 +224,39 @@ serve(async (req) => {
         }).join('\n')
       : 'なし';
 
-    // 医療情報テキストを作成（end_dateの有無で現在/過去を区別）
+    // 医療情報テキストを作成
+    // - start_dateとend_dateがある → 完了（寛解、服薬終了など）
+    // - start_dateのみ → 継続中
+    // - どちらもない → 経験あり
     const formatMedicalItems = (items: any[], nameKey: string, altNameKey?: string) => {
       if (!items || items.length === 0) return 'なし';
 
-      const current: string[] = [];
-      const past: string[] = [];
+      const completed: string[] = [];  // start_date + end_date あり
+      const ongoing: string[] = [];    // start_date のみ
+      const experienced: string[] = []; // どちらもなし
 
       items.forEach(item => {
         const name = (item as any)[nameKey]?.name || (altNameKey ? (item as any)[altNameKey]?.name : null);
         if (!name) return;
 
-        if (item.end_date) {
-          past.push(name);
+        if (item.start_date && item.end_date) {
+          completed.push(name);
+        } else if (item.start_date && !item.end_date) {
+          ongoing.push(name);
         } else {
-          current.push(name);
+          experienced.push(name);
         }
       });
 
       const parts: string[] = [];
-      if (current.length > 0) {
-        parts.push(`【現在】${current.join(', ')}`);
+      if (ongoing.length > 0) {
+        parts.push(`【継続中】${ongoing.join(', ')}`);
       }
-      if (past.length > 0) {
-        parts.push(`【過去】${past.join(', ')}`);
+      if (completed.length > 0) {
+        parts.push(`【完了】${completed.join(', ')}`);
+      }
+      if (experienced.length > 0) {
+        parts.push(`【経験あり】${experienced.join(', ')}`);
       }
 
       return parts.length > 0 ? parts.join(' / ') : 'なし';
@@ -282,7 +291,7 @@ ${userName}さん
 - 診断名: ${diagnosesText}
 - 服薬: ${medicationsText}
 - 治療: ${treatmentsText}
-※【現在】は現在進行中、【過去】は終了済みを示します
+※【継続中】は現在も続いているもの、【完了】は寛解・服薬終了・治療完了したもの、【経験あり】は時期は不明だが経験があるもの
 
 ${lastReflectionSection}【投稿・返信】
 ${postsText}
@@ -339,10 +348,10 @@ ${checkinsText}
 - 前回の振り返りがない場合（初回）は、この項目は無視する
 
 【医療情報への言及】
-- 【現在】と記載されている項目は現在進行中のもの。日々向き合っていることを労い、寄り添う
-- 【過去】と記載されている項目は終了済みのもの。乗り越えてきた経験として敬意を払う
-- 現在進行中の治療や服薬がある場合は、続けていることの大変さに共感する
-- 過去の診断や治療がある場合は、その経験を経て今があることを肯定的に捉える
+- 【継続中】：現在も向き合っている診断・服薬・治療。日々続けていることの大変さに共感し、労う
+- 【完了】：寛解した診断、終了した服薬、完了した治療。乗り越えてきたことへの敬意を払い、その経験が今の強さにつながっていると肯定する
+- 【経験あり】：時期は不明だが経験があるもの。その経験があることを踏まえて寄り添う
+- 医療情報は押し付けがましくなく、自然な形で振り返りに織り込む
 
 【投稿時間への言及】
 - 深夜（0時〜4時頃）の投稿が多い場合：眠れない夜があったのかな、と優しく気にかける。責めたり批判したりせず、そういう夜もあるよね、と共感する
