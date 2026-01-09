@@ -192,6 +192,7 @@ function RootLayoutNav() {
           <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
           <Stack.Screen name="create-post" options={{ presentation: 'modal', headerShown: false, gestureEnabled: false }} />
           <Stack.Screen name="reply/[id]" options={{ presentation: 'modal', headerShown: false, gestureEnabled: false }} />
+          <Stack.Screen name="quote/[id]" options={{ presentation: 'modal', headerShown: false, gestureEnabled: false }} />
         </Stack>
       </NavigationThemeProvider>
     </QueryClientProvider>

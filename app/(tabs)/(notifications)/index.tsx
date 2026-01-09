@@ -1,6 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { Heart, MessageCircle, UserRoundPlus } from 'lucide-react-native';
+import { Heart, MessageCircle, Quote, Repeat2, UserRoundPlus } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Pressable, RefreshControl } from 'react-native';
 
@@ -20,7 +20,7 @@ import { formatRelativeDate } from '@/src/utils/dateUtils';
 
 interface Notification {
   id: string;
-  type: 'like' | 'reply' | 'follow';
+  type: 'like' | 'reply' | 'follow' | 'repost' | 'quote';
   post_id: string | null;
   is_read: boolean;
   created_at: string;
@@ -286,6 +286,10 @@ export default function NotificationsScreen() {
         return 'があなたの投稿に返信しました';
       case 'follow':
         return 'があなたをフォローしました';
+      case 'repost':
+        return 'があなたの投稿をリポストしました';
+      case 'quote':
+        return 'があなたの投稿を引用しました';
       default:
         return '';
     }
@@ -299,6 +303,10 @@ export default function NotificationsScreen() {
         return <Icon as={MessageCircle} size="xl" className="text-typography-600" />;
       case 'follow':
         return <Icon as={UserRoundPlus} size="xl" className="text-info-600" />;
+      case 'repost':
+        return <Icon as={Repeat2} size="xl" className="text-success-500" />;
+      case 'quote':
+        return <Icon as={Quote} size="xl" className="text-primary-500" />;
       default:
         return null;
     }
@@ -349,8 +357,8 @@ export default function NotificationsScreen() {
             </VStack>
           )}
 
-          {/* いいね通知の場合：投稿内容のみ */}
-          {item.type === 'like' && item.post_content && (
+          {/* いいね・リポスト・引用リポスト通知の場合：投稿内容のみ */}
+          {(item.type === 'like' || item.type === 'repost' || item.type === 'quote') && item.post_content && (
             <Text
               className="text-base text-typography-500"
               numberOfLines={2}

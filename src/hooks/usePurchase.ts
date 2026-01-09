@@ -1,18 +1,37 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  initConnection,
-  endConnection,
-  fetchProducts,
-  requestPurchase,
-  purchaseUpdatedListener,
-  finishTransaction,
-  getAvailablePurchases,
-  clearTransactionIOS,
-  type Purchase,
-  type Product,
-} from 'react-native-iap';
 import { Alert, Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { supabase } from '@/src/lib/supabase';
+
+// Expo Goで実行中かどうかを判定
+const isExpoGo = Constants.appOwnership === 'expo';
+
+// Expo Go以外でのみreact-native-iapをインポート
+let iapModule: typeof import('react-native-iap') | null = null;
+if (!isExpoGo) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    iapModule = require('react-native-iap');
+  } catch (e) {
+    console.log('react-native-iap not available');
+  }
+}
+
+type Product = {
+  productId: string;
+  title: string;
+  description: string;
+  price: string;
+  localizedPrice: string;
+  currency: string;
+};
+
+type Purchase = {
+  productId: string;
+  transactionId?: string;
+  transactionReceipt?: string;
+  purchaseToken?: string;
+};
 
 // 商品ID
 const PRODUCT_IDS = Platform.select({

@@ -1,8 +1,10 @@
 import { Href, useRouter, useSegments } from 'expo-router';
-import { CalendarDays, Clock, Flag, Heart, MessageCircle } from 'lucide-react-native';
+import { CalendarDays, Clock, Flag, Heart, MessageCircle, Repeat2 } from 'lucide-react-native';
+import { useState } from 'react';
 import { Pressable, ScrollView } from 'react-native';
 
 import DefaultAvatar from '@/components/icons/DefaultAvatar';
+import QuotedPostCard from '@/components/QuotedPostCard';
 import ReplyIndicator from '@/components/ReplyIndicator';
 import Tag from '@/components/Tag';
 import { Avatar, AvatarImage } from '@/components/ui/avatar';
@@ -15,6 +17,17 @@ import { useCurrentUser } from '@/src/hooks/useCurrentUser';
 import { formatExperiencedAt, formatRelativeDate } from '@/src/utils/dateUtils';
 import { getCurrentTab } from '@/src/utils/getCurrentTab';
 
+interface QuotedPost {
+  id: string;
+  content: string;
+  created_at: string;
+  is_hidden?: boolean;
+  user: {
+    display_name: string;
+    avatar_url?: string | null;
+  };
+}
+
 interface PostItemProps {
   post: {
     id: string;
@@ -24,6 +37,8 @@ interface PostItemProps {
     parent_post_id?: string | null;
     parentContent?: string;
     parentAvatarUrl?: string | null;
+    quoted_post_id?: string | null;
+    quotedPost?: QuotedPost | null;
     is_hidden?: boolean;
     user: {
       display_name: string;
@@ -37,8 +52,15 @@ interface PostItemProps {
     isMuted?: boolean;
     repliesCount?: number;
     likesCount?: number;
+    repostsCount?: number;
     isLikedByCurrentUser?: boolean;
+    isRepostedByCurrentUser?: boolean;
     hasRepliedByCurrentUser?: boolean;
+    repostedBy?: {
+      user_id: string;
+      display_name: string;
+      avatar_url?: string | null;
+    } | null;
   };
   disableAvatarTap?: boolean;
 }
@@ -68,6 +90,22 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
     }
   };
 
+  const handleQuotedPostPress = () => {
+    if (post.quoted_post_id) {
+      const currentTab = getCurrentTab(segments);
+      router.push(`/(tabs)/${currentTab}/post/${post.quoted_post_id}` as Href);
+    }
+  };
+
+  const handleRepostedByPress = (e: { stopPropagation: () => void }) => {
+    if (post.repostedBy) {
+      e.stopPropagation();
+      const currentTab = getCurrentTab(segments);
+      router.push(`/(tabs)/${currentTab}/user/${post.repostedBy.user_id}` as Href);
+    }
+  };
+
+  const [repostAvatarError, setRepostAvatarError] = useState(false);
   const displayName = post.isMuted ? 'ミュートユーザー' : post.user.display_name;
   const hasAvatar = !post.isMuted && post.user.avatar_url;
 
@@ -94,6 +132,28 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
   return (
     <Pressable onPress={handlePress}>
       <Box className="border-b border-outline-200 px-4 py-3">
+        {/* リポストインジケーター */}
+        {post.repostedBy && (
+          <Pressable onPress={handleRepostedByPress}>
+            <HStack space="xs" className="items-center mb-1 ml-12">
+              <Icon as={Repeat2} size="sm" className="text-typography-600" />
+              <Avatar size="xs">
+                {post.repostedBy.avatar_url && !repostAvatarError ? (
+                  <AvatarImage
+                    source={{ uri: post.repostedBy.avatar_url }}
+                    onError={() => setRepostAvatarError(true)}
+                  />
+                ) : (
+                  <DefaultAvatar size="xs" />
+                )}
+              </Avatar>
+              <Text className="text-sm text-typography-500">
+                {post.repostedBy.display_name}さんがリポスト
+              </Text>
+            </HStack>
+          </Pressable>
+        )}
+
         <HStack space="sm" className="items-start">
           {/* アバター */}
           {AvatarComponent}
@@ -145,6 +205,16 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
               {post.content}
             </Text>
 
+            {/* 引用リポストカード */}
+            {post.quoted_post_id && post.quotedPost && (
+              <Box className="mt-2">
+                <QuotedPostCard
+                  post={post.quotedPost}
+                  onPress={handleQuotedPostPress}
+                />
+              </Box>
+            )}
+
             {/* 体験日・投稿時間とアクションボタン（横並び） */}
             <HStack className="items-center justify-between">
               {/* 体験日・投稿時間（左側） */}
@@ -173,6 +243,20 @@ export default function PostItem({ post, disableAvatarTap = false }: PostItemPro
                   {(post.repliesCount ?? 0) > 0 && (
                     <Text className={`text-sm ${post.hasRepliedByCurrentUser ? "text-primary-500" : "text-typography-500"}`}>
                       {post.repliesCount}
+                    </Text>
+                  )}
+                </HStack>
+
+                {/* リポスト数 */}
+                <HStack space="xs" className="items-center">
+                  <Icon
+                    as={Repeat2}
+                    size="sm"
+                    className={post.isRepostedByCurrentUser ? "text-success-500" : "text-typography-500"}
+                  />
+                  {(post.repostsCount ?? 0) > 0 && (
+                    <Text className={`text-sm ${post.isRepostedByCurrentUser ? "text-success-500" : "text-typography-500"}`}>
+                      {post.repostsCount}
                     </Text>
                   )}
                 </HStack>
