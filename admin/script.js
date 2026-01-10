@@ -14,6 +14,7 @@ let postsPage = 1;
 let usersPage = 1;
 let checkinsPage = 1;
 let reflectionsPage = 1;
+let likesPage = 1;
 
 // ページ読み込み時の処理
 window.addEventListener('DOMContentLoaded', async () => {
@@ -126,6 +127,9 @@ function showTab(tabName) {
     } else if (tabName === 'reflections') {
         document.getElementById('reflectionsTab').classList.remove('hidden');
         loadReflections();
+    } else if (tabName === 'likes') {
+        document.getElementById('likesTab').classList.remove('hidden');
+        loadLikes();
     }
 }
 
@@ -677,18 +681,24 @@ function getReasonColor(reason) {
 // ページング情報を更新
 function updatePagination(type, currentPage, totalCount) {
     const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+    const pageText = `ページ ${currentPage} / ${totalPages} (全${totalCount}件)`;
 
-    // ページ情報の表示を更新
-    document.getElementById(`${type}PageInfo`).textContent =
-        `ページ ${currentPage} / ${totalPages} (全${totalCount}件)`;
+    // ページ情報の表示を更新（上部・下部両方）
+    document.getElementById(`${type}PageInfo`).textContent = pageText;
+    const pageInfoTop = document.getElementById(`${type}PageInfoTop`);
+    if (pageInfoTop) pageInfoTop.textContent = pageText;
 
-    // 前へボタンの有効/無効
+    // 前へボタンの有効/無効（上部・下部両方）
     const prevButton = document.getElementById(`${type}Prev`);
     prevButton.disabled = currentPage === 1;
+    const prevButtonTop = document.getElementById(`${type}PrevTop`);
+    if (prevButtonTop) prevButtonTop.disabled = currentPage === 1;
 
-    // 次へボタンの有効/無効
+    // 次へボタンの有効/無効（上部・下部両方）
     const nextButton = document.getElementById(`${type}Next`);
     nextButton.disabled = currentPage >= totalPages || totalCount === 0;
+    const nextButtonTop = document.getElementById(`${type}NextTop`);
+    if (nextButtonTop) nextButtonTop.disabled = currentPage >= totalPages || totalCount === 0;
 }
 
 // 通報一覧のページング
@@ -1032,6 +1042,135 @@ function nextReflectionsPage() {
     loadReflections();
 }
 
+// いいね一覧読み込み
+async function loadLikes() {
+    const container = document.getElementById('likesList');
+    container.innerHTML = '<div class="text-center py-8 text-gray-500">読み込み中...</div>';
+
+    try {
+        const start = (likesPage - 1) * PAGE_SIZE;
+        const end = start + PAGE_SIZE - 1;
+
+        // いいねデータを取得
+        const { data: likes, error: likesError, count } = await supabaseAdmin
+            .from('likes')
+            .select('*', { count: 'exact' })
+            .order('created_at', { ascending: false })
+            .range(start, end);
+
+        if (likesError) throw likesError;
+
+        // ページング情報を更新
+        updatePagination('likes', likesPage, count);
+
+        if (likes.length === 0) {
+            container.innerHTML = '<div class="text-center py-8 text-gray-500">いいねはありません</div>';
+            return;
+        }
+
+        // ユーザー情報を取得（いいねしたユーザー）
+        const userIds = [...new Set(likes.map(l => l.user_id))];
+        const { data: users } = await supabaseAdmin
+            .from('users')
+            .select('user_id, display_name, avatar_url')
+            .in('user_id', userIds);
+
+        const usersMap = new Map(users?.map(u => [u.user_id, u]) || []);
+
+        // 投稿情報を取得
+        const postIds = [...new Set(likes.map(l => l.post_id))];
+        const { data: posts } = await supabaseAdmin
+            .from('posts')
+            .select('id, content, created_at, user_id, is_hidden')
+            .in('id', postIds);
+
+        const postsMap = new Map(posts?.map(p => [p.id, p]) || []);
+
+        // 投稿者の情報を取得
+        const postUserIds = [...new Set(posts?.map(p => p.user_id) || [])];
+        const { data: postUsers } = await supabaseAdmin
+            .from('users')
+            .select('user_id, display_name, avatar_url')
+            .in('user_id', postUserIds);
+
+        const postUsersMap = new Map(postUsers?.map(u => [u.user_id, u]) || []);
+
+        const rows = likes.map(like => {
+            const liker = usersMap.get(like.user_id);
+            const post = postsMap.get(like.post_id);
+            const postAuthor = post ? postUsersMap.get(post.user_id) : null;
+
+            return `
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4">
+                    <div class="flex items-center gap-2">
+                        ${liker?.avatar_url ?
+                            `<img src="${liker.avatar_url}" class="w-8 h-8 rounded-full">` :
+                            '<div class="w-8 h-8 rounded-full bg-gray-300"></div>'
+                        }
+                        <span class="font-semibold text-gray-800">${liker?.display_name || '削除済み'}</span>
+                    </div>
+                </td>
+                <td class="px-6 py-4">
+                    ${post ? `
+                        <div class="flex items-center gap-2">
+                            ${postAuthor?.avatar_url ?
+                                `<img src="${postAuthor.avatar_url}" class="w-8 h-8 rounded-full">` :
+                                '<div class="w-8 h-8 rounded-full bg-gray-300"></div>'
+                            }
+                            <span class="text-sm text-gray-700">${postAuthor?.display_name || '削除済み'}</span>
+                        </div>
+                    ` : ''}
+                </td>
+                <td class="px-6 py-4 max-w-md">
+                    ${post ? `<p class="text-sm text-gray-700 truncate">${post.content}</p>` : '<span class="text-gray-400">削除済み</span>'}
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
+                    ${new Date(like.created_at).toLocaleString('ja-JP', {
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    })}
+                </td>
+            </tr>
+            `;
+        }).join('');
+
+        container.innerHTML = `
+            <table class="w-full">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">いいねしたユーザー</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">投稿者</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">投稿内容</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">日時</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    ${rows}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error('いいね読み込みエラー:', error);
+        container.innerHTML = '<div class="text-center py-8 text-red-500">エラーが発生しました</div>';
+    }
+}
+
+// いいね一覧のページング
+function prevLikesPage() {
+    if (likesPage > 1) {
+        likesPage--;
+        loadLikes();
+    }
+}
+
+function nextLikesPage() {
+    likesPage++;
+    loadLikes();
+}
+
 // ユーザー詳細を表示
 async function showUserDetail(userId) {
     try {
@@ -1239,3 +1378,6 @@ window.showReflectionDetail = showReflectionDetail;
 window.closeReflectionModal = closeReflectionModal;
 window.showUserDetail = showUserDetail;
 window.closeUserDetailModal = closeUserDetailModal;
+window.loadLikes = loadLikes;
+window.prevLikesPage = prevLikesPage;
+window.nextLikesPage = nextLikesPage;
