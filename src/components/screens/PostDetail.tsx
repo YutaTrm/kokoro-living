@@ -7,9 +7,11 @@ import * as Clipboard from 'expo-clipboard';
 
 import ConfirmModal from '@/components/ConfirmModal';
 import PostActionButtons from '@/components/PostActionButtons';
+import QuotedPostCard from '@/components/QuotedPostCard';
 import ReplyIndicator from '@/components/ReplyIndicator';
 import ReplyItem from '@/components/ReplyItem';
 import Tag from '@/components/Tag';
+import { useRepost } from '@/src/hooks/useRepost';
 import DefaultAvatar from '@/components/icons/DefaultAvatar';
 import { Avatar, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
@@ -33,12 +35,24 @@ interface Post {
   created_at: string;
   user_id: string;
   parent_post_id?: string | null;
+  quoted_post_id?: string | null;
   experienced_at?: string | null;
   is_hidden?: boolean;
   hidden_reason?: string | null;
   user: {
     display_name: string;
     user_id: string;
+    avatar_url?: string | null;
+  };
+}
+
+interface QuotedPost {
+  id: string;
+  content: string;
+  created_at: string;
+  is_hidden?: boolean;
+  user: {
+    display_name: string;
     avatar_url?: string | null;
   };
 }
@@ -66,6 +80,7 @@ export default function PostDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [post, setPost] = useState<Post | null>(null);
   const [parentPost, setParentPost] = useState<Post | null>(null);
+  const [quotedPost, setQuotedPost] = useState<QuotedPost | null>(null);
   const [replies, setReplies] = useState<Reply[]>([]);
   const [likesCount, setLikesCount] = useState(0);
   const [repliesCount, setRepliesCount] = useState(0);
@@ -87,6 +102,9 @@ export default function PostDetailScreen() {
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // リポストフック
+  const { isReposted, repostCount, toggleRepost } = useRepost(id);
 
   // 認証状態の監視
   useEffect(() => {
@@ -124,14 +142,14 @@ export default function PostDetailScreen() {
     try {
       const { data: postData, error: postError } = await supabase
         .from('posts')
-        .select('id, content, created_at, user_id, experienced_at, parent_post_id, is_hidden, hidden_reason')
+        .select('id, content, created_at, user_id, experienced_at, parent_post_id, quoted_post_id, is_hidden, hidden_reason')
         .eq('id', id)
         .single();
 
       if (postError) throw postError;
 
-      // ユーザー情報と親投稿を並列取得
-      const [userRes, parentRes] = await Promise.all([
+      // ユーザー情報・親投稿・引用投稿を並列取得
+      const [userRes, parentRes, quotedRes] = await Promise.all([
         supabase
           .from('users')
           .select('user_id, display_name, avatar_url')
@@ -142,6 +160,13 @@ export default function PostDetailScreen() {
               .from('posts')
               .select('id, content, created_at, user_id')
               .eq('id', postData.parent_post_id)
+              .single()
+          : Promise.resolve({ data: null }),
+        postData.quoted_post_id
+          ? supabase
+              .from('posts')
+              .select('id, content, created_at, user_id, is_hidden')
+              .eq('id', postData.quoted_post_id)
               .single()
           : Promise.resolve({ data: null }),
       ]);
@@ -171,6 +196,28 @@ export default function PostDetailScreen() {
             avatar_url: parentUserData?.avatar_url || null,
           },
         });
+      }
+
+      // 引用投稿がある場合はユーザー情報を取得
+      if (quotedRes.data) {
+        const { data: quotedUserData } = await supabase
+          .from('users')
+          .select('user_id, display_name, avatar_url')
+          .eq('user_id', quotedRes.data.user_id)
+          .single();
+
+        setQuotedPost({
+          id: quotedRes.data.id,
+          content: quotedRes.data.content,
+          created_at: quotedRes.data.created_at,
+          is_hidden: quotedRes.data.is_hidden,
+          user: {
+            display_name: quotedUserData?.display_name || 'Unknown',
+            avatar_url: quotedUserData?.avatar_url || null,
+          },
+        });
+      } else {
+        setQuotedPost(null);
       }
     } catch (error) {
       console.error('投稿取得エラー:', error);
@@ -597,6 +644,34 @@ export default function PostDetailScreen() {
     router.push(`/reply/${id}`);
   };
 
+  const handleRepost = async () => {
+    if (!isLoggedIn) {
+      Alert.alert('エラー', 'ログインしてください');
+      return;
+    }
+    try {
+      await toggleRepost();
+    } catch (error) {
+      console.error('リポストエラー:', error);
+      Alert.alert('エラー', 'リポストに失敗しました');
+    }
+  };
+
+  const handleQuoteRepost = () => {
+    if (!isLoggedIn) {
+      Alert.alert('エラー', 'ログインしてください');
+      return;
+    }
+    router.push(`/quote/${id}`);
+  };
+
+  const handleQuotedPostPress = () => {
+    if (post?.quoted_post_id) {
+      const currentTab = getCurrentTab(segments);
+      router.push(`/(tabs)/${currentTab}/post/${post.quoted_post_id}` as Href);
+    }
+  };
+
   const handleEdit = () => {
     router.push(`/create-post?postId=${id}`);
   };
@@ -857,6 +932,13 @@ export default function PostDetailScreen() {
 
           <Text className="text-lg leading-6 mb-2">{post.content}</Text>
 
+          {/* 引用カード */}
+          {quotedPost && (
+            <Box className="mb-2">
+              <QuotedPostCard post={quotedPost} onPress={handleQuotedPostPress} />
+            </Box>
+          )}
+
           {post.experienced_at && (
             <HStack space="xs" className="items-center mb-2">
               <Icon as={CalendarDays} size="sm" className="text-typography-500" />
@@ -885,10 +967,14 @@ export default function PostDetailScreen() {
           <PostActionButtons
             repliesCount={repliesCount}
             likesCount={likesCount}
+            repostsCount={repostCount}
             isLiked={isLiked}
+            isReposted={isReposted}
             isBookmarked={isBookmarked}
             onReply={handleReply}
             onLike={handleLike}
+            onRepost={handleRepost}
+            onQuoteRepost={handleQuoteRepost}
             onBookmark={handleBookmark}
             onLikesCountPress={() => {
               const currentTab = getCurrentTab(segments);

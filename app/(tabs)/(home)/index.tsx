@@ -18,7 +18,7 @@ import { Text } from '@/components/ui/text';
 import { VStack } from '@/components/ui/vstack';
 import { MOOD_EMOJIS, MOOD_LABELS, useMoodCheckin } from '@/src/hooks/useMoodCheckin';
 import { supabase } from '@/src/lib/supabase';
-import { fetchPostMetadata, fetchPostTags } from '@/src/utils/postUtils';
+import { fetchPostMetadata, fetchPostTags, fetchQuotedPostInfo, fetchRepostMetadata, fetchRepostsForTimeline, QuotedPostInfo, RepostForTimeline } from '@/src/utils/postUtils';
 
 const SELECTED_LIST_KEY = 'selected_list_id';
 const LIMIT = 20;
@@ -28,6 +28,8 @@ interface Post {
   content: string;
   created_at: string;
   experienced_at?: string | null;
+  quoted_post_id?: string | null;
+  quotedPost?: QuotedPostInfo | null;
   is_hidden?: boolean;
   user: {
     display_name: string;
@@ -40,8 +42,17 @@ interface Post {
   statuses: string[];
   repliesCount?: number;
   likesCount?: number;
+  repostsCount?: number;
   isLikedByCurrentUser?: boolean;
+  isRepostedByCurrentUser?: boolean;
   hasRepliedByCurrentUser?: boolean;
+  repostedBy?: {
+    user_id: string;
+    display_name: string;
+    avatar_url?: string | null;
+  } | null;
+  // リポスト経由の場合、タイムライン上のソート用日時
+  timelineSortDate?: string;
 }
 
 interface List {
@@ -185,6 +196,7 @@ export default function TabOneScreen() {
         content: string;
         created_at: string;
         experienced_at: string | null;
+        quoted_post_id: string | null;
         user_id: string;
         is_hidden: boolean;
       }> = [];
@@ -221,7 +233,7 @@ export default function TabOneScreen() {
           // 全投稿を取得（ブロック・ミュートを除外）
           let query = supabase
             .from('posts')
-            .select('id, content, created_at, experienced_at, user_id, is_hidden')
+            .select('id, content, created_at, experienced_at, quoted_post_id, user_id, is_hidden')
             .is('parent_post_id', null)
             .eq('is_hidden', false)
             .order('created_at', { ascending: false })
@@ -256,7 +268,7 @@ export default function TabOneScreen() {
           // リストメンバーの投稿を取得（非表示を除外）
           const { data: listPosts, error: listError } = await supabase
             .from('posts')
-            .select('id, content, created_at, experienced_at, user_id, is_hidden')
+            .select('id, content, created_at, experienced_at, quoted_post_id, user_id, is_hidden')
             .in('user_id', listMemberIds)
             .is('parent_post_id', null)
             .eq('is_hidden', false)
@@ -278,32 +290,119 @@ export default function TabOneScreen() {
           const followingIds = followingData?.map(f => f.following_id) || [];
           const timelineUserIds = [user.id, ...followingIds];
 
-          // 自分とフォローしている人の投稿を一括取得
-          const { data: timelinePosts, error: timelineError } = await supabase
-            .from('posts')
-            .select('id, content, created_at, experienced_at, user_id, is_hidden')
-            .in('user_id', timelineUserIds)
-            .is('parent_post_id', null)
-            .order('created_at', { ascending: false })
-            .range(currentOffset, currentOffset + LIMIT - 1);
+          // 自分とフォローしている人の投稿とリポストを並列取得
+          const [timelinePostsRes, repostsForTimeline] = await Promise.all([
+            supabase
+              .from('posts')
+              .select('id, content, created_at, experienced_at, quoted_post_id, user_id, is_hidden')
+              .in('user_id', timelineUserIds)
+              .is('parent_post_id', null)
+              .order('created_at', { ascending: false })
+              .range(currentOffset, currentOffset + LIMIT * 2 - 1), // リポストとマージ後にLIMIT件になるよう多めに取得
+            fetchRepostsForTimeline(timelineUserIds, LIMIT * 2, currentOffset),
+          ]);
 
-          // 非表示・ミュートをフィルタリング（自分の投稿は非表示でも表示、ミュートは除外しない）
-          rawPostsCount = (timelinePosts || []).length;
-          const filteredPosts = (timelinePosts || []).filter(p => {
-            if (p.user_id === user.id) return true; // 自分の投稿は常に表示
-            if (p.is_hidden) return false; // 他人の非表示投稿は除外
-            if (mutedIds.includes(p.user_id)) return false; // ミュートユーザーは除外
-            return true;
+          const { data: timelinePosts, error: timelineError } = timelinePostsRes;
+          postsError = timelineError;
+
+          // リポスト元の投稿を取得
+          const repostedPostIds = repostsForTimeline
+            .map(r => r.postId)
+            .filter(id => !timelinePosts?.some(p => p.id === id)); // 既に取得済みの投稿は除外
+
+          let repostedPostsData: typeof timelinePosts = [];
+          if (repostedPostIds.length > 0) {
+            const { data } = await supabase
+              .from('posts')
+              .select('id, content, created_at, experienced_at, quoted_post_id, user_id, is_hidden')
+              .in('id', repostedPostIds)
+              .is('parent_post_id', null);
+            repostedPostsData = data || [];
+          }
+
+          // リポスト情報をマップに変換
+          const repostInfoMap = new Map<string, RepostForTimeline>();
+          repostsForTimeline.forEach(r => {
+            // 同じ投稿が複数人にリポストされている場合は最新のものを使用
+            if (!repostInfoMap.has(r.postId) || r.repostedAt > repostInfoMap.get(r.postId)!.repostedAt) {
+              repostInfoMap.set(r.postId, r);
+            }
           });
 
+          // 通常投稿とリポスト経由の投稿をマージ
+          const allPostsMap = new Map<string, {
+            post: NonNullable<typeof timelinePosts>[0];
+            timelineSortDate: string;
+            repostedBy?: { user_id: string; display_name: string };
+          }>();
+
+          // 通常投稿を追加
+          (timelinePosts || []).forEach(p => {
+            allPostsMap.set(p.id, {
+              post: p,
+              timelineSortDate: p.created_at,
+            });
+          });
+
+          // リポスト経由の投稿を追加（リポスト日時でソート）
+          repostedPostsData.forEach(p => {
+            const repostInfo = repostInfoMap.get(p.id);
+            if (repostInfo) {
+              // 既に通常投稿として存在する場合は、リポスト日時の方が新しければ上書き
+              const existing = allPostsMap.get(p.id);
+              if (!existing || repostInfo.repostedAt > existing.timelineSortDate) {
+                allPostsMap.set(p.id, {
+                  post: p,
+                  timelineSortDate: repostInfo.repostedAt,
+                  repostedBy: repostInfo.repostedBy,
+                });
+              }
+            }
+          });
+
+          // 既存の投稿がリポストされた場合もrepostedByを追加
+          (timelinePosts || []).forEach(p => {
+            const repostInfo = repostInfoMap.get(p.id);
+            if (repostInfo) {
+              const existing = allPostsMap.get(p.id);
+              if (existing && repostInfo.repostedAt > existing.timelineSortDate) {
+                allPostsMap.set(p.id, {
+                  post: p,
+                  timelineSortDate: repostInfo.repostedAt,
+                  repostedBy: repostInfo.repostedBy,
+                });
+              }
+            }
+          });
+
+          // ソートしてLIMIT件に絞る
+          const mergedPosts = Array.from(allPostsMap.values())
+            .sort((a, b) => new Date(b.timelineSortDate).getTime() - new Date(a.timelineSortDate).getTime())
+            .slice(0, LIMIT);
+
+          // 非表示・ミュートをフィルタリング
+          rawPostsCount = mergedPosts.length;
+          const filteredPosts = mergedPosts
+            .filter(item => {
+              const p = item.post;
+              if (p.user_id === user.id) return true; // 自分の投稿は常に表示
+              if (p.is_hidden) return false; // 他人の非表示投稿は除外
+              if (mutedIds.includes(p.user_id)) return false; // ミュートユーザーは除外
+              return true;
+            })
+            .map(item => ({
+              ...item.post,
+              timelineSortDate: item.timelineSortDate,
+              repostedBy: item.repostedBy,
+            }));
+
           postsData = filteredPosts;
-          postsError = timelineError;
         }
       } else {
         // 未ログイン: すべての投稿を取得（非表示を除外）
         const result = await supabase
           .from('posts')
-          .select('id, content, created_at, experienced_at, user_id, is_hidden')
+          .select('id, content, created_at, experienced_at, quoted_post_id, user_id, is_hidden')
           .is('parent_post_id', null)
           .eq('is_hidden', false)
           .order('created_at', { ascending: false })
@@ -327,15 +426,20 @@ export default function TabOneScreen() {
       // 投稿者のユーザーIDと投稿IDを取得
       const postUserIds = [...new Set(postsData.map(p => p.user_id))];
       const postIds = postsData.map(p => p.id);
+      const quotedPostIds = postsData
+        .map(p => p.quoted_post_id)
+        .filter((id): id is string => id !== null);
 
-      // ユーザー情報・タグ・メタデータを並列取得
-      const [usersRes, tagsResult, metadataResult] = await Promise.all([
+      // ユーザー情報・タグ・メタデータ・引用投稿・リポストを並列取得
+      const [usersRes, tagsResult, metadataResult, quotedPostsMap, repostMetadataResult] = await Promise.all([
         supabase
           .from('users')
           .select('user_id, display_name, avatar_url')
           .in('user_id', postUserIds),
         fetchPostTags(postIds),
         fetchPostMetadata(postIds, user?.id || null),
+        fetchQuotedPostInfo(quotedPostIds),
+        fetchRepostMetadata(postIds, user?.id || null),
       ]);
 
       if (usersRes.error) throw usersRes.error;
@@ -347,6 +451,7 @@ export default function TabOneScreen() {
 
       const { diagnosesMap, treatmentsMap, medicationsMap, statusesMap } = tagsResult;
       const { repliesMap, likesMap, myLikesMap, myRepliesMap } = metadataResult;
+      const { repostsMap, myRepostsMap } = repostMetadataResult;
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const formattedPosts: Post[] = postsData.map((post: any) => ({
@@ -354,6 +459,8 @@ export default function TabOneScreen() {
         content: post.content,
         created_at: post.created_at,
         experienced_at: post.experienced_at || null,
+        quoted_post_id: post.quoted_post_id || null,
+        quotedPost: post.quoted_post_id ? quotedPostsMap.get(post.quoted_post_id) || null : null,
         is_hidden: post.is_hidden || false,
         user: {
           display_name: usersMap.get(post.user_id)?.display_name || 'Unknown',
@@ -366,8 +473,12 @@ export default function TabOneScreen() {
         statuses: statusesMap.get(post.id) || [],
         repliesCount: repliesMap.get(post.id) || 0,
         likesCount: likesMap.get(post.id) || 0,
+        repostsCount: repostsMap.get(post.id) || 0,
         isLikedByCurrentUser: myLikesMap.get(post.id) || false,
+        isRepostedByCurrentUser: myRepostsMap.get(post.id) || false,
         hasRepliedByCurrentUser: myRepliesMap.get(post.id) || false,
+        repostedBy: post.repostedBy || null,
+        timelineSortDate: post.timelineSortDate || post.created_at,
       }));
 
       if (reset) {

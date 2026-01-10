@@ -229,3 +229,273 @@ export async function fetchPostTags(postIds: string[]): Promise<{
 
   return { diagnosesMap, treatmentsMap, medicationsMap, statusesMap };
 }
+
+export interface QuotedPostInfo {
+  id: string;
+  content: string;
+  created_at: string;
+  is_hidden?: boolean;
+  user: {
+    display_name: string;
+    avatar_url: string | null;
+  };
+}
+
+/**
+ * 引用元投稿の情報を取得
+ */
+export async function fetchQuotedPostInfo(
+  quotedPostIds: string[]
+): Promise<Map<string, QuotedPostInfo>> {
+  if (quotedPostIds.length === 0) {
+    return new Map();
+  }
+
+  // 引用元投稿を取得
+  const { data: quotedPostsData } = await supabase
+    .from('posts')
+    .select('id, content, created_at, user_id, is_hidden')
+    .in('id', quotedPostIds);
+
+  if (!quotedPostsData || quotedPostsData.length === 0) {
+    return new Map();
+  }
+
+  // 引用元投稿の投稿者情報を取得
+  const quotedUserIds = [...new Set(quotedPostsData.map((p) => p.user_id))];
+  const { data: quotedUsersData } = await supabase
+    .from('users')
+    .select('user_id, display_name, avatar_url')
+    .in('user_id', quotedUserIds);
+
+  const userInfoMap = new Map<string, { display_name: string; avatar_url: string | null }>();
+  (quotedUsersData || []).forEach((u) => {
+    userInfoMap.set(u.user_id, {
+      display_name: u.display_name || 'Unknown',
+      avatar_url: u.avatar_url,
+    });
+  });
+
+  // 引用元投稿IDごとに情報をマッピング
+  const quotedInfoMap = new Map<string, QuotedPostInfo>();
+  quotedPostsData.forEach((p) => {
+    const userInfo = userInfoMap.get(p.user_id);
+    quotedInfoMap.set(p.id, {
+      id: p.id,
+      content: p.content,
+      created_at: p.created_at,
+      is_hidden: p.is_hidden,
+      user: {
+        display_name: userInfo?.display_name || 'Unknown',
+        avatar_url: userInfo?.avatar_url || null,
+      },
+    });
+  });
+
+  return quotedInfoMap;
+}
+
+export interface RepostMetadataMaps {
+  repostsMap: Map<string, number>;
+  myRepostsMap: Map<string, boolean>;
+}
+
+/**
+ * 投稿IDリストに対するリポスト数・現在ユーザーのリポスト状態を取得
+ */
+export async function fetchRepostMetadata(
+  postIds: string[],
+  currentUserId: string | null
+): Promise<RepostMetadataMaps> {
+  if (postIds.length === 0) {
+    return {
+      repostsMap: new Map(),
+      myRepostsMap: new Map(),
+    };
+  }
+
+  const [repostsRes, myRepostsRes] = await Promise.all([
+    // リポスト数
+    supabase
+      .from('reposts')
+      .select('post_id')
+      .in('post_id', postIds),
+    // 現在ユーザーのリポスト
+    currentUserId
+      ? supabase
+          .from('reposts')
+          .select('post_id')
+          .eq('user_id', currentUserId)
+          .in('post_id', postIds)
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  // リポスト数マップ
+  const repostsMap = new Map<string, number>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  repostsRes.data?.forEach((r: any) => {
+    const count = repostsMap.get(r.post_id) || 0;
+    repostsMap.set(r.post_id, count + 1);
+  });
+
+  // 自分のリポストマップ
+  const myRepostsMap = new Map<string, boolean>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  myRepostsRes.data?.forEach((r: any) => {
+    myRepostsMap.set(r.post_id, true);
+  });
+
+  return { repostsMap, myRepostsMap };
+}
+
+export interface RepostForTimeline {
+  postId: string;
+  repostedAt: string;
+  repostedBy: {
+    user_id: string;
+    display_name: string;
+    avatar_url: string | null;
+  };
+}
+
+/**
+ * タイムライン用のリポストを取得（指定ユーザーがリポストした投稿）
+ */
+export async function fetchRepostsForTimeline(
+  userIds: string[],
+  limit: number,
+  offset: number
+): Promise<RepostForTimeline[]> {
+  if (userIds.length === 0) {
+    return [];
+  }
+
+  // リポストを取得
+  const { data: repostsData, error } = await supabase
+    .from('reposts')
+    .select('post_id, user_id, created_at')
+    .in('user_id', userIds)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (error || !repostsData || repostsData.length === 0) {
+    return [];
+  }
+
+  // リポストしたユーザーの情報を取得
+  const repostUserIds = [...new Set(repostsData.map(r => r.user_id))];
+  const { data: usersData } = await supabase
+    .from('users')
+    .select('user_id, display_name, avatar_url')
+    .in('user_id', repostUserIds);
+
+  const usersMap = new Map<string, { display_name: string; avatar_url: string | null }>();
+  (usersData || []).forEach(u => {
+    usersMap.set(u.user_id, {
+      display_name: u.display_name || 'Unknown',
+      avatar_url: u.avatar_url || null,
+    });
+  });
+
+  return repostsData.map(r => ({
+    postId: r.post_id,
+    repostedAt: r.created_at,
+    repostedBy: {
+      user_id: r.user_id,
+      display_name: usersMap.get(r.user_id)?.display_name || 'Unknown',
+      avatar_url: usersMap.get(r.user_id)?.avatar_url || null,
+    },
+  }));
+}
+
+export interface UserInfo {
+  display_name: string;
+  avatar_url: string | null;
+}
+
+/**
+ * ユーザーID配列からユーザー情報Mapを取得
+ */
+export async function fetchUsersMap(
+  userIds: string[]
+): Promise<Map<string, UserInfo>> {
+  if (userIds.length === 0) {
+    return new Map();
+  }
+
+  const { data: usersData } = await supabase
+    .from('users')
+    .select('user_id, display_name, avatar_url')
+    .in('user_id', userIds);
+
+  const usersMap = new Map<string, UserInfo>();
+  (usersData || []).forEach((u) => {
+    usersMap.set(u.user_id, {
+      display_name: u.display_name || 'Unknown',
+      avatar_url: u.avatar_url || null,
+    });
+  });
+
+  return usersMap;
+}
+
+export interface RepostPostData {
+  id: string;
+  content: string;
+  created_at: string;
+  user_id: string;
+  experienced_at: string | null;
+  quoted_post_id: string | null;
+  is_hidden?: boolean;
+}
+
+/**
+ * リポスト元投稿のデータを取得
+ */
+export async function fetchRepostPostsData(
+  postIds: string[]
+): Promise<RepostPostData[]> {
+  if (postIds.length === 0) {
+    return [];
+  }
+
+  const { data } = await supabase
+    .from('posts')
+    .select('id, content, created_at, user_id, experienced_at, quoted_post_id, is_hidden')
+    .in('id', postIds)
+    .eq('is_hidden', false);
+
+  return data || [];
+}
+
+/**
+ * 投稿とリポストをマージして時系列でソート
+ */
+export function mergeAndSortPostsWithReposts<T extends { timelineSortDate?: string; created_at: string }>(
+  posts: T[],
+  reposts: T[]
+): T[] {
+  const allPosts = [...posts, ...reposts];
+  allPosts.sort((a, b) => {
+    const dateA = a.timelineSortDate || a.created_at;
+    const dateB = b.timelineSortDate || b.created_at;
+    return new Date(dateB).getTime() - new Date(dateA).getTime();
+  });
+  return allPosts;
+}
+
+/**
+ * リポストデータから引用元投稿IDを抽出して追加
+ */
+export function extractQuotedPostIdsFromReposts(
+  repostPostsData: RepostPostData[],
+  existingQuotedPostIds: string[]
+): string[] {
+  const quotedPostIds = [...existingQuotedPostIds];
+  repostPostsData.forEach((p) => {
+    if (p.quoted_post_id && !quotedPostIds.includes(p.quoted_post_id)) {
+      quotedPostIds.push(p.quoted_post_id);
+    }
+  });
+  return quotedPostIds;
+}

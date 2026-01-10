@@ -397,7 +397,7 @@ export default function ProfileScreen() {
         <FlatList
           data={getCurrentData()}
           renderItem={renderItem}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => `${item.id}-${'repostedBy' in item && item.repostedBy ? item.repostedBy.user_id : 'own'}`}
           ListHeaderComponent={!profile ? renderLoadingHeader : renderHeader}
           ListEmptyComponent={renderEmptyComponent}
           ListFooterComponent={

@@ -2,7 +2,17 @@ import { useState } from 'react';
 
 import { supabase } from '@/src/lib/supabase';
 import { fetchPostsStats } from '@/src/utils/postStats';
-import { fetchParentPostInfo } from '@/src/utils/postUtils';
+import {
+  extractQuotedPostIdsFromReposts,
+  fetchParentPostInfo,
+  fetchQuotedPostInfo,
+  fetchRepostMetadata,
+  fetchRepostPostsData,
+  fetchRepostsForTimeline,
+  fetchUsersMap,
+  mergeAndSortPostsWithReposts,
+  QuotedPostInfo,
+} from '@/src/utils/postUtils';
 
 export interface Post {
   id: string;
@@ -13,6 +23,8 @@ export interface Post {
   parent_post_id?: string | null;
   parentContent?: string;
   parentAvatarUrl?: string | null;
+  quoted_post_id?: string | null;
+  quotedPost?: QuotedPostInfo | null;
   user: {
     display_name: string;
     user_id: string;
@@ -24,8 +36,16 @@ export interface Post {
   statuses: string[];
   repliesCount?: number;
   likesCount?: number;
+  repostsCount?: number;
   isLikedByCurrentUser?: boolean;
+  isRepostedByCurrentUser?: boolean;
   hasRepliedByCurrentUser?: boolean;
+  repostedBy?: {
+    user_id: string;
+    display_name: string;
+    avatar_url?: string | null;
+  } | null;
+  timelineSortDate?: string;
 }
 
 interface TagsResult {
@@ -125,32 +145,60 @@ export const usePostsData = () => {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: postsData, error: postsError } = await supabase
-        .from('posts')
-        .select('id, content, created_at, user_id, is_hidden, experienced_at')
-        .eq('user_id', user.id)
-        .is('parent_post_id', null)
-        .order('created_at', { ascending: false });
+      // 自分の投稿（引用リポスト含む）とリポストを並列取得
+      const [postsResult, repostsResult, userRes] = await Promise.all([
+        supabase
+          .from('posts')
+          .select('id, content, created_at, user_id, is_hidden, experienced_at, quoted_post_id')
+          .eq('user_id', user.id)
+          .is('parent_post_id', null)
+          .order('created_at', { ascending: false }),
+        fetchRepostsForTimeline([user.id], 1000, 0),
+        supabase
+          .from('users')
+          .select('user_id, display_name, avatar_url')
+          .eq('user_id', user.id)
+          .single(),
+      ]);
 
-      if (postsError) throw postsError;
+      if (postsResult.error) throw postsResult.error;
 
-      if (!postsData || postsData.length === 0) {
-        setUserPosts([]);
-        return;
-      }
+      const postsData = postsResult.data || [];
+      const repostsData = repostsResult || [];
+      const userData = userRes.data;
 
-      const { data: userData } = await supabase
-        .from('users')
-        .select('user_id, display_name, avatar_url')
-        .eq('user_id', user.id)
-        .single();
-
+      // 投稿IDリスト
       const postIds = postsData.map((p) => p.id);
-      const tagsMap = await fetchTagsForPosts(postIds);
-      const statsMap = await fetchPostsStats(postIds, user.id);
+      const repostPostIds = repostsData.map((r) => r.postId);
+      const allPostIds = [...new Set([...postIds, ...repostPostIds])];
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const formattedPosts: Post[] = postsData.map((post: any) => {
+      // 引用元投稿IDリスト
+      let quotedPostIds = postsData
+        .map((p) => p.quoted_post_id)
+        .filter((qid): qid is string => qid !== null);
+
+      // リポスト元投稿の情報を取得（共通関数使用）
+      const repostPostsData = await fetchRepostPostsData(repostPostIds);
+
+      // リポスト元投稿の引用元も取得対象に追加（共通関数使用）
+      quotedPostIds = extractQuotedPostIdsFromReposts(repostPostsData, quotedPostIds);
+
+      // リポスト元投稿のユーザー情報を取得（共通関数使用）
+      const repostUserIds = [...new Set(repostPostsData.map((p) => p.user_id))];
+      const repostUsersMap = await fetchUsersMap(repostUserIds);
+
+      // タグ・メタデータ・引用投稿情報を並列取得
+      const [tagsMap, statsMap, repostMetadataResult, quotedPostsInfo] = await Promise.all([
+        fetchTagsForPosts(allPostIds),
+        fetchPostsStats(allPostIds, user.id),
+        fetchRepostMetadata(allPostIds, user.id),
+        fetchQuotedPostInfo([...new Set(quotedPostIds)]),
+      ]);
+
+      const { repostsMap, myRepostsMap } = repostMetadataResult;
+
+      // 通常投稿をフォーマット
+      const formattedPosts: Post[] = postsData.map((post) => {
         const tags = tagsMap.get(post.id) || {
           diagnoses: [],
           treatments: [],
@@ -169,6 +217,8 @@ export const usePostsData = () => {
           created_at: post.created_at,
           experienced_at: post.experienced_at,
           is_hidden: post.is_hidden || false,
+          quoted_post_id: post.quoted_post_id,
+          quotedPost: post.quoted_post_id ? quotedPostsInfo.get(post.quoted_post_id) || null : null,
           user: {
             display_name: userData?.display_name || 'Unknown',
             user_id: post.user_id,
@@ -180,12 +230,70 @@ export const usePostsData = () => {
           statuses: tags.statuses,
           repliesCount: stats.repliesCount,
           likesCount: stats.likesCount,
+          repostsCount: repostsMap.get(post.id) || 0,
           isLikedByCurrentUser: stats.isLikedByCurrentUser,
+          isRepostedByCurrentUser: myRepostsMap.get(post.id) || false,
           hasRepliedByCurrentUser: stats.hasRepliedByCurrentUser,
+          timelineSortDate: post.created_at,
         };
       });
 
-      setUserPosts(formattedPosts);
+      // リポストをフォーマット
+      const formattedReposts: Post[] = [];
+      for (const repost of repostsData) {
+        const originalPost = repostPostsData.find((p) => p.id === repost.postId);
+        if (!originalPost) continue;
+
+        const originalUser = repostUsersMap.get(originalPost.user_id);
+        const tags = tagsMap.get(originalPost.id) || {
+          diagnoses: [],
+          treatments: [],
+          medications: [],
+          statuses: [],
+        };
+        const stats = statsMap.get(originalPost.id) || {
+          repliesCount: 0,
+          likesCount: 0,
+          isLikedByCurrentUser: false,
+          hasRepliedByCurrentUser: false,
+        };
+
+        formattedReposts.push({
+          id: originalPost.id,
+          content: originalPost.content,
+          created_at: originalPost.created_at,
+          experienced_at: originalPost.experienced_at,
+          is_hidden: false,
+          quoted_post_id: originalPost.quoted_post_id,
+          quotedPost: originalPost.quoted_post_id ? quotedPostsInfo.get(originalPost.quoted_post_id) || null : null,
+          user: {
+            display_name: originalUser?.display_name || 'Unknown',
+            user_id: originalPost.user_id,
+            avatar_url: originalUser?.avatar_url || null,
+          },
+          diagnoses: tags.diagnoses,
+          treatments: tags.treatments,
+          medications: tags.medications,
+          statuses: tags.statuses,
+          repliesCount: stats.repliesCount,
+          likesCount: stats.likesCount,
+          repostsCount: repostsMap.get(originalPost.id) || 0,
+          isLikedByCurrentUser: stats.isLikedByCurrentUser,
+          isRepostedByCurrentUser: myRepostsMap.get(originalPost.id) || false,
+          hasRepliedByCurrentUser: stats.hasRepliedByCurrentUser,
+          repostedBy: {
+            user_id: repost.repostedBy.user_id,
+            display_name: repost.repostedBy.display_name,
+            avatar_url: repost.repostedBy.avatar_url,
+          },
+          timelineSortDate: repost.repostedAt,
+        });
+      }
+
+      // 通常投稿とリポストをマージしてソート（共通関数使用）
+      const allPosts = mergeAndSortPostsWithReposts(formattedPosts, formattedReposts);
+
+      setUserPosts(allPosts);
     } catch (error) {
       console.error('投稿取得エラー:', error);
     } finally {

@@ -23,7 +23,19 @@ import { useBlock } from '@/src/hooks/useBlock';
 import { useFollow } from '@/src/hooks/useFollow';
 import { useMute } from '@/src/hooks/useMute';
 import { supabase } from '@/src/lib/supabase';
-import { fetchParentPostInfo, fetchPostMetadata, fetchPostTags } from '@/src/utils/postUtils';
+import {
+  extractQuotedPostIdsFromReposts,
+  fetchParentPostInfo,
+  fetchPostMetadata,
+  fetchPostTags,
+  fetchQuotedPostInfo,
+  fetchRepostMetadata,
+  fetchRepostPostsData,
+  fetchRepostsForTimeline,
+  fetchUsersMap,
+  mergeAndSortPostsWithReposts,
+  QuotedPostInfo,
+} from '@/src/utils/postUtils';
 import { sortByStartDate } from '@/src/utils/sortByStartDate';
 import { ListPlus, MessageCircleOff, MoreVertical, ShieldBan } from 'lucide-react-native';
 
@@ -51,6 +63,8 @@ interface Post {
   parent_post_id?: string | null;
   parentContent?: string;
   parentAvatarUrl?: string | null;
+  quoted_post_id?: string | null;
+  quotedPost?: QuotedPostInfo | null;
   user: {
     display_name: string;
     user_id: string;
@@ -62,8 +76,16 @@ interface Post {
   statuses: string[];
   repliesCount?: number;
   likesCount?: number;
+  repostsCount?: number;
   isLikedByCurrentUser?: boolean;
+  isRepostedByCurrentUser?: boolean;
   hasRepliedByCurrentUser?: boolean;
+  repostedBy?: {
+    user_id: string;
+    display_name: string;
+    avatar_url?: string | null;
+  } | null;
+  timelineSortDate?: string;
 }
 
 export default function UserDetailScreen() {
@@ -274,49 +296,71 @@ export default function UserDetailScreen() {
     }
     try {
       const currentOffset = loadMore ? posts.length : 0;
-      const { data: postsData, error: postsError } = await supabase
-        .from('posts')
-        .select('id, content, created_at, user_id, experienced_at')
-        .eq('user_id', id)
-        .is('parent_post_id', null)
-        .eq('is_hidden', false)
-        .order('created_at', { ascending: false })
-        .range(currentOffset, currentOffset + POSTS_LIMIT - 1);
 
-      if (postsError) throw postsError;
-
-      if (!postsData || postsData.length === 0) {
-        if (!loadMore) setPosts([]);
-        setHasMorePosts(false);
-        return;
-      }
-
-      setHasMorePosts(postsData.length === POSTS_LIMIT);
-
-      const postIds = postsData.map((p) => p.id);
-
-      // ユーザー情報・タグ・メタデータを並列取得
-      const [userRes, tagsResult, metadataResult] = await Promise.all([
+      // このユーザーの投稿（引用リポスト含む）とリポストを並列取得
+      const [postsResult, repostsResult, userRes] = await Promise.all([
+        supabase
+          .from('posts')
+          .select('id, content, created_at, user_id, experienced_at, quoted_post_id')
+          .eq('user_id', id)
+          .is('parent_post_id', null)
+          .eq('is_hidden', false)
+          .order('created_at', { ascending: false }),
+        fetchRepostsForTimeline([id ?? ''], 1000, 0),
         supabase
           .from('users')
           .select('user_id, display_name, avatar_url')
           .eq('user_id', id)
           .single(),
-        fetchPostTags(postIds),
-        fetchPostMetadata(postIds, currentUserId),
       ]);
 
+      if (postsResult.error) throw postsResult.error;
+
+      const postsData = postsResult.data || [];
+      const repostsData = repostsResult || [];
       const userData = userRes.data;
+
+      // 投稿IDリスト
+      const postIds = postsData.map((p) => p.id);
+      const repostPostIds = repostsData.map((r) => r.postId);
+      const allPostIds = [...new Set([...postIds, ...repostPostIds])];
+
+      // 引用元投稿IDリスト
+      let quotedPostIds = postsData
+        .map((p) => p.quoted_post_id)
+        .filter((qid): qid is string => qid !== null);
+
+      // リポスト元投稿の情報を取得（共通関数使用）
+      const repostPostsData = await fetchRepostPostsData(repostPostIds);
+
+      // リポスト元投稿の引用元も取得対象に追加（共通関数使用）
+      quotedPostIds = extractQuotedPostIdsFromReposts(repostPostsData, quotedPostIds);
+
+      // リポスト元投稿のユーザー情報を取得（共通関数使用）
+      const repostUserIds = [...new Set(repostPostsData.map((p) => p.user_id))];
+      const repostUsersMap = await fetchUsersMap(repostUserIds);
+
+      // タグ・メタデータ・引用投稿情報を並列取得
+      const [tagsResult, metadataResult, repostMetadataResult, quotedPostsInfo] = await Promise.all([
+        fetchPostTags(allPostIds),
+        fetchPostMetadata(allPostIds, currentUserId),
+        fetchRepostMetadata(allPostIds, currentUserId),
+        fetchQuotedPostInfo([...new Set(quotedPostIds)]),
+      ]);
+
       const { diagnosesMap, treatmentsMap, medicationsMap, statusesMap } = tagsResult;
       const { repliesMap, likesMap, myLikesMap, myRepliesMap } = metadataResult;
+      const { repostsMap, myRepostsMap } = repostMetadataResult;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const formattedPosts: Post[] = postsData.map((post: any) => ({
+      // 通常投稿をフォーマット
+      const formattedPosts: Post[] = postsData.map((post) => ({
         id: post.id,
         content: post.content,
         created_at: post.created_at,
         experienced_at: post.experienced_at,
         is_hidden: false,
+        quoted_post_id: post.quoted_post_id,
+        quotedPost: post.quoted_post_id ? quotedPostsInfo.get(post.quoted_post_id) || null : null,
         user: {
           display_name: userData?.display_name || 'Unknown',
           user_id: post.user_id,
@@ -328,18 +372,68 @@ export default function UserDetailScreen() {
         statuses: statusesMap.get(post.id) || [],
         repliesCount: repliesMap.get(post.id) || 0,
         likesCount: likesMap.get(post.id) || 0,
+        repostsCount: repostsMap.get(post.id) || 0,
         isLikedByCurrentUser: myLikesMap.get(post.id) || false,
+        isRepostedByCurrentUser: myRepostsMap.get(post.id) || false,
         hasRepliedByCurrentUser: myRepliesMap.get(post.id) || false,
+        timelineSortDate: post.created_at,
       }));
+
+      // リポストをフォーマット
+      const formattedReposts: Post[] = [];
+      for (const repost of repostsData) {
+        const originalPost = repostPostsData.find((p) => p.id === repost.postId);
+        if (!originalPost) continue;
+
+        const originalUser = repostUsersMap.get(originalPost.user_id);
+
+        formattedReposts.push({
+          id: originalPost.id,
+          content: originalPost.content,
+          created_at: originalPost.created_at,
+          experienced_at: originalPost.experienced_at,
+          is_hidden: false,
+          quoted_post_id: originalPost.quoted_post_id,
+          quotedPost: originalPost.quoted_post_id ? quotedPostsInfo.get(originalPost.quoted_post_id) || null : null,
+          user: {
+            display_name: originalUser?.display_name || 'Unknown',
+            user_id: originalPost.user_id,
+            avatar_url: originalUser?.avatar_url || null,
+          },
+          diagnoses: diagnosesMap.get(originalPost.id) || [],
+          treatments: treatmentsMap.get(originalPost.id) || [],
+          medications: medicationsMap.get(originalPost.id) || [],
+          statuses: statusesMap.get(originalPost.id) || [],
+          repliesCount: repliesMap.get(originalPost.id) || 0,
+          likesCount: likesMap.get(originalPost.id) || 0,
+          repostsCount: repostsMap.get(originalPost.id) || 0,
+          isLikedByCurrentUser: myLikesMap.get(originalPost.id) || false,
+          isRepostedByCurrentUser: myRepostsMap.get(originalPost.id) || false,
+          hasRepliedByCurrentUser: myRepliesMap.get(originalPost.id) || false,
+          repostedBy: {
+            user_id: repost.repostedBy.user_id,
+            display_name: repost.repostedBy.display_name,
+            avatar_url: repost.repostedBy.avatar_url,
+          },
+          timelineSortDate: repost.repostedAt,
+        });
+      }
+
+      // 通常投稿とリポストをマージしてソート（共通関数使用）
+      const allPosts = mergeAndSortPostsWithReposts(formattedPosts, formattedReposts);
+
+      // ページネーション
+      const paginatedPosts = allPosts.slice(currentOffset, currentOffset + POSTS_LIMIT);
+      setHasMorePosts(allPosts.length > currentOffset + POSTS_LIMIT);
 
       if (loadMore) {
         setPosts((prev) => {
-          const existingIds = new Set(prev.map((p) => p.id));
-          const newPosts = formattedPosts.filter((p) => !existingIds.has(p.id));
+          const existingIds = new Set(prev.map((p) => `${p.id}-${p.repostedBy?.user_id || ''}`));
+          const newPosts = paginatedPosts.filter((p) => !existingIds.has(`${p.id}-${p.repostedBy?.user_id || ''}`));
           return [...prev, ...newPosts];
         });
       } else {
-        setPosts(formattedPosts);
+        setPosts(paginatedPosts);
       }
     } catch (error) {
       console.error('投稿取得エラー:', error);
@@ -756,7 +850,7 @@ export default function UserDetailScreen() {
       <Box className="flex-1 bg-background-0">
         <FlatList
           data={getListData()}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => `${item.id}-${item.repostedBy?.user_id || 'own'}`}
           renderItem={({ item }) => <PostItem post={item} disableAvatarTap />}
           ListHeaderComponent={renderHeader}
           ListEmptyComponent={renderEmptyContent}
