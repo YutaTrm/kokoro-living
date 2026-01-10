@@ -261,7 +261,7 @@ export default function ReplyItem({
             )}
 
             {/* 返信テキスト */}
-            <Text className="text-lg leading-5">{reply.content}</Text>
+            <Text className="text-lg leading-6">{reply.content}</Text>
 
             {/* アクションボタン */}
             <Box className="mt-2">

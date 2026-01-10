@@ -641,7 +641,7 @@ export default function UserDetailScreen() {
           {/* Bio */}
           {profile.bio && (
             <Box className="mt-3">
-              <Text className="text-base">{profile.bio}</Text>
+              <Text className="text-base leading-6">{profile.bio}</Text>
             </Box>
           )}
         </Box>
