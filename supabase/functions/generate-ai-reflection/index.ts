@@ -30,10 +30,10 @@ serve(async (req) => {
       throw new Error('CLAUDE_API_KEYが設定されていません');
     }
 
-    // 最後の振り返り生成日時を取得
+    // 最後の振り返り生成日時と内容を取得
     const { data: lastReflection } = await supabase
       .from('ai_reflections')
-      .select('created_at')
+      .select('created_at, content')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -225,22 +225,62 @@ serve(async (req) => {
       : 'なし';
 
     // 医療情報テキストを作成
-    const diagnosesText = userDiagnoses && userDiagnoses.length > 0
-      ? userDiagnoses.map(d => (d as any).diagnoses?.name).filter(Boolean).join(', ')
-      : 'なし';
+    // - start_dateとend_dateがある → 完了（寛解、服薬終了など）
+    // - start_dateのみ → 継続中
+    // - どちらもない → 経験あり
+    const formatMedicalItems = (items: any[], nameKey: string, altNameKey?: string) => {
+      if (!items || items.length === 0) return 'なし';
 
-    const medicationsText = userMedications && userMedications.length > 0
-      ? userMedications.map(m => (m as any).ingredients?.name || (m as any).products?.name).filter(Boolean).join(', ')
-      : 'なし';
+      const completed: string[] = [];  // start_date + end_date あり
+      const ongoing: string[] = [];    // start_date のみ
+      const experienced: string[] = []; // どちらもなし
 
-    const treatmentsText = userTreatments && userTreatments.length > 0
-      ? userTreatments.map(t => (t as any).treatments?.name).filter(Boolean).join(', ')
-      : 'なし';
+      items.forEach(item => {
+        const name = (item as any)[nameKey]?.name || (altNameKey ? (item as any)[altNameKey]?.name : null);
+        if (!name) return;
+
+        if (item.start_date && item.end_date) {
+          completed.push(name);
+        } else if (item.start_date && !item.end_date) {
+          ongoing.push(name);
+        } else {
+          experienced.push(name);
+        }
+      });
+
+      const parts: string[] = [];
+      if (ongoing.length > 0) {
+        parts.push(`【継続中】${ongoing.join(', ')}`);
+      }
+      if (completed.length > 0) {
+        parts.push(`【完了】${completed.join(', ')}`);
+      }
+      if (experienced.length > 0) {
+        parts.push(`【経験あり】${experienced.join(', ')}`);
+      }
+
+      return parts.length > 0 ? parts.join(' / ') : 'なし';
+    };
+
+    const diagnosesText = formatMedicalItems(userDiagnoses || [], 'diagnoses');
+    const medicationsText = formatMedicalItems(userMedications || [], 'ingredients', 'products');
+    const treatmentsText = formatMedicalItems(userTreatments || [], 'treatments');
+
+    // 前回の振り返り内容
+    const lastReflectionText = lastReflection?.content || null;
 
     // 期間の計算
     const endDate = now;
     const startDate = dataStartDate;
     const dateRangeText = `${startDate.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', ...jstOptions })}〜${endDate.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', ...jstOptions })}`;
+
+    // 前回の振り返りセクション
+    const lastReflectionSection = lastReflectionText
+      ? `【前回の振り返り内容】
+${lastReflectionText}
+
+`
+      : '';
 
     const userPrompt = `以下は、${userName}さんの最近の行動データと医療情報です。
 
@@ -251,8 +291,9 @@ ${userName}さん
 - 診断名: ${diagnosesText}
 - 服薬: ${medicationsText}
 - 治療: ${treatmentsText}
+※【継続中】は現在も続いているもの、【完了】は寛解・服薬終了・治療完了したもの、【経験あり】は時期は不明だが経験があるもの
 
-【投稿・返信】
+${lastReflectionSection}【投稿・返信】
 ${postsText}
 ※「〇〇の出来事について △△に投稿」と記載がある投稿は、過去の出来事を振り返って投稿したものです。出来事の日付に注目して分析してください。ただし日時はシステム上のものなので触れず、年と月にだけ触れてください。
 
@@ -285,6 +326,7 @@ ${checkinsText}
 
 【分析対象】
 - ユーザーの医療情報（診断名、服薬、治療）
+- 前回の振り返り内容（ある場合）
 - 投稿・返信の内容（テキスト）と投稿時間
 - 気分チェックインの記録と変化
 - いいね数、返信数、フォロー数
@@ -297,6 +339,19 @@ ${checkinsText}
 - ユーザーの医療情報を踏まえて、その状況に寄り添った言葉をかける
 - アドバイスや指示はしない
 - 800文字程度で生成
+
+【前回の振り返りへの言及】
+- 前回の振り返り内容がある場合は、それを踏まえて今回の振り返りを作成する
+- 前回からの変化や成長があれば、それを自然に褒める（例：「前回は〜だったけど、今回は〜」）
+- 前回と同じような状況でも、継続していることを肯定的に捉える
+- 前回の内容を丸ごと繰り返さない。あくまで今回の振り返りがメイン
+- 前回の振り返りがない場合（初回）は、この項目は無視する
+
+【医療情報への言及】
+- 【継続中】：現在も向き合っている診断・服薬・治療。日々続けていることの大変さに共感し、労う
+- 【完了】：寛解した診断、終了した服薬、完了した治療。乗り越えてきたことへの敬意を払い、その経験が今の強さにつながっていると肯定する
+- 【経験あり】：時期は不明だが経験があるもの。その経験があることを踏まえて寄り添う
+- 医療情報は押し付けがましくなく、自然な形で振り返りに織り込む
 
 【投稿時間への言及】
 - 深夜（0時〜4時頃）の投稿が多い場合：眠れない夜があったのかな、と優しく気にかける。責めたり批判したりせず、そういう夜もあるよね、と共感する

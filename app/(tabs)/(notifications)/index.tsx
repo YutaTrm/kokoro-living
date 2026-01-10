@@ -342,7 +342,7 @@ export default function NotificationsScreen() {
                 onPress={() => handleParentPress(item.parent_post_id!)}
               />
               {item.post_content && (
-                <Text className="text-base" numberOfLines={2}>
+                <Text className="text-base leading-6" numberOfLines={2}>
                   {item.post_content}
                 </Text>
               )}
@@ -352,7 +352,7 @@ export default function NotificationsScreen() {
           {/* いいね通知の場合：投稿内容のみ */}
           {item.type === 'like' && item.post_content && (
             <Text
-              className="text-base text-typography-500"
+              className="text-base leading-6 text-typography-500"
               numberOfLines={2}
             >
               {item.post_content}
