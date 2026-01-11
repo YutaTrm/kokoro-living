@@ -72,6 +72,10 @@
                         class="tab-button border-b-2 border-transparent py-4 px-1 text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium">
                     いいね一覧
                 </button>
+                <button onclick="showTab('goodThings')"
+                        class="tab-button border-b-2 border-transparent py-4 px-1 text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium">
+                    3GoodThings
+                </button>
             </nav>
         </div>
 
@@ -274,6 +278,39 @@
                     </button>
                     <span id="likesPageInfo" class="text-sm text-gray-600">ページ 1</span>
                     <button id="likesNext" onclick="nextLikesPage()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                        次へ →
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3GoodThings一覧 -->
+        <div id="goodThingsTab" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                    <h2 class="text-lg font-semibold">3GoodThings一覧</h2>
+                    <button onclick="loadGoodThings()" class="text-blue-500 hover:text-blue-600">
+                        🔄 更新
+                    </button>
+                </div>
+                <div class="px-6 py-3 border-b border-gray-200 flex justify-between items-center">
+                    <button id="goodThingsPrevTop" onclick="prevGoodThingsPage()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                        ← 前へ
+                    </button>
+                    <span id="goodThingsPageInfoTop" class="text-sm text-gray-600">ページ 1</span>
+                    <button id="goodThingsNextTop" onclick="nextGoodThingsPage()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                        次へ →
+                    </button>
+                </div>
+                <div id="goodThingsList" class="overflow-x-auto">
+                    <div class="text-center py-8 text-gray-500">読み込み中...</div>
+                </div>
+                <div class="px-6 py-4 border-t border-gray-200 flex justify-between items-center">
+                    <button id="goodThingsPrev" onclick="prevGoodThingsPage()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                        ← 前へ
+                    </button>
+                    <span id="goodThingsPageInfo" class="text-sm text-gray-600">ページ 1</span>
+                    <button id="goodThingsNext" onclick="nextGoodThingsPage()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">
                         次へ →
                     </button>
                 </div>

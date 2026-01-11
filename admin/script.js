@@ -15,6 +15,7 @@ let usersPage = 1;
 let checkinsPage = 1;
 let reflectionsPage = 1;
 let likesPage = 1;
+let goodThingsPage = 1;
 
 // ページ読み込み時の処理
 window.addEventListener('DOMContentLoaded', async () => {
@@ -130,6 +131,9 @@ function showTab(tabName) {
     } else if (tabName === 'likes') {
         document.getElementById('likesTab').classList.remove('hidden');
         loadLikes();
+    } else if (tabName === 'goodThings') {
+        document.getElementById('goodThingsTab').classList.remove('hidden');
+        loadGoodThings();
     }
 }
 
@@ -325,9 +329,53 @@ async function loadPosts() {
             parentPostsMap = new Map(parentPosts?.map(p => [p.id, p]) || []);
         }
 
+        // 引用元投稿の情報を取得
+        const quotedPostIds = posts.map(p => p.quoted_post_id).filter(Boolean);
+        let quotedPostsMap = new Map();
+        let quotedPostUsersMap = new Map();
+        if (quotedPostIds.length > 0) {
+            const { data: quotedPosts } = await supabaseAdmin
+                .from('posts')
+                .select('id, content, user_id')
+                .in('id', quotedPostIds);
+            quotedPostsMap = new Map(quotedPosts?.map(p => [p.id, p]) || []);
+
+            // 引用元投稿者の情報を取得
+            const quotedUserIds = [...new Set(quotedPosts?.map(p => p.user_id) || [])];
+            if (quotedUserIds.length > 0) {
+                const { data: quotedUsers } = await supabaseAdmin
+                    .from('users')
+                    .select('user_id, display_name')
+                    .in('user_id', quotedUserIds);
+                quotedPostUsersMap = new Map(quotedUsers?.map(u => [u.user_id, u]) || []);
+            }
+        }
+
+        // 各投稿のリポスト数を取得
+        const postIds = posts.map(p => p.id);
+        const { data: reposts } = await supabaseAdmin
+            .from('reposts')
+            .select('post_id')
+            .in('post_id', postIds);
+
+        // リポスト数をカウント
+        const repostCountMap = new Map();
+        reposts?.forEach(r => {
+            repostCountMap.set(r.post_id, (repostCountMap.get(r.post_id) || 0) + 1);
+        });
+
         const rows = posts.map(post => {
             const user = usersMap.get(post.user_id);
             const parentPost = post.parent_post_id ? parentPostsMap.get(post.parent_post_id) : null;
+            const quotedPost = post.quoted_post_id ? quotedPostsMap.get(post.quoted_post_id) : null;
+            const quotedPostUser = quotedPost ? quotedPostUsersMap.get(quotedPost.user_id) : null;
+            const repostCount = repostCountMap.get(post.id) || 0;
+
+            // 投稿タイプを判定（引用リポストのみバッジ表示、返信は↩アイコンで表示済み）
+            let postTypeBadge = '';
+            if (post.quoted_post_id) {
+                postTypeBadge = '<span class="px-2 py-1 text-xs font-semibold rounded bg-purple-100 text-purple-800 mr-1">引用</span>';
+            }
 
             return `
             <tr class="hover:bg-gray-50 ${post.is_hidden ? 'bg-red-50' : ''}">
@@ -341,8 +389,15 @@ async function loadPosts() {
                     </div>
                 </td>
                 <td class="px-6 py-4 max-w-md">
+                    ${postTypeBadge ? `<div class="mb-1">${postTypeBadge}</div>` : ''}
                     ${parentPost ? `<p class="text-xs text-gray-400 mb-1 truncate">↩ ${parentPost.content}</p>` : ''}
                     <p class="text-sm text-gray-800">${post.content}</p>
+                    ${quotedPost ? `
+                        <div class="mt-2 p-2 border border-gray-200 rounded bg-gray-50">
+                            <p class="text-xs text-gray-500 mb-1">引用: ${quotedPostUser?.display_name || '削除済み'}</p>
+                            <p class="text-xs text-gray-600 truncate">${quotedPost.content}</p>
+                        </div>
+                    ` : ''}
                 </td>
                 <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
                     ${new Date(post.created_at).toLocaleString('ja-JP', {
@@ -351,6 +406,9 @@ async function loadPosts() {
                         hour: '2-digit',
                         minute: '2-digit'
                     })}
+                </td>
+                <td class="px-6 py-4 text-center">
+                    ${repostCount > 0 ? `<span class="text-sm text-green-600 font-semibold">${repostCount}</span>` : '<span class="text-gray-400">-</span>'}
                 </td>
                 <td class="px-6 py-4">
                     ${post.is_hidden ? '<span class="px-3 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">非表示</span>' : '<span class="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">表示中</span>'}
@@ -379,6 +437,7 @@ async function loadPosts() {
                         <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ユーザー</th>
                         <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">内容</th>
                         <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">日時</th>
+                        <th class="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">リポスト数</th>
                         <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ステータス</th>
                         <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">操作</th>
                     </tr>
@@ -1171,6 +1230,123 @@ function nextLikesPage() {
     loadLikes();
 }
 
+// 3GoodThings一覧読み込み
+async function loadGoodThings() {
+    const container = document.getElementById('goodThingsList');
+    container.innerHTML = '<div class="text-center py-8 text-gray-500">読み込み中...</div>';
+
+    try {
+        // 全データを取得してグループ化
+        const { data: goodThings, error: goodThingsError } = await supabaseAdmin
+            .from('user_good_things')
+            .select('*')
+            .order('recorded_date', { ascending: false })
+            .order('display_order', { ascending: true });
+
+        if (goodThingsError) {
+            throw goodThingsError;
+        }
+
+        if (!goodThings || goodThings.length === 0) {
+            updatePagination('goodThings', goodThingsPage, 0);
+            container.innerHTML = '<div class="text-center py-8 text-gray-500">3GoodThingsはありません</div>';
+            return;
+        }
+
+        // ユーザー+日付でグループ化
+        const groupedMap = new Map();
+        goodThings.forEach(item => {
+            const key = `${item.user_id}_${item.recorded_date}`;
+            if (!groupedMap.has(key)) {
+                groupedMap.set(key, {
+                    user_id: item.user_id,
+                    recorded_date: item.recorded_date,
+                    items: [],
+                    created_at: item.created_at
+                });
+            }
+            groupedMap.get(key).items.push(item);
+        });
+
+        const grouped = Array.from(groupedMap.values());
+        const totalCount = grouped.length;
+
+        // ページング
+        const start = (goodThingsPage - 1) * PAGE_SIZE;
+        const end = start + PAGE_SIZE;
+        const pagedData = grouped.slice(start, end);
+
+        updatePagination('goodThings', goodThingsPage, totalCount);
+
+        // ユーザー情報を取得
+        const userIds = [...new Set(pagedData.map(g => g.user_id))];
+        const { data: users } = await supabaseAdmin
+            .from('users')
+            .select('user_id, display_name, avatar_url')
+            .in('user_id', userIds);
+
+        const usersMap = new Map(users?.map(u => [u.user_id, u]) || []);
+
+        const rows = pagedData.map(group => {
+            const user = usersMap.get(group.user_id);
+            const itemsHtml = group.items.map(item =>
+                `<div class="mb-1"><span class="text-xs text-gray-400 mr-1">${item.display_order}.</span>${item.content}</div>`
+            ).join('');
+
+            return `
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4">
+                    <div class="flex items-center gap-2">
+                        ${user?.avatar_url ?
+                            `<img src="${user.avatar_url}" class="w-8 h-8 rounded-full">` :
+                            '<div class="w-8 h-8 rounded-full bg-gray-300"></div>'
+                        }
+                        <span class="font-semibold text-gray-800">${user?.display_name || '削除済み'}</span>
+                    </div>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
+                    ${group.recorded_date}
+                </td>
+                <td class="px-6 py-4 max-w-md">
+                    <div class="text-sm text-gray-700">${itemsHtml}</div>
+                </td>
+            </tr>
+            `;
+        }).join('');
+
+        container.innerHTML = `
+            <table class="w-full">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ユーザー</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">記録日</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">内容</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    ${rows}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error('3GoodThings読み込みエラー:', error);
+        container.innerHTML = `<div class="text-center py-8 text-red-500">エラーが発生しました: ${error.message || error}</div>`;
+    }
+}
+
+// 3GoodThings一覧のページング
+function prevGoodThingsPage() {
+    if (goodThingsPage > 1) {
+        goodThingsPage--;
+        loadGoodThings();
+    }
+}
+
+function nextGoodThingsPage() {
+    goodThingsPage++;
+    loadGoodThings();
+}
+
 // ユーザー詳細を表示
 async function showUserDetail(userId) {
     try {
@@ -1381,3 +1557,6 @@ window.closeUserDetailModal = closeUserDetailModal;
 window.loadLikes = loadLikes;
 window.prevLikesPage = prevLikesPage;
 window.nextLikesPage = nextLikesPage;
+window.loadGoodThings = loadGoodThings;
+window.prevGoodThingsPage = prevGoodThingsPage;
+window.nextGoodThingsPage = nextGoodThingsPage;
