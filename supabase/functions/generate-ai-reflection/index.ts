@@ -93,6 +93,13 @@ serve(async (req) => {
       .eq('follower_id', userId)
       .gte('created_at', dataStartDate.toISOString());
 
+    // リポスト数
+    const { count: repostsCount } = await supabase
+      .from('reposts')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .gte('created_at', dataStartDate.toISOString());
+
     // 返信数（parent_post_id != null）
     const repliesCount = posts?.filter(p => p.parent_post_id !== null).length || 0;
 
@@ -104,8 +111,17 @@ serve(async (req) => {
       .gte('created_at', dataStartDate.toISOString())
       .order('created_at', { ascending: false });
 
-    // データ数チェック（投稿+チェックインの合計が5件以上必要）
-    const totalDataCount = (posts?.length || 0) + (checkins?.length || 0);
+    // 3GoodThings（いいことリスト）を取得
+    const { data: goodThings } = await supabase
+      .from('user_good_things')
+      .select('content, recorded_date, display_order')
+      .eq('user_id', userId)
+      .gte('recorded_date', dataStartDate.toISOString().split('T')[0])
+      .order('recorded_date', { ascending: false })
+      .order('display_order', { ascending: true });
+
+    // データ数チェック（投稿+チェックイン+3GoodThingsの合計が5件以上必要）
+    const totalDataCount = (posts?.length || 0) + (checkins?.length || 0) + (goodThings?.length || 0);
     if (totalDataCount < 5) {
       return new Response(
         JSON.stringify({
@@ -224,6 +240,28 @@ serve(async (req) => {
         }).join('\n')
       : 'なし';
 
+    // 3GoodThingsテキストを作成（日付ごとにグループ化）
+    let goodThingsText = 'なし';
+    if (goodThings && goodThings.length > 0) {
+      // 日付ごとにグループ化
+      const groupedByDate = new Map<string, string[]>();
+      goodThings.forEach((item: any) => {
+        const date = new Date(item.recorded_date).toLocaleDateString('ja-JP', jstOptions);
+        if (!groupedByDate.has(date)) {
+          groupedByDate.set(date, []);
+        }
+        groupedByDate.get(date)!.push(item.content);
+      });
+
+      // テキスト生成
+      const entries: string[] = [];
+      groupedByDate.forEach((items, date) => {
+        entries.push(`[${date}]\n${items.map((content, i) => `  ${i + 1}. ${content}`).join('\n')}`);
+      });
+      goodThingsText = entries.join('\n');
+    }
+    const goodThingsDaysCount = goodThings ? new Set(goodThings.map((g: any) => g.recorded_date)).size : 0;
+
     // 医療情報テキストを作成
     // - start_dateとend_dateがある → 完了（寛解、服薬終了など）
     // - start_dateのみ → 継続中
@@ -300,14 +338,18 @@ ${postsText}
 【気分チェックイン】
 ${checkinsText}
 
+【3GoodThings（いいことリスト）】
+${goodThingsText}
+
 【アクション統計】
 - いいね数: ${likesCount || 0}回
+- リポスト数: ${repostsCount || 0}回
 - 返信数: ${repliesCount}回
 - フォロー数: ${followsCount || 0}人
 
-この情報をもとに、ユーザーのこの期間を振り返り、前向きで共感的な感想を800文字程度で生成してください。
+この情報をもとに、ユーザーのこの期間を振り返り、前向きで共感的な感想を1000文字程度で生成してください。
 
-投稿内容だけでなく、気分チェックインの変化、いいねや返信などの他のユーザーとの交流についても前向きに言及してください。医療情報（診断名・服薬・治療）も踏まえて、ユーザーの状況に寄り添った言葉をかけてください。
+投稿内容だけでなく、気分チェックインの変化、3GoodThings（いいことリスト）の内容、いいねやリポスト・返信などの他のユーザーとの交流についても前向きに言及してください。医療情報（診断名・服薬・治療）も踏まえて、ユーザーの状況に寄り添った言葉をかけてください。
 
 過去の出来事について投稿している場合は、その時期の出来事として分析に含めてください。
 
@@ -317,7 +359,9 @@ ${checkinsText}
 期間: ${dateRangeText}
 投稿・返信: ${posts?.length || 0}件
 気分チェックイン: ${checkins?.length || 0}回
+3GoodThings: ${goodThingsDaysCount}日分
 いいね: ${likesCount || 0}回
+リポスト: ${repostsCount || 0}回
 フォロー: ${followsCount || 0}人`;
 
     const systemPrompt = `あなたはメンタルヘルスケアSNSの優しいAIアシスタントです。
@@ -329,16 +373,17 @@ ${checkinsText}
 - 前回の振り返り内容（ある場合）
 - 投稿・返信の内容（テキスト）と投稿時間
 - 気分チェックインの記録と変化
-- いいね数、返信数、フォロー数
+- 3GoodThings（いいことリスト）の記録
+- いいね数、リポスト数、返信数、フォロー数
 
 【振り返りの方針】
 - 前向きな感想を述べる
 - 頑張りや変化を褒める
-- 投稿内容だけでなく、気分チェックインの変化、いいねや返信などのアクションにも言及する
-- 他のユーザーとの交流（いいね、返信、フォロー）を前向きに評価する
+- 投稿内容だけでなく、気分チェックインの変化、3GoodThingsの内容、いいねやリポスト・返信などのアクションにも言及する
+- 他のユーザーとの交流（いいね、リポスト、返信、フォロー）を前向きに評価する
 - ユーザーの医療情報を踏まえて、その状況に寄り添った言葉をかける
 - アドバイスや指示はしない
-- 800文字程度で生成
+- 1000文字程度で生成
 
 【前回の振り返りへの言及】
 - 前回の振り返り内容がある場合は、それを踏まえて今回の振り返りを作成する
@@ -361,6 +406,13 @@ ${checkinsText}
 【気分チェックインへの言及】
 - チェックインの時間帯が毎日同じような時間（例：毎朝、毎晩など）で規則的な場合：習慣化できていることを褒める
 - チェックインと過去の出来事（投稿の「〇〇の出来事について」の部分）は関連付けない。チェックインはあくまでその日の気分を記録したもの
+
+【3GoodThings（いいことリスト）への言及】
+- 3GoodThingsとは、その日にあった良いことを3つ記録する習慣。ポジティブ心理学に基づいた手法
+- 記録している場合：日々の中で良いことを見つけようとしている姿勢を褒める
+- 複数日分の記録がある場合：継続できていることを褒める
+- 記録の内容に触れる場合：具体的な内容（例：「美味しいコーヒーを飲めた」「友達と話せた」など）を引用して共感する
+- 小さなことでも良いことを見つけられている視点を肯定する
 
 【トーン】
 - 友達のように親しみやすく、でも馴れ馴れしすぎない
@@ -439,7 +491,9 @@ ${checkinsText}
         stats: {
           postsCount: posts?.length || 0,
           checkinsCount: checkins?.length || 0,
+          goodThingsDaysCount,
           likesCount: likesCount || 0,
+          repostsCount: repostsCount || 0,
           repliesCount,
           followsCount: followsCount || 0,
           tokensUsed,
