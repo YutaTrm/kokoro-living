@@ -69,11 +69,6 @@ export default function ReplyScreen() {
     }
   };
 
-  const truncateText = (text: string, maxLen: number = 50) => {
-    const firstLine = text.split('\n')[0];
-    if (firstLine.length <= maxLen) return firstLine;
-    return firstLine.substring(0, maxLen) + '...';
-  };
 
   const handlePost = async () => {
     const content = contentRef.current;
@@ -153,8 +148,8 @@ export default function ReplyScreen() {
               <Text className="text-sm text-typography-500">
                 {parentPost.user.display_name}さんの投稿に返信:
               </Text>
-              <Text className="text-sm text-typography-500 mt-1" numberOfLines={2}>
-                {truncateText(parentPost.content)}
+              <Text className="text-sm text-typography-500 mt-1">
+                {parentPost.content}
               </Text>
             </Box>
           )}
