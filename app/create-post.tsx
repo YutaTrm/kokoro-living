@@ -73,7 +73,9 @@ export default function CreatePostScreen() {
 
         // prefillがある場合は初期値として設定
         if (prefill) {
-          setContent(prefill);
+          contentRef.current = prefill;
+          setContentLength(prefill.length);
+          setInitialContent(prefill);
         }
       }
     };
