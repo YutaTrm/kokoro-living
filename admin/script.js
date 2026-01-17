@@ -371,12 +371,6 @@ async function loadPosts() {
             const quotedPostUser = quotedPost ? quotedPostUsersMap.get(quotedPost.user_id) : null;
             const repostCount = repostCountMap.get(post.id) || 0;
 
-            // 投稿タイプを判定（引用リポストのみバッジ表示、返信は↩アイコンで表示済み）
-            let postTypeBadge = '';
-            if (post.quoted_post_id) {
-                postTypeBadge = '<span class="px-2 py-1 text-xs font-semibold rounded bg-purple-100 text-purple-800 mr-1">引用</span>';
-            }
-
             return `
             <tr class="hover:bg-gray-50 ${post.is_hidden ? 'bg-red-50' : ''}">
                 <td class="px-6 py-4">
@@ -389,7 +383,6 @@ async function loadPosts() {
                     </div>
                 </td>
                 <td class="px-6 py-4 max-w-md">
-                    ${postTypeBadge ? `<div class="mb-1">${postTypeBadge}</div>` : ''}
                     ${parentPost ? `<p class="text-xs text-gray-400 mb-1 truncate">↩ ${parentPost.content}</p>` : ''}
                     <p class="text-sm text-gray-800">${post.content}</p>
                     ${quotedPost ? `
@@ -400,12 +393,13 @@ async function loadPosts() {
                     ` : ''}
                 </td>
                 <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
-                    ${new Date(post.created_at).toLocaleString('ja-JP', {
+                    <div>${new Date(post.created_at).toLocaleString('ja-JP', {
                         month: '2-digit',
                         day: '2-digit',
                         hour: '2-digit',
                         minute: '2-digit'
-                    })}
+                    })}</div>
+                    ${post.experienced_at ? `<div class="text-xs text-blue-500 mt-1">体験: ${post.experienced_at.substring(0, 7)}</div>` : ''}
                 </td>
                 <td class="px-6 py-4 text-center">
                     ${repostCount > 0 ? `<span class="text-sm text-green-600 font-semibold">${repostCount}</span>` : '<span class="text-gray-400">-</span>'}
