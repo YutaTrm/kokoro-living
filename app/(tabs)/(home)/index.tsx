@@ -204,30 +204,21 @@ export default function TabOneScreen() {
       let rawPostsCount = 0; // フィルタリング前の件数を保持
 
       if (user) {
-        // ミュートしているユーザーIDを取得
-        const { data: mutesData } = await supabase
-          .from('mutes')
-          .select('muted_id')
-          .eq('muter_id', user.id);
+        // ミュート・ブロック・フォローを並列取得
+        const [mutesRes, blocksRes, blockedByRes, followsRes] = await Promise.all([
+          supabase.from('mutes').select('muted_id').eq('muter_id', user.id),
+          supabase.from('blocks').select('blocked_id').eq('blocker_id', user.id),
+          supabase.from('blocks').select('blocker_id').eq('blocked_id', user.id),
+          supabase.from('follows').select('following_id').eq('follower_id', user.id),
+        ]);
 
-        const mutedIds = mutesData?.map(m => m.muted_id) || [];
+        const mutedIds = mutesRes.data?.map(m => m.muted_id) || [];
+        const blockedIds = blocksRes.data?.map(b => b.blocked_id) || [];
+        const blockedByIds = blockedByRes.data?.map(b => b.blocker_id) || [];
+        const followingIds = followsRes.data?.map(f => f.following_id) || [];
 
         // すべての投稿が選択されている場合
         if (selectedListId === 'all') {
-          // ブロックしているユーザーIDを取得
-          const { data: blocksData } = await supabase
-            .from('blocks')
-            .select('blocked_id')
-            .eq('blocker_id', user.id);
-          const blockedIds = blocksData?.map(b => b.blocked_id) || [];
-
-          // 自分をブロックしているユーザーIDを取得
-          const { data: blockedByData } = await supabase
-            .from('blocks')
-            .select('blocker_id')
-            .eq('blocked_id', user.id);
-          const blockedByIds = blockedByData?.map(b => b.blocker_id) || [];
-
           const excludeUserIds = [...blockedIds, ...blockedByIds, ...mutedIds];
 
           // 全投稿を取得（ブロック・ミュートを除外）
@@ -281,13 +272,7 @@ export default function TabOneScreen() {
           postsData = filteredPosts;
           postsError = listError;
         } else {
-          // タイムライン: 自分がフォローしている人のIDを取得
-          const { data: followingData } = await supabase
-            .from('follows')
-            .select('following_id')
-            .eq('follower_id', user.id);
-
-          const followingIds = followingData?.map(f => f.following_id) || [];
+          // タイムライン: 自分とフォロー中ユーザー（既に並列取得済み）
           const timelineUserIds = [user.id, ...followingIds];
 
           // 自分とフォローしている人の投稿とリポストを並列取得
