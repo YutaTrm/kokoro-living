@@ -199,6 +199,9 @@ export default function TabOneScreen() {
         quoted_post_id: string | null;
         user_id: string;
         is_hidden: boolean;
+        replies_count: number;
+        likes_count: number;
+        reposts_count: number;
       }> = [];
       let postsError = null;
       let rawPostsCount = 0; // フィルタリング前の件数を保持
@@ -224,7 +227,7 @@ export default function TabOneScreen() {
           // 全投稿を取得（ブロック・ミュートを除外）
           let query = supabase
             .from('posts')
-            .select('id, content, created_at, experienced_at, quoted_post_id, user_id, is_hidden')
+            .select('id, content, created_at, experienced_at, quoted_post_id, user_id, is_hidden, replies_count, likes_count, reposts_count')
             .is('parent_post_id', null)
             .eq('is_hidden', false)
             .order('created_at', { ascending: false })
@@ -259,7 +262,7 @@ export default function TabOneScreen() {
           // リストメンバーの投稿を取得（非表示を除外）
           const { data: listPosts, error: listError } = await supabase
             .from('posts')
-            .select('id, content, created_at, experienced_at, quoted_post_id, user_id, is_hidden')
+            .select('id, content, created_at, experienced_at, quoted_post_id, user_id, is_hidden, replies_count, likes_count, reposts_count')
             .in('user_id', listMemberIds)
             .is('parent_post_id', null)
             .eq('is_hidden', false)
@@ -279,7 +282,7 @@ export default function TabOneScreen() {
           const [timelinePostsRes, repostsForTimeline] = await Promise.all([
             supabase
               .from('posts')
-              .select('id, content, created_at, experienced_at, quoted_post_id, user_id, is_hidden')
+              .select('id, content, created_at, experienced_at, quoted_post_id, user_id, is_hidden, replies_count, likes_count, reposts_count')
               .in('user_id', timelineUserIds)
               .is('parent_post_id', null)
               .order('created_at', { ascending: false })
@@ -299,7 +302,7 @@ export default function TabOneScreen() {
           if (repostedPostIds.length > 0) {
             const { data } = await supabase
               .from('posts')
-              .select('id, content, created_at, experienced_at, quoted_post_id, user_id, is_hidden')
+              .select('id, content, created_at, experienced_at, quoted_post_id, user_id, is_hidden, replies_count, likes_count, reposts_count')
               .in('id', repostedPostIds)
               .is('parent_post_id', null);
             repostedPostsData = data || [];
@@ -387,7 +390,7 @@ export default function TabOneScreen() {
         // 未ログイン: すべての投稿を取得（非表示を除外）
         const result = await supabase
           .from('posts')
-          .select('id, content, created_at, experienced_at, quoted_post_id, user_id, is_hidden')
+          .select('id, content, created_at, experienced_at, quoted_post_id, user_id, is_hidden, replies_count, likes_count, reposts_count')
           .is('parent_post_id', null)
           .eq('is_hidden', false)
           .order('created_at', { ascending: false })
@@ -435,8 +438,8 @@ export default function TabOneScreen() {
       );
 
       const { diagnosesMap, treatmentsMap, medicationsMap, statusesMap } = tagsResult;
-      const { repliesMap, likesMap, myLikesMap, myRepliesMap } = metadataResult;
-      const { repostsMap, myRepostsMap } = repostMetadataResult;
+      const { myLikesMap, myRepliesMap } = metadataResult;
+      const { myRepostsMap } = repostMetadataResult;
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const formattedPosts: Post[] = postsData.map((post: any) => ({
@@ -456,9 +459,9 @@ export default function TabOneScreen() {
         treatments: treatmentsMap.get(post.id) || [],
         medications: medicationsMap.get(post.id) || [],
         statuses: statusesMap.get(post.id) || [],
-        repliesCount: repliesMap.get(post.id) || 0,
-        likesCount: likesMap.get(post.id) || 0,
-        repostsCount: repostsMap.get(post.id) || 0,
+        repliesCount: post.replies_count || 0,
+        likesCount: post.likes_count || 0,
+        repostsCount: post.reposts_count || 0,
         isLikedByCurrentUser: myLikesMap.get(post.id) || false,
         isRepostedByCurrentUser: myRepostsMap.get(post.id) || false,
         hasRepliedByCurrentUser: myRepliesMap.get(post.id) || false,

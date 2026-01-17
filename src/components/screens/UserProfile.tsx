@@ -301,7 +301,7 @@ export default function UserDetailScreen() {
       const [postsResult, repostsResult, userRes] = await Promise.all([
         supabase
           .from('posts')
-          .select('id, content, created_at, user_id, experienced_at, quoted_post_id')
+          .select('id, content, created_at, user_id, experienced_at, quoted_post_id, replies_count, likes_count, reposts_count')
           .eq('user_id', id)
           .is('parent_post_id', null)
           .eq('is_hidden', false)
@@ -349,8 +349,25 @@ export default function UserDetailScreen() {
       ]);
 
       const { diagnosesMap, treatmentsMap, medicationsMap, statusesMap } = tagsResult;
-      const { repliesMap, likesMap, myLikesMap, myRepliesMap } = metadataResult;
-      const { repostsMap, myRepostsMap } = repostMetadataResult;
+      const { myLikesMap, myRepliesMap } = metadataResult;
+      const { myRepostsMap } = repostMetadataResult;
+
+      // 投稿IDからカウントを取得するためのマップを作成
+      const postCountsMap = new Map<string, { replies_count: number; likes_count: number; reposts_count: number }>();
+      postsData.forEach((p) => {
+        postCountsMap.set(p.id, {
+          replies_count: p.replies_count || 0,
+          likes_count: p.likes_count || 0,
+          reposts_count: p.reposts_count || 0,
+        });
+      });
+      repostPostsData.forEach((p) => {
+        postCountsMap.set(p.id, {
+          replies_count: p.replies_count || 0,
+          likes_count: p.likes_count || 0,
+          reposts_count: p.reposts_count || 0,
+        });
+      });
 
       // 通常投稿をフォーマット
       const formattedPosts: Post[] = postsData.map((post) => ({
@@ -370,9 +387,9 @@ export default function UserDetailScreen() {
         treatments: treatmentsMap.get(post.id) || [],
         medications: medicationsMap.get(post.id) || [],
         statuses: statusesMap.get(post.id) || [],
-        repliesCount: repliesMap.get(post.id) || 0,
-        likesCount: likesMap.get(post.id) || 0,
-        repostsCount: repostsMap.get(post.id) || 0,
+        repliesCount: post.replies_count || 0,
+        likesCount: post.likes_count || 0,
+        repostsCount: post.reposts_count || 0,
         isLikedByCurrentUser: myLikesMap.get(post.id) || false,
         isRepostedByCurrentUser: myRepostsMap.get(post.id) || false,
         hasRepliedByCurrentUser: myRepliesMap.get(post.id) || false,
@@ -386,6 +403,7 @@ export default function UserDetailScreen() {
         if (!originalPost) continue;
 
         const originalUser = repostUsersMap.get(originalPost.user_id);
+        const counts = postCountsMap.get(originalPost.id);
 
         formattedReposts.push({
           id: originalPost.id,
@@ -404,9 +422,9 @@ export default function UserDetailScreen() {
           treatments: treatmentsMap.get(originalPost.id) || [],
           medications: medicationsMap.get(originalPost.id) || [],
           statuses: statusesMap.get(originalPost.id) || [],
-          repliesCount: repliesMap.get(originalPost.id) || 0,
-          likesCount: likesMap.get(originalPost.id) || 0,
-          repostsCount: repostsMap.get(originalPost.id) || 0,
+          repliesCount: counts?.replies_count || 0,
+          likesCount: counts?.likes_count || 0,
+          repostsCount: counts?.reposts_count || 0,
           isLikedByCurrentUser: myLikesMap.get(originalPost.id) || false,
           isRepostedByCurrentUser: myRepostsMap.get(originalPost.id) || false,
           hasRepliedByCurrentUser: myRepliesMap.get(originalPost.id) || false,
@@ -453,7 +471,7 @@ export default function UserDetailScreen() {
       const currentOffset = loadMore ? replies.length : 0;
       const { data: repliesData, error: repliesError } = await supabase
         .from('posts')
-        .select('id, content, created_at, user_id, parent_post_id')
+        .select('id, content, created_at, user_id, parent_post_id, replies_count, likes_count')
         .eq('user_id', id)
         .not('parent_post_id', 'is', null)
         .eq('is_hidden', false)
@@ -485,7 +503,7 @@ export default function UserDetailScreen() {
       ]);
 
       const userData = userRes.data;
-      const { repliesMap, likesMap, myLikesMap, myRepliesMap } = metadataResult;
+      const { myLikesMap, myRepliesMap } = metadataResult;
 
       const formattedReplies: Post[] = repliesData.map((reply) => {
         const parentInfo = reply.parent_post_id ? parentInfoMap.get(reply.parent_post_id) : undefined;
@@ -506,8 +524,8 @@ export default function UserDetailScreen() {
           treatments: [],
           medications: [],
           statuses: [],
-          repliesCount: repliesMap.get(reply.id) || 0,
-          likesCount: likesMap.get(reply.id) || 0,
+          repliesCount: reply.replies_count || 0,
+          likesCount: reply.likes_count || 0,
           isLikedByCurrentUser: myLikesMap.get(reply.id) || false,
           hasRepliedByCurrentUser: myRepliesMap.get(reply.id) || false,
         };
@@ -540,7 +558,7 @@ export default function UserDetailScreen() {
       const currentOffset = loadMore ? likedPosts.length : 0;
       const { data: likesData, error: likesError } = await supabase
         .from('likes')
-        .select('post_id, posts!inner(id, content, created_at, user_id, experienced_at, parent_post_id)')
+        .select('post_id, posts!inner(id, content, created_at, user_id, experienced_at, parent_post_id, replies_count, likes_count)')
         .eq('user_id', id)
         .eq('posts.is_hidden', false)
         .order('created_at', { ascending: false })
@@ -582,7 +600,7 @@ export default function UserDetailScreen() {
       ]);
 
       const { diagnosesMap, treatmentsMap, medicationsMap, statusesMap } = tagsResult;
-      const { repliesMap, likesMap, myLikesMap, myRepliesMap } = metadataResult;
+      const { myLikesMap, myRepliesMap } = metadataResult;
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const formattedPosts: Post[] = likesData.map((like: any) => {
@@ -605,8 +623,8 @@ export default function UserDetailScreen() {
           treatments: treatmentsMap.get(like.posts.id) || [],
           medications: medicationsMap.get(like.posts.id) || [],
           statuses: statusesMap.get(like.posts.id) || [],
-          repliesCount: repliesMap.get(like.posts.id) || 0,
-          likesCount: likesMap.get(like.posts.id) || 0,
+          repliesCount: like.posts.replies_count || 0,
+          likesCount: like.posts.likes_count || 0,
           isLikedByCurrentUser: myLikesMap.get(like.posts.id) || false,
           hasRepliedByCurrentUser: myRepliesMap.get(like.posts.id) || false,
         };

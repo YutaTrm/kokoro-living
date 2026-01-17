@@ -57,72 +57,39 @@ export interface PostMetadata {
 }
 
 export interface PostMetadataMaps {
-  repliesMap: Map<string, number>;
-  likesMap: Map<string, number>;
   myLikesMap: Map<string, boolean>;
   myRepliesMap: Map<string, boolean>;
 }
 
 /**
- * 投稿IDリストに対する返信数・いいね数・現在ユーザーの状態を取得
+ * 投稿IDリストに対する現在ユーザーのいいね・返信状態を取得
+ * ※返信数・いいね数はpostsテーブルのキャッシュカラムから取得するため、ここでは取得しない
  */
 export async function fetchPostMetadata(
   postIds: string[],
   currentUserId: string | null
 ): Promise<PostMetadataMaps> {
-  if (postIds.length === 0) {
+  if (postIds.length === 0 || !currentUserId) {
     return {
-      repliesMap: new Map(),
-      likesMap: new Map(),
       myLikesMap: new Map(),
       myRepliesMap: new Map(),
     };
   }
 
-  const [repliesRes, likesRes, myLikesRes, myRepliesRes] = await Promise.all([
-    // 返信数
-    supabase
-      .from('posts')
-      .select('parent_post_id')
-      .in('parent_post_id', postIds),
-    // いいね数
+  const [myLikesRes, myRepliesRes] = await Promise.all([
+    // 現在ユーザーのいいね
     supabase
       .from('likes')
       .select('post_id')
+      .eq('user_id', currentUserId)
       .in('post_id', postIds),
-    // 現在ユーザーのいいね
-    currentUserId
-      ? supabase
-          .from('likes')
-          .select('post_id')
-          .eq('user_id', currentUserId)
-          .in('post_id', postIds)
-      : Promise.resolve({ data: [] }),
     // 現在ユーザーの返信
-    currentUserId
-      ? supabase
-          .from('posts')
-          .select('parent_post_id')
-          .eq('user_id', currentUserId)
-          .in('parent_post_id', postIds)
-      : Promise.resolve({ data: [] }),
+    supabase
+      .from('posts')
+      .select('parent_post_id')
+      .eq('user_id', currentUserId)
+      .in('parent_post_id', postIds),
   ]);
-
-  // 返信数マップ
-  const repliesMap = new Map<string, number>();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  repliesRes.data?.forEach((r: any) => {
-    const count = repliesMap.get(r.parent_post_id) || 0;
-    repliesMap.set(r.parent_post_id, count + 1);
-  });
-
-  // いいね数マップ
-  const likesMap = new Map<string, number>();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  likesRes.data?.forEach((l: any) => {
-    const count = likesMap.get(l.post_id) || 0;
-    likesMap.set(l.post_id, count + 1);
-  });
 
   // 自分のいいね・返信マップ
   const myLikesMap = new Map<string, boolean>();
@@ -136,7 +103,7 @@ export async function fetchPostMetadata(
     myRepliesMap.set(r.parent_post_id, true);
   });
 
-  return { repliesMap, likesMap, myLikesMap, myRepliesMap };
+  return { myLikesMap, myRepliesMap };
 }
 
 /**
@@ -296,56 +263,38 @@ export async function fetchQuotedPostInfo(
 }
 
 export interface RepostMetadataMaps {
-  repostsMap: Map<string, number>;
   myRepostsMap: Map<string, boolean>;
 }
 
 /**
- * 投稿IDリストに対するリポスト数・現在ユーザーのリポスト状態を取得
+ * 投稿IDリストに対する現在ユーザーのリポスト状態を取得
+ * ※リポスト数はpostsテーブルのキャッシュカラムから取得するため、ここでは取得しない
  */
 export async function fetchRepostMetadata(
   postIds: string[],
   currentUserId: string | null
 ): Promise<RepostMetadataMaps> {
-  if (postIds.length === 0) {
+  if (postIds.length === 0 || !currentUserId) {
     return {
-      repostsMap: new Map(),
       myRepostsMap: new Map(),
     };
   }
 
-  const [repostsRes, myRepostsRes] = await Promise.all([
-    // リポスト数
-    supabase
-      .from('reposts')
-      .select('post_id')
-      .in('post_id', postIds),
-    // 現在ユーザーのリポスト
-    currentUserId
-      ? supabase
-          .from('reposts')
-          .select('post_id')
-          .eq('user_id', currentUserId)
-          .in('post_id', postIds)
-      : Promise.resolve({ data: [] }),
-  ]);
-
-  // リポスト数マップ
-  const repostsMap = new Map<string, number>();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  repostsRes.data?.forEach((r: any) => {
-    const count = repostsMap.get(r.post_id) || 0;
-    repostsMap.set(r.post_id, count + 1);
-  });
+  // 現在ユーザーのリポスト
+  const { data: myRepostsData } = await supabase
+    .from('reposts')
+    .select('post_id')
+    .eq('user_id', currentUserId)
+    .in('post_id', postIds);
 
   // 自分のリポストマップ
   const myRepostsMap = new Map<string, boolean>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  myRepostsRes.data?.forEach((r: any) => {
+  myRepostsData?.forEach((r: any) => {
     myRepostsMap.set(r.post_id, true);
   });
 
-  return { repostsMap, myRepostsMap };
+  return { myRepostsMap };
 }
 
 export interface RepostForTimeline {
@@ -447,6 +396,9 @@ export interface RepostPostData {
   experienced_at: string | null;
   quoted_post_id: string | null;
   is_hidden?: boolean;
+  replies_count: number;
+  likes_count: number;
+  reposts_count: number;
 }
 
 /**
@@ -461,7 +413,7 @@ export async function fetchRepostPostsData(
 
   const { data } = await supabase
     .from('posts')
-    .select('id, content, created_at, user_id, experienced_at, quoted_post_id, is_hidden')
+    .select('id, content, created_at, user_id, experienced_at, quoted_post_id, is_hidden, replies_count, likes_count, reposts_count')
     .in('id', postIds)
     .eq('is_hidden', false);
 
