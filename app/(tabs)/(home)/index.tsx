@@ -65,6 +65,7 @@ export default function TabOneScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -157,6 +158,7 @@ export default function TabOneScreen() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsLoggedIn(!!session);
+      setCurrentUserId(session?.user?.id ?? null);
     });
 
     return () => subscription.unsubscribe();
@@ -165,14 +167,17 @@ export default function TabOneScreen() {
   // 画面にフォーカスが当たった時にタイムラインを再読み込み
   useFocusEffect(
     useCallback(() => {
-      loadPosts(true);
-    }, [selectedListId])
+      if (!loading) {
+        loadPosts(true);
+      }
+    }, [selectedListId, loading])
   );
 
   const checkLoginStatus = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     const loggedIn = !!session;
     setIsLoggedIn(loggedIn);
+    setCurrentUserId(session?.user?.id ?? null);
     setLoading(false);
   };
 
@@ -180,6 +185,8 @@ export default function TabOneScreen() {
     if (!reset && (!hasMore || loadingMore)) return;
 
     const currentOffset = reset ? 0 : posts.length;
+    const startTime = Date.now();
+    const logTime = (label: string) => console.log(`[Timeline] ${label}: ${Date.now() - startTime}ms`);
 
     try {
       if (reset) {
@@ -189,7 +196,8 @@ export default function TabOneScreen() {
         setLoadingMore(true);
       }
 
-      const { data: { user } } = await supabase.auth.getUser();
+      // currentUserIdはstateでキャッシュ済み（認証APIの呼び出しを省略して高速化）
+      logTime('1. userId from cache');
 
       let postsData: Array<{
         id: string;
@@ -206,15 +214,16 @@ export default function TabOneScreen() {
       let postsError = null;
       let rawPostsCount = 0; // フィルタリング前の件数を保持
 
-      if (user) {
+      if (currentUserId) {
         // ミュート・ブロック・フォローを並列取得
         const [mutesRes, blocksRes, blockedByRes, followsRes] = await Promise.all([
-          supabase.from('mutes').select('muted_id').eq('muter_id', user.id),
-          supabase.from('blocks').select('blocked_id').eq('blocker_id', user.id),
-          supabase.from('blocks').select('blocker_id').eq('blocked_id', user.id),
-          supabase.from('follows').select('following_id').eq('follower_id', user.id),
+          supabase.from('mutes').select('muted_id').eq('muter_id', currentUserId),
+          supabase.from('blocks').select('blocked_id').eq('blocker_id', currentUserId),
+          supabase.from('blocks').select('blocker_id').eq('blocked_id', currentUserId),
+          supabase.from('follows').select('following_id').eq('follower_id', currentUserId),
         ]);
 
+        logTime('2. mutes/blocks/follows parallel');
         const mutedIds = mutesRes.data?.map(m => m.muted_id) || [];
         const blockedIds = blocksRes.data?.map(b => b.blocked_id) || [];
         const blockedByIds = blockedByRes.data?.map(b => b.blocker_id) || [];
@@ -276,7 +285,7 @@ export default function TabOneScreen() {
           postsError = listError;
         } else {
           // タイムライン: 自分とフォロー中ユーザー（既に並列取得済み）
-          const timelineUserIds = [user.id, ...followingIds];
+          const timelineUserIds = [currentUserId, ...followingIds];
 
           // 自分とフォローしている人の投稿とリポストを並列取得
           const [timelinePostsRes, repostsForTimeline] = await Promise.all([
@@ -290,6 +299,7 @@ export default function TabOneScreen() {
             fetchRepostsForTimeline(timelineUserIds, LIMIT * 2, currentOffset),
           ]);
 
+          logTime('3. posts + reposts parallel');
           const { data: timelinePosts, error: timelineError } = timelinePostsRes;
           postsError = timelineError;
 
@@ -373,7 +383,7 @@ export default function TabOneScreen() {
           const filteredPosts = mergedPosts
             .filter(item => {
               const p = item.post;
-              if (p.user_id === user.id) return true; // 自分の投稿は常に表示
+              if (p.user_id === currentUserId) return true; // 自分の投稿は常に表示
               if (p.is_hidden) return false; // 他人の非表示投稿は除外
               if (mutedIds.includes(p.user_id)) return false; // ミュートユーザーは除外
               return true;
@@ -384,6 +394,7 @@ export default function TabOneScreen() {
               repostedBy: item.repostedBy,
             }));
 
+          logTime('4. repost posts + merge');
           postsData = filteredPosts;
         }
       } else {
@@ -425,11 +436,12 @@ export default function TabOneScreen() {
           .select('user_id, display_name, avatar_url')
           .in('user_id', postUserIds),
         fetchPostTags(postIds),
-        fetchPostMetadata(postIds, user?.id || null),
+        fetchPostMetadata(postIds, currentUserId),
         fetchQuotedPostInfo(quotedPostIds),
-        fetchRepostMetadata(postIds, user?.id || null),
+        fetchRepostMetadata(postIds, currentUserId),
       ]);
 
+      logTime('5. users/tags/metadata parallel');
       if (usersRes.error) throw usersRes.error;
 
       // ユーザー情報をマップに変換
@@ -469,6 +481,7 @@ export default function TabOneScreen() {
         timelineSortDate: post.timelineSortDate || post.created_at,
       }));
 
+      logTime('6. format complete');
       if (reset) {
         setPosts(formattedPosts);
       } else {
@@ -482,6 +495,7 @@ export default function TabOneScreen() {
     } catch (error) {
       console.error('投稿取得エラー:', error);
     } finally {
+      logTime('TOTAL');
       setLoadingPosts(false);
       setLoadingMore(false);
     }
